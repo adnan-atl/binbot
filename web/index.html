@@ -325,7 +325,7 @@ button{font:inherit}
 <div id="c-view">
 <fieldset class="binlist"><legend class="sr">Bins to remind me about</legend><div id="c-rows"></div></fieldset>
 <div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
-<a class="pill solid" href="#phone" style="width:100%">Yes, these are right</a>
+<a class="pill solid" id="c-yes" href="#phone" style="width:100%">Yes, these are right</a>
 <button type="button" class="ghost" id="c-edit">Something's off</button>
 </div>
 </div>
@@ -585,6 +585,7 @@ Share with your street
     ownLookup = null;
     req.then(function (j) {
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
+      note = j.shared && j.error ? j.error : '';
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
       calendarFailed = !bins.length;
@@ -605,7 +606,7 @@ Share with your street
       $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
     }).then(done);
   }
-  var ownLookup = null, shared = false;
+  var ownLookup = null, shared = false, note = '';
   $('#addr').addEventListener('change', function () { if (this.value) submitPostcode(); });
   // "These aren't my days": look this home up individually instead of reusing the street's round.
   document.addEventListener('click', function (e) {
@@ -693,13 +694,18 @@ Share with your street
       : editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
     $('#c-lede').textContent = empty ? (calendarFailed ? "BinBot couldn't read " + (API.council || 'your council') + "'s calendar this time. Tell it your bins and it'll keep an eye on the council for changes." : 'Add each bin with its day and how often it goes out.')
       : editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.'
-      : shared ? 'Your neighbours on ' + postcode + ' get these days. Same lorry, same street.' : '';
+      : note ? note : shared ? 'Your neighbours on ' + postcode + ' get these days. Same lorry, same street.' : '';
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
-    $('#c-lede').hidden = !editing && !shared;
+    $('#c-lede').hidden = !editing && !shared && !note;
     $('#c-own').hidden = !(editing && shared && API.live);
     $('#c-view').hidden = editing;
     $('#c-editor').hidden = !editing;
+    // Don't let people confirm a schedule we can't remind them about yet.
+    var missing = bins.filter(function (b) { return b.on !== false && !b.days.length; }).length;
+    $('#c-yes').textContent = missing ? 'Set the missing days' : 'Yes, these are right';
+    $('#c-yes').setAttribute('href', missing ? '#confirm' : '#phone');
+    $('#c-yes').dataset.missing = missing ? '1' : '';
     if (!editing) {
       $('#c-rows').innerHTML = bins.map(function (b) {
         var chosen = DAYS.filter(function (d) { return b.days.indexOf(d) > -1; });
@@ -750,8 +756,12 @@ Share with your street
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
   });
   $('#c-edit').addEventListener('click', function () { editing = true; renderConfirm(); });
+  document.addEventListener('click', function (e) {
+    var y = e.target.closest('#c-yes'); if (!y || !y.dataset.missing) return;
+    e.preventDefault(); e.stopImmediatePropagation(); editing = true; renderConfirm(); window.scrollTo(0, 0);
+  }, true);
   $('#c-save').addEventListener('click', function () { editing = false; adding = null; saveBins(); renderConfirm(); window.scrollTo(0, 0); });
-  $('#c-view').addEventListener('click', function (e) { if (e.target.closest('a[href="#phone"]')) saveBins(); });
+  $('#c-view').addEventListener('click', function (e) { var y = e.target.closest('#c-yes'); if (y && !y.dataset.missing) saveBins(); });
   // Add a bin: type, then day(s), then how often
   var TYPES = [
     { id: 'rec', name: 'Recycling', kind: 'Blue bin', color: '#2F6FEB', shape: 'wheelie' },
