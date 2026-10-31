@@ -57,6 +57,7 @@ class CouncilStatus(str, enum.Enum):
 class Frequency(str, enum.Enum):
     weekly = "weekly"
     fortnightly = "fortnightly"
+    three_weekly = "three_weekly"
     four_weekly = "four_weekly"
     irregular = "irregular"
 

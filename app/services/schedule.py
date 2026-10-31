@@ -29,6 +29,7 @@ from app.models import (
     Snapshot,
     now,
 )
+from app.services import checks as checker
 from app.services import geo
 from app.services.normalize import PURPOSE, categorise, colour_of, describe_rule
 
@@ -273,8 +274,12 @@ def _mark_success(council: Council):
 # ------------------------------------------------------------------ read model
 
 
-def schedule_for(db: Session, prop: Property) -> list[dict]:
-    """Bins for a round with a derived rule each. This is what step 3 shows."""
+def schedule_for(db: Session, prop: Property, with_checks: bool = False):
+    """
+    Bins for a round with a derived rule each. This is what step 3 shows. Frequencies go
+    through the checker (checks.py), which only claims one it can back up. With
+    with_checks=True returns (bins, checks).
+    """
     today = date.today()
     # Include recent past dates: councils that only publish "your next collection" reveal
     # their frequency over a few weekly refreshes, and past events are kept for that.
@@ -304,7 +309,11 @@ def schedule_for(db: Session, prop: Property) -> list[dict]:
             "frequency": rule["frequency"],
             "next": rule["next"],
             "dates": [e.date.isoformat() for e in evs[:8]],
+            "history": [e.date for e in all_evs],
         })
     order = ["recycling", "general", "food", "garden", "glass", "paper", "other"]
     out.sort(key=lambda b: order.index(b["category"]))
-    return out
+    council = prop.council
+    found = checker.run(out, council.name if council else "Your council",
+                        council.gss_code if council else None, today)
+    return (out, found) if with_checks else out
