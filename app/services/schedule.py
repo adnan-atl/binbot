@@ -92,13 +92,43 @@ def resolve_property(
     if prop is None:
         prop = Property(uprn=uprn, postcode=info.postcode, house_number=house_number,
                         address_line=address_line, council_id=council.id,
-                        lat=info.lat, lng=info.lng)
+                        lat=info.lat, lng=info.lng,
+                        round_key=postcode_round_key(council, info.postcode))
         db.add(prop)
         db.flush()
-        # Default cache key: one calendar per property. Collapsing to a council "round"
-        # is an adapter-level optimisation we can add per council later.
-        prop.round_key = f"p:{prop.id}"
     return prop
+
+
+def postcode_round_key(council: Council, postcode: str) -> str:
+    """
+    Default round: everyone on a postcode shares one calendar. A UK postcode is one
+    side of one street (15-40 homes) and the lorry drives streets, not houses, so the
+    first neighbour's lookup serves the whole postcode. Paid address lookups happen once
+    per postcode, not once per user. A home whose dates differ gets its own round via
+    own_round().
+    """
+    return f"pc:{council.gss_code}:{postcode}"
+
+
+def own_round(db: Session, prop: Property) -> None:
+    """Detach a property from its postcode round (its dates differ from the neighbours')."""
+    prop.round_key = f"p:{prop.id}"
+    db.flush()
+
+
+def round_has_calendar(db: Session, round_key: str) -> bool:
+    return db.scalar(
+        select(CollectionEvent.id).where(CollectionEvent.round_key == round_key,
+                                         CollectionEvent.date >= date.today()).limit(1)
+    ) is not None
+
+
+def representative_for(db: Session, round_key: str) -> Property | None:
+    """The property to fetch a round with: prefer one that has a UPRN."""
+    return db.scalar(
+        select(Property).where(Property.round_key == round_key)
+        .order_by(Property.uprn.is_(None), Property.created_at)
+    )
 
 
 # ------------------------------------------------------------------ fetching

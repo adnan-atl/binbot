@@ -14,7 +14,8 @@ class PostcodeOut(BaseModel):
     supported: bool
     needs_house_number: bool
     needs_uprn: bool
-    addresses: list[AddressOut]
+    round_known: bool = False  # a neighbour on this postcode already has a calendar
+    addresses: list[AddressOut] = Field(default_factory=list)
 
 
 class StartIn(BaseModel):
@@ -42,9 +43,16 @@ class StartOut(BaseModel):
     user_id: str
     property_id: str
     council: str
-    source: str  # council | manual | demo
+    source: str  # council | neighbours | manual | demo
     bins: list[BinOut]
+    shared: bool = False  # calendar reused from the postcode round, not fetched for this home
     error: str | None = None
+
+
+class OwnCalendarIn(BaseModel):
+    uprn: str | None = None
+    house_number: str | None = None
+    address_line: str | None = None
 
 
 class BinIn(BaseModel):

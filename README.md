@@ -22,7 +22,7 @@ export DATABASE_URL=sqlite:///binbot.db   # or a Postgres URL
 alembic upgrade head
 uvicorn app.main:app --reload             # API + UI
 python -m app.workers.main                # monitor + reminder dispatcher
-pytest                                    # 15 tests, no network needed
+pytest                                    # 17 tests, no network needed
 ```
 
 `DEMO_MODE=true` makes any postcode resolve to canned Hackney data with no outbound
@@ -50,6 +50,12 @@ postcode ──► postcodes.io ──► council (GSS code) ──► adapter �
 3. Councils look addresses up by **UPRN**, not postcode. Configure `ADDRESS_PROVIDER`
    (OS Places or getAddress.io) to offer a house picker. Without one, councils that
    need a UPRN (218 of 330) fall back to manual entry.
+   **Address lookups are paid, so they happen once per postcode, not per user.** The
+   default round key is `pc:<council>:<postcode>`: the first neighbour's lookup fetches
+   the street's calendar, everyone else on that postcode reuses it (`source=neighbours`,
+   no address lookup at all). A home whose dates differ hits "These aren't my days",
+   which detaches it to its own round (`POST /users/{id}/own-calendar`). The monitor
+   refreshes one representative property per round.
 4. Dates from the council are stored as concrete `CollectionEvent`s. "Every other
    Tuesday" is derived for display only; the council's dates win, including bank
    holiday moves.
@@ -85,8 +91,9 @@ A broken adapter never silences anyone: reminders keep running on the last good 
 ## API (one call per screen)
 
 ```
-GET  /api/postcode/{pc}                 council, support status, addresses
-POST /api/signup/start                  creates user + property, fetches calendar → bins
+GET  /api/postcode/{pc}                 council, support status, round_known; ?addresses=true runs the paid lookup
+POST /api/signup/start                  creates user + property, reuses the postcode round or fetches → bins
+POST /api/users/{id}/own-calendar       "not my days": own round + fresh fetch
 GET  /api/users/{id}/bins
 PUT  /api/users/{id}/bins               enable/disable, manual rules, add/remove
 POST /api/users/{id}/phone              WhatsApp number + consent
@@ -109,6 +116,7 @@ templates for anything sent outside a 24-hour reply window.
 - Address lookup needs an API key; there is no free UPRN source.
 - Scrapers are only as good as UKBinCollectionData's; expect a few to break each month.
   The health check tells you which.
-- `round_key` defaults to one calendar per property. Collapsing properties onto council
-  rounds (big scraping savings) is a per-council optimisation not yet done.
+- Postcode rounds assume one calendar per postcode. That holds for almost all of them;
+  the "not my days" path covers the exceptions, but nothing detects them automatically.
+- Local fixes for broken upstream scrapers live in `app/adapters/overrides.py`.
 - Bank holiday list in `monitor.py` is static; wire it to gov.uk/bank-holidays.json.

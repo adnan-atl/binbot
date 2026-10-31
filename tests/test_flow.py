@@ -1,7 +1,7 @@
 """The six screens, end to end, in demo mode (no network)."""
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.models import Outbox, Reminder, ReminderStatus
 from app.services.reminders import dispatch_due
@@ -19,6 +19,8 @@ def test_postcode_lookup(client):
     assert r.status_code == 200
     j = r.json()
     assert j["council"] == "Hackney" and j["supported"] is True
+    assert j["addresses"] == [] and j["round_known"] is False  # no paid lookup by default
+    j = client.get("/api/postcode/E8%203PB?addresses=true").json()
     assert len(j["addresses"]) == 5 and j["addresses"][0]["uprn"]
     assert client.get("/api/postcode/nope").status_code == 400
 
@@ -93,3 +95,29 @@ def test_dispatch_and_inbound(client, db):
 def test_health(client):
     j = client.get("/api/health").json()
     assert j["ok"] and j["coverage"]["councils"] > 300
+
+
+def test_neighbours_share_a_round(client, db):
+    """Second home on a postcode reuses the first one's calendar: no fetch, no address lookup."""
+    from sqlalchemy import select
+    from app.models import Property, Snapshot
+
+    first = signup(client)
+    assert first["shared"] is False and first["source"] == "demo"
+    assert client.get("/api/postcode/E8%203PB").json()["round_known"] is True
+
+    r = client.post("/api/signup/start", json={"postcode": "E8 3PB"})  # no uprn, no house
+    second = r.json()
+    assert second["shared"] is True and second["source"] == "neighbours"
+    assert sorted(b["label"] for b in second["bins"]) == sorted(b["label"] for b in first["bins"])
+    assert db.scalar(select(func.count()).select_from(Snapshot)) == 1
+    keys = {p.round_key for p in db.scalars(select(Property))}
+    assert len(keys) == 1 and keys.pop().startswith("pc:")
+
+    # "Not my days": detach, fetch own calendar, settings reseeded.
+    r = client.post(f"/api/users/{second['user_id']}/own-calendar",
+                    json={"uprn": "10000003", "house_number": "14"})
+    assert r.status_code == 200 and r.json()["shared"] is False
+    assert db.scalar(select(func.count()).select_from(Snapshot)) == 2
+    assert len({p.round_key for p in db.scalars(select(Property))}) == 2
+    assert len(client.get(f"/api/users/{second['user_id']}/bins").json()) == 4

@@ -26,7 +26,7 @@ from app.models import (
 )
 from app.providers.messaging import send_message
 from app.services.reminders import dispatch_due, rebuild_reminders
-from app.services.schedule import refresh_round
+from app.services.schedule import refresh_round, representative_for
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
 
     stats = {"checked": 0, "changed": 0, "failed": 0, "notified": 0}
     for key in stale_keys | never:
-        prop = db.scalar(select(Property).where(Property.round_key == key))
+        prop = representative_for(db, key)
         if not prop or not prop.council or prop.council.status == CouncilStatus.unsupported:
             continue
         res = refresh_round(db, prop)
@@ -122,6 +122,7 @@ def health_check(db: Session) -> dict:
         prop = db.scalar(
             select(Property).join(User, User.property_id == Property.id)
             .where(Property.council_id == c.id, User.status == UserStatus.active)
+            .order_by(Property.uprn.is_(None))  # prefer a home we can actually look up
         )
         if not prop:
             out["skipped"] += 1

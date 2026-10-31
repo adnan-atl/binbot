@@ -26,7 +26,16 @@ from app.models import (
 from app.services import geo
 from app.services.normalize import describe_rule
 from app.services.reminders import handle_inbound, rebuild_reminders
-from app.services.schedule import refresh_round, resolve_property, schedule_for
+from app.services.schedule import (
+    get_or_create_council,
+    own_round,
+    postcode_round_key,
+    refresh_round,
+    representative_for,
+    resolve_property,
+    round_has_calendar,
+    schedule_for,
+)
 
 router = APIRouter(prefix="/api")
 
@@ -42,18 +51,28 @@ def _user(db: Session, user_id: str) -> User:
 
 
 @router.get("/postcode/{postcode}", response_model=S.PostcodeOut)
-def postcode_lookup(postcode: str):
+def postcode_lookup(postcode: str, addresses: bool = False, db: Session = Depends(get_db)):
+    """
+    What we know about a postcode. `addresses=true` runs the (paid) address lookup; the
+    UI only asks for it when the council needs an address AND no neighbour has signed up
+    yet (round_known=false). Otherwise the first neighbour's calendar is reused for free.
+    """
     try:
         info = geo.lookup_postcode(postcode)
     except geo.BadPostcode:
         raise HTTPException(400, "That doesn't look like a UK postcode")
     spec = spec_for(info.gss_code)
+    council = get_or_create_council(db, info.gss_code, info.district)
+    known = round_has_calendar(db, postcode_round_key(council, info.postcode))
+    db.commit()
     return S.PostcodeOut(
         postcode=info.postcode, council=info.district, gss_code=info.gss_code,
         supported=spec is not None,
         needs_house_number=bool(spec and (spec.needs_house_number or spec.needs_uprn)),
         needs_uprn=bool(spec and spec.needs_uprn),
-        addresses=[S.AddressOut(**a.__dict__) for a in geo.lookup_addresses(info.postcode)],
+        round_known=known,
+        addresses=[S.AddressOut(**a.__dict__) for a in geo.lookup_addresses(info.postcode)]
+        if addresses else [],
     )
 
 
@@ -76,24 +95,64 @@ def signup_start(body: S.StartIn, db: Session = Depends(get_db)):
     db.add(user)
     db.flush()
 
-    source, error = "manual", None
+    source, error, shared = "manual", None, False
     if get_settings().demo_mode:
         source = "demo"
-    if council.status != CouncilStatus.unsupported:
+    if round_has_calendar(db, prop.round_key):
+        # A neighbour already fetched this postcode's round: reuse it, no lookup at all.
+        source, shared = "neighbours", True
+    elif council.status != CouncilStatus.unsupported:
         res = refresh_round(db, prop, source=source)
         if res.error:
             error = res.error
         else:
             source = source if source == "demo" else "council"
-            # Seed the user's bin settings from the council's bins.
-            for b in schedule_for(db, prop):
-                db.add(UserBinSetting(user_id=user.id, bin_type_id=b["bin_type_id"],
-                                      label=b["label"], category=BinCategory(b["category"])))
+    if not error:
+        _seed_settings(db, user, prop)
     if user.referred_by_id:
         db.add(Referral(referrer_id=user.referred_by_id, referred_id=user.id))
     db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=council.name,
-                      source=source if not error else "manual", error=error,
+                      source=source if not error else "manual", error=error, shared=shared,
+                      bins=_bins_out(db, user))
+
+
+def _seed_settings(db: Session, user: User, prop) -> None:
+    """One UserBinSetting per council bin on the property's round."""
+    for s in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id,
+                                                      UserBinSetting.bin_type_id.is_not(None),
+                                                      UserBinSetting.override_rule.is_(None))):
+        db.delete(s)
+    db.flush()
+    for b in schedule_for(db, prop):
+        db.add(UserBinSetting(user_id=user.id, bin_type_id=b["bin_type_id"],
+                              label=b["label"], category=BinCategory(b["category"])))
+    db.flush()
+
+
+@router.post("/users/{user_id}/own-calendar", response_model=S.StartOut)
+def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_db)):
+    """
+    'These aren't my days': detach this home from the postcode round and fetch its own
+    calendar. This is the one place a paid address lookup happens for a non-first neighbour.
+    """
+    user = _user(db, user_id)
+    prop = user.property
+    if prop is None:
+        raise HTTPException(400, "No property on this user")
+    if body.uprn:
+        prop.uprn, prop.house_number, prop.address_line = body.uprn, body.house_number, body.address_line
+    elif body.house_number:
+        prop.house_number, prop.address_line = body.house_number, body.address_line
+    own_round(db, prop)
+    source = "demo" if get_settings().demo_mode else "council"
+    res = refresh_round(db, prop, source=source)
+    error = res.error
+    if not error:
+        _seed_settings(db, user, prop)
+    db.commit()
+    return S.StartOut(user_id=user.id, property_id=prop.id, council=prop.council.name,
+                      source=source if not error else "manual", error=error, shared=False,
                       bins=_bins_out(db, user))
 
 
