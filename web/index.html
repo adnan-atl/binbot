@@ -325,7 +325,6 @@ button{font:inherit}
 </div>
 <div id="c-view">
 <fieldset class="binlist"><legend class="sr">Bins to remind me about</legend><div id="c-rows"></div></fieldset>
-<div id="c-gap" class="hint" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:14px 18px;border:1px dashed var(--line);border-radius:16px" hidden></div>
 <div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
 <a class="pill solid" id="c-yes" href="#phone" style="width:100%">Yes, these are right</a>
 <button type="button" class="ghost" id="c-edit">Something's off</button>
@@ -598,7 +597,6 @@ Share with your street
       fetching = false;
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
       note = j.shared && j.error ? j.error : '';
-      checks = j.checks || [];
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
       calendarFailed = !bins.length;
@@ -620,7 +618,7 @@ Share with your street
       $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
     }).then(done);
   }
-  var ownLookup = null, shared = false, note = '', checks = [];
+  var ownLookup = null, shared = false, note = '';
   $('#addr').addEventListener('change', function () { if (this.value) submitPostcode(); });
   // "These aren't my days": look this home up individually instead of reusing the street's round.
   document.addEventListener('click', function (e) {
@@ -697,7 +695,7 @@ Share with your street
   };
   var freqText = function (b) {
     var n = b.days.length;
-    if (b.freq === 'unknown') return 'How often: still checking';
+    if (b.freq === 'unknown') return '';  // never show doubt; the row just shows the day
     if (b.freq === 'weekly') return n === 2 ? 'Twice a week' : n > 2 ? n + '× a week' : 'Every week';
     return b.freq === 'fortnightly' ? 'Every 2 weeks' : b.freq === 'three' ? 'Every 3 weeks' : 'Every 4 weeks';
   };
@@ -753,21 +751,6 @@ Share with your street
           '<div style="display:flex;flex-direction:column;gap:10px"><span class="sublabel" id="f-' + b.id + '">How often</span><div role="group" aria-labelledby="f-' + b.id + '" style="display:flex;flex-direction:column;gap:6px">' + freqs + '</div></div></div>') + '</div>';
       }).join('');
     }
-    // What the checker couldn't confirm (missing bins, council sources disagreeing). Shown
-    // plainly, never hidden; a missing bin is one tap to add. Doesn't block confirming.
-    var have = bins.map(function (b) { return b.cat; });
-    var open = checks.filter(function (c) {
-      if (c.kind === 'missing_stream') return have.indexOf(c.category) < 0;
-      // A conflict is settled once the resident sets that bin's schedule themselves (source 1).
-      return !bins.some(function (b) { return b.cat === c.category && (b.dirty || b.manual); });
-    });
-    var gap = $('#c-gap');
-    gap.hidden = editing || empty || !open.length;
-    gap.style.flexDirection = 'column'; gap.style.alignItems = 'stretch';
-    gap.innerHTML = open.map(function (c, i) {
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span>' + esc(c.text) + '</span>' +
-        (c.kind === 'missing_stream' ? '<button type="button" class="ghost" data-addcheck="' + checks.indexOf(c) + '" style="white-space:nowrap">Add it</button>' : '') + '</div>';
-    }).join('');
     renderAdder();
   }
   $('#c-rows').addEventListener('change', function (e) {
@@ -792,17 +775,6 @@ Share with your street
   });
   $('#c-cards').addEventListener('input', function (e) {
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
-  });
-  var CHECK_TYPE = { recycling: 'rec', paper: 'rec', glass: 'rec', general: 'gen', food: 'food', garden: 'gar' };
-  var CHECK_FREQ = { 7: 'weekly', 14: 'fortnightly', 21: 'three', 28: 'monthly' };
-  var CHECK_NAME = { paper: 'Paper and card', glass: 'Glass' };
-  document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-addcheck]'); if (!t) return;
-    var c = checks[+t.dataset.addcheck];
-    editing = true;
-    adding = { type: CHECK_TYPE[c.category] || 'other', days: [], freq: CHECK_FREQ[c.every_days] || null, cat: c.category, name: CHECK_NAME[c.category] };
-    renderConfirm();
-    var el = $('#c-adder'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   $('#c-edit').addEventListener('click', function () { editing = true; renderConfirm(); });
   document.addEventListener('click', function (e) {
