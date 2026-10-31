@@ -37,6 +37,9 @@ def _run_module(spec: AdapterSpec, lookup: LookupInput) -> str:
         url,
         postcode=lookup.postcode,
         paon=lookup.house_number,
+        # 7 upstream modules (Lancaster, Chichester, Dover, East Ayrshire, Anglesey, Richmond,
+        # Midlothian) read the house number as `number`, the rest as `paon`. Send both.
+        number=lookup.house_number,
         uprn=lookup.uprn,
         skip_get_url=spec.skip_get_url,
         web_driver=settings.selenium_url or None,

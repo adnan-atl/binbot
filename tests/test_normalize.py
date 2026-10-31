@@ -93,3 +93,26 @@ def test_glasgow_override_reads_frequency_and_calendar():
     assert describe_rule([d for d in blue if d >= date(2026, 10, 31)])["frequency"] == "fortnightly"
     assert describe_rule([d for d in green if d >= date(2026, 10, 31)]) == {
         "days": ["SUN"], "frequency": "weekly", "next": "2026-11-01"}
+
+
+def test_house_number_reaches_modules_that_read_number(monkeypatch):
+    """Regression (Lancaster): some upstream modules read kwargs['number'], not 'paon'."""
+    import json as _json
+    import types
+    from app.adapters import ukbcd
+    from app.adapters.base import LookupInput
+    from app.adapters.registry import spec_for
+
+    seen = {}
+
+    class Fake:
+        def template_method(self, url, **kw):
+            seen.update(kw)
+            return _json.dumps({"bins": [{"type": "Recycling", "collectionDate": "03/11/2026"}]})
+
+    import uk_bin_collection.uk_bin_collection.collect_data as cd
+    monkeypatch.setattr(cd, "import_council_module",
+                        lambda name: types.SimpleNamespace(CouncilClass=Fake))
+    ukbcd.UKBCDAdapter(spec_for("E07000121")).fetch(
+        LookupInput(postcode="LA1 1AA", house_number="12"))
+    assert seen["number"] == "12" and seen["paon"] == "12"
