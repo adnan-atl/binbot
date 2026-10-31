@@ -19,6 +19,7 @@ from app.adapters.registry import library_version, spec_for
 from app.adapters.ukbcd import UKBCDAdapter
 from app.core.config import get_settings
 from app.models import (
+    BinCategory,
     BinType,
     ChangeLog,
     CollectionEvent,
@@ -29,7 +30,7 @@ from app.models import (
     now,
 )
 from app.services import geo
-from app.services.normalize import categorise, colour_of, describe_rule
+from app.services.normalize import PURPOSE, categorise, colour_of, describe_rule
 
 log = logging.getLogger(__name__)
 
@@ -63,10 +64,13 @@ def get_or_create_bin_type(db: Session, council: Council, label: str) -> BinType
     bt = db.scalar(
         select(BinType).where(BinType.council_id == council.id, BinType.council_label == label)
     )
+    cat = categorise(label, council.gss_code)
     if bt:
+        if bt.category == BinCategory.other and cat != BinCategory.other:
+            bt.category = cat  # we learned what this colour means for this council
         return bt
     bt = BinType(council_id=council.id, council_label=label,
-                 category=categorise(label), colour=colour_of(label))
+                 category=cat, colour=colour_of(label))
     db.add(bt)
     db.flush()
     return bt
@@ -270,23 +274,30 @@ def _mark_success(council: Council):
 def schedule_for(db: Session, prop: Property) -> list[dict]:
     """Bins for a round with a derived rule each. This is what step 3 shows."""
     today = date.today()
+    # Include recent past dates: councils that only publish "your next collection" reveal
+    # their frequency over a few weekly refreshes, and past events are kept for that.
     events = db.scalars(
         select(CollectionEvent).where(CollectionEvent.round_key == prop.round_key,
-                                      CollectionEvent.date >= today)
+                                      CollectionEvent.date >= today - timedelta(days=70))
         .order_by(CollectionEvent.date)
     ).all()
     by_bin: dict[str, list[CollectionEvent]] = {}
     for e in events:
         by_bin.setdefault(e.bin_type_id, []).append(e)
     out = []
-    for bt_id, evs in by_bin.items():
+    for bt_id, all_evs in by_bin.items():
+        evs = [e for e in all_evs if e.date >= today]
+        if not evs:
+            continue
         bt = evs[0].bin_type
-        rule = describe_rule([e.date for e in evs])
+        rule = describe_rule([e.date for e in all_evs])
+        rule["next"] = evs[0].date.isoformat()
         out.append({
             "bin_type_id": bt.id,
             "label": bt.council_label,
             "category": bt.category.value,
             "colour": bt.colour,
+            "purpose": PURPOSE[bt.category],
             "days": rule["days"],
             "frequency": rule["frequency"],
             "next": rule["next"],

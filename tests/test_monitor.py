@@ -93,3 +93,23 @@ def test_adapter_breakage_flags_council_and_keeps_old_dates(client, db, fake_ada
 def test_refresh_stale_polls_harder_near_bank_holiday():
     assert monitor.near_bank_holiday(date(2026, 12, 10), 21)
     assert not monitor.near_bank_holiday(date(2026, 10, 1), 21)
+
+
+def test_frequency_learned_from_weekly_refreshes(client, db, fake_adapter):
+    """A council that only publishes 'your next collection' still yields a frequency once
+    a few refreshes have been observed (past events are kept and used for the rule)."""
+    from app.services.schedule import schedule_for
+    from app.models import CollectionEvent
+
+    first = date.today() + timedelta(days=3)
+    fake_adapter["items"] = [RawCollection("Blue Bin", first)]
+    user = _signup_active(client, db)
+    assert schedule_for(db, user.property)[0]["frequency"] == "irregular"
+    # Simulate two fortnightly refreshes having happened in the past.
+    bt_id = db.scalar(select(CollectionEvent.bin_type_id))
+    for back in (14, 28):
+        db.add(CollectionEvent(round_key=user.property.round_key, bin_type_id=bt_id,
+                               date=first - timedelta(days=back)))
+    db.flush()
+    assert schedule_for(db, user.property)[0]["frequency"] == "fortnightly"
+    assert schedule_for(db, user.property)[0]["next"] == first.isoformat()
