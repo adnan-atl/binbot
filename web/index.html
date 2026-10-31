@@ -587,30 +587,38 @@ Share with your street
     ownLookup = null;
     // Show progress while the council answers (seconds for some sites), instead of a frozen
     // button followed by a replayed animation.
-    fetching = true; parseAt = 0;
+    fetching = true; parseAt = 0; hold = 1;
     PSTEPS[0].sub = API.council || 'Your council';
     PSTEPS[1].sub = 'Asking ' + (API.council || 'your council') + ' for your dates';
     PSTEPS[2] = { label: 'Match your road', sub: '' }; PSTEPS[3] = { label: 'Spot your bins', sub: '' };
-    setTimeout(function () { if (fetching) { PSTEPS[1].sub = 'Some council websites are slow. Nearly there…'; drawParsing(parseAt); } }, 6000);
+    setTimeout(function () { if (fetching) { PSTEPS[hold].sub = 'Some council websites are slow. Nearly there…'; drawParsing(parseAt); } }, 8000);
     go('parsing');
     req.then(function (j) {
-      fetching = false;
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
       note = j.shared && j.error ? j.error : '';
+      PSTEPS[0].sub = j.council || PSTEPS[0].sub;
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
+      if (!bins.length) return j;
+      // Calendar in hand: keep the loader on while BinBot double-checks it against the
+      // street (fills anything this address's calendar left out) before showing anything.
+      PSTEPS[1].sub = shared ? 'Same round as your neighbours on ' + postcode : 'Including bank holiday changes';
+      PSTEPS[2] = { label: 'Match your street', sub: 'Double-checking with your neighbours' };
+      hold = 2; drawParsing(parseAt = 2);
+      return api('POST', '/users/' + API.userId + '/verify').then(function (list) { bins = list.map(binFromApi); return j; },
+                                                                function () { return j; });
+    }).then(function (j) {
+      if (!j) return;
+      fetching = false;
       calendarFailed = !bins.length;
       var dayNames = []; bins.forEach(function (b) { b.days.forEach(function (d) { if (dayNames.indexOf(d) < 0) dayNames.push(d); }); });
-      PSTEPS[0].sub = j.council || PSTEPS[0].sub;
       if (calendarFailed) {
         PSTEPS[1].sub = "Couldn't read it this time. You'll set your bins yourself.";
-        PSTEPS[2].label = 'Collection days'; PSTEPS[2].sub = 'Add them on the next screen';
-        PSTEPS[3].label = 'No bins found yet'; PSTEPS[3].sub = 'Takes about 30 seconds';
+        PSTEPS[2] = { label: 'Collection days', sub: 'Add them on the next screen' };
+        PSTEPS[3] = { label: 'No bins found yet', sub: 'Takes about 30 seconds' };
       } else {
-        PSTEPS[1].sub = shared ? 'Same round as your neighbours on ' + postcode : 'Including bank holiday changes';
-        PSTEPS[2].label = shared ? 'Matched your street' : 'Matched your road'; PSTEPS[2].sub = (dayNames.map(function (d) { return LONG[d]; }).join(' and ') || 'Set') + ' collections';
-        PSTEPS[3].label = 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins');
-        PSTEPS[3].sub = bins.map(function (b) { return b.name; }).join(', ');
+        PSTEPS[2] = { label: shared ? 'Matched your street' : 'Matched your road', sub: (dayNames.map(function (d) { return LONG[d]; }).join(' and ') || 'Set') + ' collections' };
+        PSTEPS[3] = { label: 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins'), sub: bins.map(function (b) { return b.name; }).join(', ') };
       }
       if (current === 'parsing') runParsing(); else go('parsing');
     }).catch(function (e) {
@@ -658,11 +666,11 @@ Share with your street
     }).join('');
     $('#p-next').hidden = at < PSTEPS.length;
   }
-  var fetching = false, parseAt = 0;
+  var fetching = false, parseAt = 0, hold = 1;
   function runParsing() {
     clearInterval(timer);
-    // Council already known: tick it, spin on the calendar until the answer is in.
-    if (fetching) { parseAt = 1; drawParsing(parseAt); return; }
+    // Work still running: tick what's done, spin on the step in progress.
+    if (fetching) { parseAt = hold; drawParsing(parseAt); return; }
     // Answer is in: finish the remaining steps quickly. Demo mode keeps the slower show.
     var ms = API.live ? 220 : 900;
     if (!API.live) parseAt = 0;
