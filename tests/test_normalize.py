@@ -127,3 +127,33 @@ def test_os_door_uses_structured_fields():
     assert os_door({"BUILDING_NAME": "ROSE COTTAGE",
                     "ADDRESS": "ROSE COTTAGE, ELM ROAD, LANCASTER, LA1 1AA"}) == "ROSE COTTAGE"
     assert os_door({"ADDRESS": "12, ELM ROAD, LANCASTER, LA1 1AA"}) == "12"
+
+
+def test_postcode_and_address_lookups_are_cached(monkeypatch):
+    """One sign-up asks for the same postcode up to 3 times; only the first goes out."""
+    from types import SimpleNamespace
+    from app.services import geo
+
+    geo._cache.clear()
+    calls = []
+
+    class R:
+        status_code = 200
+        def __init__(self, url): self.url = url
+        def raise_for_status(self): pass
+        def json(self):
+            if "os.uk" in self.url:
+                return {"results": [{"DPA": {"UPRN": 1, "BUILDING_NUMBER": "92",
+                                             "ADDRESS": "92, ST. LEONARDS GATE, LANCASTER, LA1 1NN"}}]}
+            return {"result": {"postcode": "LA1 1NN", "codes": {"admin_district": "E07000121"},
+                               "admin_district": "Lancaster", "latitude": 0, "longitude": 0}}
+
+    monkeypatch.setattr(geo.httpx, "get", lambda url, **kw: calls.append(url) or R(url))
+    monkeypatch.setattr(geo, "get_settings", lambda: SimpleNamespace(
+        demo_mode=False, postcodes_io_url="https://api.postcodes.io",
+        address_provider="os_places", os_places_api_key="k", getaddress_api_key=None))
+    for _ in range(3):
+        assert geo.lookup_postcode("la11nn").gss_code == "E07000121"
+        assert geo.lookup_addresses("LA1 1NN")[0].house_number == "92"
+    assert len(calls) == 2
+    geo._cache.clear()

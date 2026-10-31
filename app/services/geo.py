@@ -1,5 +1,6 @@
 """Postcode -> council (GSS code) and postcode -> addresses (UPRN)."""
 import re
+import time
 from dataclasses import dataclass
 
 import httpx
@@ -37,6 +38,24 @@ class AddressHit:
     house_number: str | None
 
 
+# Postcodes don't move councils and addresses barely change, so cache both. A sign-up asks
+# for the same postcode up to three times (council check, address list, start), and the
+# address list is a paid OS Places call: cached, a second neighbour or a retry costs nothing.
+_TTL = 24 * 3600
+_cache: dict[tuple[str, str], tuple[float, object]] = {}
+
+
+def _cached(kind: str, pc: str, fn):
+    hit = _cache.get((kind, pc))
+    if hit and time.monotonic() - hit[0] < _TTL:
+        return hit[1]
+    val = fn()
+    if len(_cache) > 20_000:
+        _cache.clear()
+    _cache[(kind, pc)] = (time.monotonic(), val)
+    return val
+
+
 def lookup_postcode(postcode: str) -> PostcodeInfo:
     s = get_settings()
     pc = normalise_postcode(postcode)
@@ -44,6 +63,10 @@ def lookup_postcode(postcode: str) -> PostcodeInfo:
         from app.services.demo import demo_postcode
 
         return demo_postcode(pc)
+    return _cached("pc", pc, lambda: _fetch_postcode(s, pc))
+
+
+def _fetch_postcode(s, pc: str) -> PostcodeInfo:
     r = httpx.get(f"{s.postcodes_io_url}/postcodes/{pc.replace(' ', '%20')}", timeout=10)
     if r.status_code == 404:
         raise BadPostcode(pc)
@@ -91,6 +114,13 @@ def lookup_addresses(postcode: str) -> list[AddressHit]:
         from app.services.demo import demo_addresses
 
         return demo_addresses(pc)
+    out = _cached("addr", pc, lambda: _fetch_addresses(s, pc))
+    if not out:
+        _cache.pop(("addr", pc), None)  # don't remember "nothing" (provider down, no key yet)
+    return out
+
+
+def _fetch_addresses(s, pc: str) -> list[AddressHit]:
     if s.address_provider == "os_places" and s.os_places_api_key:
         r = httpx.get(
             "https://api.os.uk/search/places/v1/postcode",
