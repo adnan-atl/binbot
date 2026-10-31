@@ -113,20 +113,21 @@ def signup_start(body: S.StartIn, db: Session = Depends(get_db)):
     if user.referred_by_id:
         db.add(Referral(referrer_id=user.referred_by_id, referred_id=user.id))
     db.commit()
-    found = _checks(db, prop) if not error else []
+    if not error and not shared:  # neighbours reuse a round that was already checked
+        _log_checks(db, prop)
     db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=council.name,
                       source=source if not error else "manual", error=error, shared=shared,
-                      bins=_bins_out(db, user), checks=found)
+                      bins=_bins_out(db, user))
 
 
-def _checks(db: Session, prop) -> list[S.CheckOut]:
-    """Run the checker; disagreements between sources also go to the change log for review."""
+def _log_checks(db: Session, prop) -> None:
+    """Checker results are for ops, never shown to the resident: log them for review."""
     _, found = schedule_for(db, prop, with_checks=True)
     for c in found:
-        if c["kind"] == "conflict":
-            db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="data_conflict", diff=c))
-    return [S.CheckOut(**c) for c in found]
+        db.add(ChangeLog(scope="round", scope_id=prop.round_key,
+                         kind="data_conflict" if c["kind"] == "conflict" else "missing_stream",
+                         diff=c))
 
 
 def _seed_settings(db: Session, user: User, prop) -> None:
@@ -169,10 +170,10 @@ def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_
                           error="We couldn't find a separate calendar for that address, so "
                                 "you're still on your street's days.")
     _seed_settings(db, user, prop)
-    found = _checks(db, prop)
+    _log_checks(db, prop)
     db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=prop.council.name,
-                      source=source, shared=False, bins=_bins_out(db, user), checks=found)
+                      source=source, shared=False, bins=_bins_out(db, user))
 
 
 def _bins_out(db: Session, user: User) -> list[S.BinOut]:
