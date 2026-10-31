@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BinBot – bin day reminders on WhatsApp</title>
+<style>
+:root{--ink:#1A1A1A;--grey:#6E6E73;--soft:#8A8A8E;--tile:#F4F4F5;--line:#E5E5EA;--green:#45C654}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:var(--ink);background:#FFFFFF}
+a{color:inherit}
+button{font:inherit}
+[hidden]{display:none !important}
+.screen{min-height:100vh;display:flex;flex-direction:column}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Home */
+#home{background:#000000;color:#FFFFFF;height:100vh;height:100svh;min-height:0;overflow:hidden;position:relative}
+.home-head{width:100%;max-width:1200px;margin:0 auto;padding:24px 32px 0}
+.badge{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:10px;background:#FFFFFF;color:#000000;text-decoration:none;font-size:22px;font-weight:700;letter-spacing:-0.02em}
+.home-main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:clamp(28px,5vh,56px) 32px 0;display:flex;flex-direction:column;align-items:stretch;min-height:0}
+.home-copy{flex:none;display:flex;flex-direction:column;gap:clamp(16px,2.4vh,24px);max-width:1040px}
+.home-h{margin:0;font-size:clamp(50px,9.4vw,124px);line-height:.96;font-weight:800;letter-spacing:-0.045em}
+.home-p{margin:0;max-width:640px;font-size:clamp(19px,2.1vw,26px);line-height:1.35;font-weight:500;color:#9A9A9E}
+.home-p svg{vertical-align:-3px}
+.phone-col{display:flex;justify-content:center;flex:none;margin-top:clamp(48px,11vh,120px)}
+.home-cta{position:fixed;left:50%;transform:translateX(-50%);width:min(520px,calc(100% - 32px));bottom:calc(20px + env(safe-area-inset-bottom));margin:0 !important;z-index:10}
+.home-cta .cta{width:100%;min-height:68px;border-radius:999px;font-size:21px;color:#0B0B0B;box-shadow:0 12px 34px rgba(0,0,0,.5)}
+.cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 32px;border-radius:14px;text-decoration:none;font-size:19px;font-weight:600;color:#FFFFFF;background:var(--green);transition:filter .15s ease}
+.cta:hover{filter:brightness(1.06)}
+.phone-outline{position:relative;width:320px;height:650px;border-radius:52px;border:2.5px solid #E5E5EA;background:#000000;flex:none;box-shadow:0 0 0 7px #121214,0 -10px 80px rgba(255,255,255,.07)}
+.phone-outline i{position:absolute;display:block;border-radius:2px;background:#E5E5EA;width:3px}
+.island{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:96px;height:28px;border-radius:999px;background:#1C1C1E;z-index:5}
+.pscreen{position:absolute;inset:8px;border-radius:42px;overflow:hidden;background:#0D0D0F;color:#FFFFFF}
+.layer{position:absolute;inset:0;transition:opacity .5s ease}
+.lock{display:flex;flex-direction:column;align-items:center;padding-top:58px}
+.lock-time{font-size:68px;font-weight:300;letter-spacing:-0.02em;line-height:1}
+.lock-date{font-size:15px;font-weight:600;color:#C7C7CC;margin-top:8px}
+.notif{position:absolute;left:12px;right:12px;top:172px;background:rgba(58,58,62,.92);border-radius:20px;padding:12px 14px;display:flex;gap:10px;transition:transform .5s cubic-bezier(.2,.8,.2,1),opacity .5s ease}
+.notif-ic{width:34px;height:34px;border-radius:9px;background:#45C654;display:flex;align-items:center;justify-content:center;flex:none}
+.notif-top{display:flex;justify-content:space-between;font-size:12px;color:#AEAEB2}
+.notif b{display:block;font-size:14px;margin-top:2px}
+.notif p{margin:1px 0 0;font-size:13px;line-height:1.35;color:#E5E5EA}
+.chat{display:flex;flex-direction:column;background:#0B0B0D}
+.chat-top{padding:46px 14px 10px;display:flex;align-items:center;gap:10px;background:#1C1C1E}
+.chat-av{width:32px;height:32px;border-radius:999px;background:#FFFFFF;color:#000000;display:flex;align-items:center;justify-content:center;flex:none}
+.chat-body{flex:1;padding:12px 10px;display:flex;flex-direction:column;justify-content:flex-start;gap:7px}
+.bub{max-width:84%;font-size:13.5px;line-height:1.38;padding:8px 11px;border-radius:16px;transition:opacity .4s ease,transform .4s cubic-bezier(.2,.8,.2,1)}
+.bub.in{align-self:flex-start;background:#2C2C2E;border-bottom-left-radius:5px}
+.bub.out{align-self:flex-end;background:#1F6B33;border-bottom-right-radius:5px}
+.bub small{display:block;text-align:right;font-size:10px;color:rgba(255,255,255,.55);margin-top:3px}
+.qr{display:flex;gap:6px;flex-wrap:wrap;transition:opacity .4s ease}
+.qr span{font-size:12.5px;font-weight:600;border:1px solid #3A3A3C;border-radius:999px;padding:6px 10px;color:#FFFFFF}
+.chat-bar{padding:8px 10px 22px;background:#1C1C1E}
+.chat-bar div{background:#2C2C2E;border-radius:999px;padding:8px 12px;font-size:13px;color:#8E8E93}
+.anim[data-s="1"] .chat{opacity:0}
+.anim[data-s="2"] .lock,.anim[data-s="3"] .lock{opacity:0}
+.anim[data-s="0"] .notif{transform:translateY(-24px);opacity:0}
+.anim[data-s="0"] .chat{opacity:0}
+.anim:not([data-s="3"]) .s3{display:none}
+.anim[data-s="3"] .qr{display:none}
+.s3{animation:pop .45s cubic-bezier(.2,.8,.2,1) both}
+.s3 + .s3{animation-delay:.6s}
+@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.layer,.notif,.bub,.qr{transition:none}.s3{animation:none}}
+
+/* Flow shared */
+.bar{width:100%;max-width:1120px;margin:0 auto;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.stack-all{flex-direction:column;align-items:stretch !important}
+.back{width:44px;height:44px;margin-left:-10px;border:0;border-radius:999px;background:transparent;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+.back:hover{background:var(--tile)}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-mark{width:38px;height:38px;border-radius:12px;background:var(--ink);color:#FFFFFF;display:flex;align-items:center;justify-content:center}
+.logo b{font-size:18px;font-weight:800;letter-spacing:-0.02em}
+.step-of{font-size:15px;font-weight:600;color:var(--grey)}
+.progress{width:100%;max-width:1120px;margin:0 auto;padding:0 24px;display:flex;gap:6px}
+.seg{flex:1;height:4px;border-radius:999px;background:var(--line)}
+.seg.on{background:var(--ink)}
+.flow-main{flex:1;width:100%;max-width:1120px;margin:0 auto;padding:64px 24px;display:flex;justify-content:center;align-items:center}
+.col{flex:1 1 420px;max-width:480px;display:flex;flex-direction:column;gap:24px}
+.h1{margin:0;font-size:48px;line-height:1.04;font-weight:800;letter-spacing:-0.032em}
+.h1 span{color:var(--soft)}
+.lede{margin:0;font-size:19px;line-height:1.5;color:var(--grey)}
+.pill{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;text-decoration:none;font-weight:600;white-space:nowrap;border:0;cursor:pointer}
+.solid{background:var(--ink);color:#FFFFFF;padding:15px 26px;font-size:17px;min-height:56px}
+.solid:hover{background:#000000}
+.go{background:var(--green);color:var(--ink);padding:15px 26px;font-size:17px;min-height:56px}
+.go:hover{filter:brightness(0.95)}
+.ghost{background:transparent;border:0;padding:12px 4px;min-height:44px;cursor:pointer;color:var(--ink);font-size:15px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.row-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.lbl{font-size:15px;font-weight:600}
+.hint{font-size:14px;color:var(--grey)}
+
+/* Postcode */
+.field{width:100%;font:inherit;font-size:22px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:18px 20px;border-radius:18px;border:0;background:var(--tile);color:var(--ink);outline:none;min-height:64px}
+.field::placeholder{color:var(--soft);font-weight:600;letter-spacing:0;text-transform:none}
+.field:focus{box-shadow:0 0 0 2px var(--ink)}
+.error{font-size:14px;color:#B42318}
+
+/* Parsing */
+.pstep{display:flex;gap:14px;align-items:center;padding:16px 0;border-bottom:1px solid #F0F0F2}
+.mark{width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;flex:none}
+.mark.done{background:var(--ink)}
+.mark.todo{border:2px solid var(--line)}
+.spin{width:22px;height:22px;border-radius:999px;border:2.5px solid var(--line);border-top-color:var(--ink);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+/* Confirm */
+.wide-main{flex:1;width:100%;max-width:820px;margin:0 auto;padding:64px 24px 80px;display:flex;flex-direction:column;gap:32px}
+.center{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center}
+#c-view,#c-editor{width:100%;max-width:560px;margin:0 auto}
+.thead{padding:0 22px 10px;font-size:13px;font-weight:600;color:var(--grey)}
+.binlist{background:var(--tile);border-radius:22px;overflow:hidden;border:0;margin:0;padding:0}
+.binrow{padding:14px 16px;min-height:72px;border-bottom:1px solid var(--line);cursor:pointer}
+.binrow:last-child{border-bottom:0}
+.binrow input{width:22px;height:22px;accent-color:var(--ink);margin:0;cursor:pointer;justify-self:end}
+.binrow.off{opacity:.45}
+.c-name{display:flex;align-items:center;gap:12px;min-width:0}
+.binic{width:44px;height:44px;border-radius:12px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;flex:none}
+.c-days{display:flex;gap:6px;flex-wrap:wrap}
+.c-freq{display:none}
+.m-only{display:block}
+.m-freq{font-size:14px;font-weight:500;color:var(--grey);white-space:nowrap;margin-top:2px}
+.dot{width:12px;height:12px;border-radius:999px;flex:none}
+.daychip{display:inline-flex;align-items:center;justify-content:center;height:32px;min-width:52px;padding:2px 12px 0;box-sizing:border-box;border-radius:999px;background:var(--ink);color:#FFFFFF;font-size:14px;font-weight:700;line-height:1;letter-spacing:0.01em}
+.editcard{background:var(--tile);border-radius:22px;padding:20px 22px 22px;display:flex;flex-direction:column;gap:18px}
+.btypes{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.btype{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 6px 12px;border-radius:16px;border:2px solid transparent;background:#FFFFFF;cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);text-align:center;line-height:1.2}
+.btype small{font-size:12px;font-weight:500;color:var(--grey)}
+.btype[aria-pressed="true"]{border-color:var(--ink)}
+.btype:hover{border-color:#C7C7CC}
+.btype[aria-pressed="true"]:hover{border-color:var(--ink)}
+.addsec{display:flex;flex-direction:column;gap:10px;animation:rise .3s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.addsec{animation:none}}
+.editgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+.days{display:grid !important;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px !important}
+.days .day{width:auto;height:44px}
+.sublabel{font-size:13px;font-weight:600;color:var(--grey)}
+.day{font-size:14px;font-weight:600;border:1px solid #D1D1D6;border-radius:999px;width:44px;height:44px;cursor:pointer;padding:0;background:#FFFFFF;color:var(--ink)}
+.freq{font-size:15px;font-weight:600;border:1px solid #D1D1D6;border-radius:14px;padding:0 14px;min-height:44px;cursor:pointer;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#FFFFFF;color:var(--ink)}
+.day[aria-pressed="true"],.freq[aria-pressed="true"]{background:var(--ink);color:#FFFFFF;border-color:var(--ink)}
+.name{flex:1;min-width:0;font:inherit;font-size:19px;font-weight:700;letter-spacing:-0.01em;color:var(--ink);background:transparent;border:0;border-radius:10px;padding:8px 10px;margin-left:-10px;outline:none}
+.name:hover{background:#FFFFFF}
+.name:focus{background:#FFFFFF;box-shadow:0 0 0 2px var(--ink)}
+.x{width:44px;height:44px;border:0;border-radius:999px;background:transparent;color:var(--grey);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none}
+.x:hover{background:var(--line);color:var(--ink)}
+.add{font-size:16px;font-weight:600;border:1.5px dashed #C7C7CC;border-radius:22px;background:transparent;min-height:56px;cursor:pointer;color:var(--ink);width:100%}
+
+/* Reminders */
+.big{text-align:left;border:0;border-radius:22px;padding:18px 20px;cursor:pointer;display:flex;flex-direction:column;gap:4px;flex:1 1 180px;background:var(--tile);color:var(--ink)}
+.big small{font-size:14px;opacity:.75}
+.big b{font-size:17px}
+.opt{font-size:16px;font-weight:600;border:0;border-radius:999px;padding:12px 18px;min-height:44px;cursor:pointer;background:var(--tile);color:var(--ink)}
+.big[aria-pressed="true"],.opt[aria-pressed="true"]{background:var(--ink);color:#FFFFFF}
+
+
+/* Level reveal */
+.reveal{position:relative;overflow:hidden;border-radius:28px;background:#0B0B0D;color:#FFFFFF;padding:22px 20px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;isolation:isolate}
+.rays{position:absolute;left:50%;top:132px;width:640px;height:640px;margin:-320px 0 0 -320px;background:repeating-conic-gradient(from 0deg,rgba(69,198,84,.16) 0deg 9deg,transparent 9deg 22.5deg);-webkit-mask:radial-gradient(circle,#000 18%,transparent 62%);mask:radial-gradient(circle,#000 18%,transparent 62%);z-index:-1;opacity:0}
+.glow{position:absolute;left:50%;top:132px;width:220px;height:220px;margin:-110px 0 0 -110px;border-radius:50%;background:radial-gradient(circle,rgba(69,198,84,.55),rgba(69,198,84,0) 70%);z-index:-1;opacity:0}
+.rv-top{font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#45C654;opacity:0}
+.badge-wrap{position:relative;margin:18px 0 6px;width:128px;height:140px;transform:scale(0)}
+.shield{width:128px;height:140px;background:linear-gradient(180deg,#FFFFFF,#D9D9DE);clip-path:polygon(50% 0,96% 18%,96% 60%,50% 100%,4% 60%,4% 18%);display:flex;align-items:center;justify-content:center;color:#0B0B0D;padding-bottom:14px;box-sizing:border-box}
+.shield::after{content:"";position:absolute;inset:7px;clip-path:polygon(50% 0,96% 18%,96% 60%,50% 100%,4% 60%,4% 18%);border:0;background:transparent}
+.lvl{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);width:44px;height:44px;border-radius:50%;background:#45C654;color:#0B0B0D;font-size:22px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px #0B0B0D}
+.rv-name{margin-top:16px;font-size:34px;font-weight:900;letter-spacing:-.03em;line-height:1;opacity:0}
+.sparks{position:absolute;left:50%;top:132px;width:0;height:0}
+.sparks i{position:absolute;width:6px;height:6px;margin:-3px;border-radius:50%;background:#45C654;opacity:0}
+.sparks i:nth-child(even){background:#FFFFFF;width:4px;height:4px;margin:-2px}
+.ladder{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%;margin-top:22px;opacity:0}
+.rung{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#6E6E73}
+.rdot{width:28px;height:28px;border-radius:50%;background:#1C1C1E;color:#6E6E73;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900}
+.rung.on{color:#FFFFFF}
+.rung.on .rdot{background:#45C654;color:#0B0B0D}
+.xp{width:100%;margin-top:16px;opacity:0}
+.xp-bar{height:12px;border-radius:999px;background:#1C1C1E;overflow:hidden}
+.xp-fill{height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#45C654,#8BE89A)}
+.xp-txt{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:13px;color:#AEAEB2}
+.xp-txt b{color:#FFFFFF}
+.reveal.play .rays{animation:raysIn .6s .15s ease-out forwards,spin 24s linear infinite}
+.reveal.play .glow{animation:glowIn .7s .25s ease-out forwards}
+.reveal.play .rv-top{animation:fadeUp .4s .05s ease-out forwards}
+.reveal.play .badge-wrap{animation:slam .7s .2s cubic-bezier(.34,1.56,.64,1) forwards}
+.reveal.play .rv-name{animation:pop .5s .75s cubic-bezier(.34,1.56,.64,1) both}
+.reveal.play .ladder{animation:fadeUp .45s 1.05s ease-out forwards}
+.reveal.play .xp{animation:fadeUp .45s 1.2s ease-out forwards}
+.reveal.play .xp-fill{animation:fill 1s 1.5s cubic-bezier(.2,.8,.2,1) forwards}
+.reveal.play .sparks i{animation:burst .9s .55s ease-out forwards}
+.sparks i:nth-child(1){--x:-96px;--y:-58px}.sparks i:nth-child(2){--x:94px;--y:-64px}.sparks i:nth-child(3){--x:-118px;--y:16px}.sparks i:nth-child(4){--x:120px;--y:10px}
+.sparks i:nth-child(5){--x:-70px;--y:78px}.sparks i:nth-child(6){--x:76px;--y:82px}.sparks i:nth-child(7){--x:-20px;--y:-104px}.sparks i:nth-child(8){--x:26px;--y:-98px}
+@keyframes raysIn{to{opacity:1}}
+@keyframes glowIn{0%{opacity:0;transform:scale(.4)}60%{opacity:1;transform:scale(1.25)}100%{opacity:.75;transform:scale(1)}}
+@keyframes slam{0%{transform:scale(0) rotate(-12deg)}100%{transform:scale(1) rotate(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes burst{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--x),var(--y)) scale(.4)}}
+@keyframes fill{to{width:6%}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.reveal .rays,.reveal .glow,.reveal .rv-top,.reveal .rv-name,.reveal .ladder,.reveal .xp{opacity:1;animation:none !important}.reveal .badge-wrap{transform:none;animation:none !important}.reveal .xp-fill{width:6%;animation:none !important}.sparks{display:none}}
+
+/* Binfluencer */
+.linkbox{display:flex;gap:8px;align-items:center;background:var(--tile);border-radius:999px;padding:6px 6px 6px 18px}
+.linkbox input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:16px;font-weight:600;color:var(--ink);outline:none}
+.copy{font-size:15px;font-weight:600;border:0;border-radius:999px;padding:10px 16px;min-height:44px;background:var(--ink);color:#FFFFFF;cursor:pointer;flex:none}
+.levelcard{background:var(--tile);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:12px}
+
+@media (max-width:600px){.home-head{padding:20px 20px 0}.home-main{padding:28px 20px 0}.home-p{max-width:none}}
+@media (max-width:760px){
+.h1{font-size:36px}.lede{font-size:17px}
+.thead{display:none}
+.binrow.cols{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name days";column-gap:12px;padding:14px 16px;align-items:center}
+.c-name{grid-area:name;align-items:center}
+.m-only{display:block;white-space:nowrap}
+.c-name .binic{margin-top:0}
+.c-days{grid-area:days;justify-content:flex-end;align-items:center;flex-wrap:nowrap}
+.c-freq{display:none}
+.wide-main{padding:40px 16px 56px;gap:24px}
+.stack-sm{flex-direction:column;align-items:stretch !important}
+.days{display:grid !important;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px !important}
+.days .day{width:auto;height:44px}
+.bar,.progress{padding-left:16px;padding-right:16px}
+.editcard{padding:18px 16px 18px}
+.stack-sm .pill{width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- 1 · Home -->
+<section id="home" class="screen" data-screen="home">
+<header class="home-head"><a class="badge" href="#home" aria-label="BinBot home">BinBot</a></header>
+<main class="home-main">
+<div class="home-copy">
+<h1 class="home-h">Miss your bin collection dates?</h1>
+<p class="home-p">A <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#45C654"></circle><path d="M8.6 7.4c.3-.3.8-.3 1 .1l1 1.7c.2.3.1.7-.1 1l-.6.6c.5 1.1 1.3 1.9 2.4 2.4l.6-.6c.3-.2.7-.3 1-.1l1.7 1c.4.2.4.7.1 1l-.7.7c-.6.6-1.5.7-2.3.3-2-1-3.6-2.6-4.6-4.6-.4-.8-.3-1.7.3-2.3z" fill="#FFFFFF"></path></svg> <span style="color:#FFFFFF">WhatsApp</span> bot that reminds you which bin to put out, the night before collection.</p>
+<div class="home-cta" style="margin-top:18px"><a class="cta" href="#postcode">Add to WhatsApp</a></div>
+</div>
+<div class="phone-col" aria-hidden="true">
+<div class="phone-outline">
+<div class="island"></div>
+<div class="pscreen anim" id="anim" data-s="0">
+<div class="layer lock">
+<div class="lock-time">19:00</div>
+<div class="lock-date">Monday 2 November</div>
+<div class="notif">
+<div class="notif-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"></path></svg></div>
+<div style="flex:1;min-width:0"><div class="notif-top"><span>WhatsApp</span><span>now</span></div><b>BinBot</b><p>Recycling goes out tomorrow. Blue bin, kerbside by 7am.</p></div>
+</div>
+</div>
+<div class="layer chat">
+<div class="chat-top"><div class="chat-av"><svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle></svg></div><div><div style="font-size:15px;font-weight:700">BinBot</div><div style="font-size:11px;color:#8E8E93">online</div></div></div>
+<div class="chat-body">
+<div class="bub in">Evening! Recycling goes out tomorrow, Tue 3 Nov.<br>Blue bin, kerbside by 7am.<small>19:00</small></div>
+<div class="qr"><span>Done, it's out</span><span>Remind me at 9pm</span></div>
+<div class="bub out s3">Done, it's out<small>19:04</small></div>
+<div class="bub in s3">Nice one. Next up: general waste, Tue 10 Nov.<small>19:04</small></div>
+</div>
+<div class="chat-bar"><div>Message</div></div>
+</div>
+</div>
+<i style="top:120px;left:-5px;height:30px"></i>
+<i style="top:170px;left:-5px;height:54px"></i>
+<i style="top:236px;left:-5px;height:54px"></i>
+<i style="top:190px;right:-5px;height:84px"></i>
+</div>
+</div>
+</main>
+</section>
+
+<!-- 2 · Postcode -->
+<section class="screen" data-screen="postcode" data-step="1" hidden>
+<div data-bar></div>
+<main class="flow-main">
+<div class="col">
+<h1 class="h1">What's your postcode?</h1>
+<p class="lede">BinBot looks up your council and your road. You'll check the dates next, then choose where reminders go.</p>
+<div id="pc-form" style="display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<label for="pc" class="lbl">Postcode</label>
+<input id="pc" class="field" type="text" autocomplete="postal-code" placeholder="e.g. E8 3PB" value="E8 3PB" aria-describedby="pc-err">
+<span id="pc-err" class="error" hidden>Enter a UK postcode, like E8 3PB.</span>
+</div>
+<div><button type="button" class="pill go" id="pc-go">Find my bin days</button></div>
+</div>
+</div>
+</main>
+</section>
+
+<!-- 3 · Parsing -->
+<section class="screen" data-screen="parsing" data-step="2" hidden>
+<div data-bar></div>
+<main class="flow-main">
+<div class="col">
+<h1 class="h1">BinBot's on it<br><span>Reading your council's calendar</span></h1>
+<div id="psteps" aria-live="polite"></div>
+<div class="row-actions">
+<a class="pill solid" href="#confirm">See my dates</a>
+<a href="#postcode" style="font-size:15px;font-weight:600;padding:12px 4px">Change postcode</a>
+</div>
+</div>
+</main>
+</section>
+
+<!-- 4 · Confirm -->
+<section class="screen" data-screen="confirm" data-step="3" hidden>
+<div data-bar></div>
+<main class="wide-main">
+<div class="center">
+<h1 class="h1" id="c-title"></h1>
+<p class="lede" id="c-lede" style="max-width:520px"></p>
+</div>
+<div id="c-view">
+<fieldset class="binlist"><legend class="sr">Bins to remind me about</legend><div id="c-rows"></div></fieldset>
+<div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
+<a class="pill solid" href="#phone" style="width:100%">Yes, these are right</a>
+<button type="button" class="ghost" id="c-edit">Something's off</button>
+</div>
+</div>
+<div id="c-editor" hidden>
+<div id="c-cards" style="display:flex;flex-direction:column;gap:12px"></div>
+<div id="c-adder"></div>
+<button type="button" class="add" id="c-add" style="margin-top:12px">+ Add a bin</button>
+<div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
+<button type="button" class="pill solid" id="c-save" style="width:100%">Save changes</button>
+<span class="hint" style="text-align:center">Or tell BinBot in the chat, in your own words.</span>
+</div>
+</div>
+</main>
+</section>
+
+<!-- 5 · Phone -->
+<section class="screen" data-screen="phone" data-step="4" hidden>
+<div data-bar></div>
+<main class="flow-main">
+<div class="col">
+<h1 class="h1">Where should BinBot<br>message you?</h1>
+<p class="lede">Your WhatsApp number. BinBot only uses it to send your bin reminders.</p>
+<div style="display:flex;flex-direction:column;gap:8px">
+<label for="tel" class="lbl">WhatsApp number</label>
+<div style="display:flex;gap:8px">
+<span aria-hidden="true" style="display:flex;align-items:center;justify-content:center;min-width:84px;border-radius:18px;background:var(--tile);font-size:20px;font-weight:700">+44</span>
+<input id="tel" class="field" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="7700 900123" value="7700 900123" aria-describedby="tel-err tel-hint" style="text-transform:none;letter-spacing:0.02em">
+</div>
+<span id="tel-err" class="error" hidden>Enter a UK mobile number, like 7700 900123.</span>
+<span id="tel-hint" class="hint">By continuing, you agree to get bin reminders on WhatsApp. Reply STOP any time.</span>
+</div>
+<div><button type="button" class="pill solid" id="tel-go">Continue</button></div>
+</div>
+</main>
+</section>
+
+<!-- 6 · Reminders -->
+<section class="screen" data-screen="reminders" data-step="5" hidden>
+<div data-bar></div>
+<main class="flow-main" style="padding-top:56px">
+<div class="col" style="gap:44px">
+<h1 class="h1">When should<br>BinBot nudge you?</h1>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span class="lbl" id="when-l">Day</span>
+<div role="group" aria-labelledby="when-l" id="whens" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px"></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span class="lbl" id="time-l">Time</span>
+<div role="group" aria-labelledby="time-l" id="times" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"></div>
+</div>
+<div style="display:flex;flex-direction:column;align-items:stretch;gap:12px">
+<a class="pill go" href="#binfluencer" style="width:100%;min-height:68px;font-size:21px">Turn on reminders</a>
+<span class="hint" style="text-align:center">Reply STOP to turn them off.</span>
+</div>
+</div>
+</main>
+</section>
+
+<!-- 7 · Binfluencer -->
+<section class="screen" data-screen="binfluencer" data-step="6" hidden>
+<div data-bar></div>
+<main class="flow-main" style="padding-top:32px">
+<div class="col">
+<div class="reveal" id="reveal" role="img" aria-label="Level 1 unlocked: Bin rookie. Invite 1 neighbour to reach Kerbside regular.">
+<div class="rays" aria-hidden="true"></div>
+<div class="glow" aria-hidden="true"></div>
+<div class="sparks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<div class="rv-top" aria-hidden="true">Level unlocked</div>
+<div class="badge-wrap" aria-hidden="true">
+<div class="shield"><svg viewBox="0 0 40 40" width="58" height="58" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><path d="M17 26c1.8 1.4 4.2 1.4 6 0"></path></svg></div>
+<div class="lvl">1</div>
+</div>
+<div class="rv-name" aria-hidden="true">Bin rookie</div>
+<div class="ladder" aria-hidden="true">
+<div class="rung on"><span class="rdot">1</span><span>Rookie</span></div>
+<div class="rung"><span class="rdot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span><span>Kerbside</span></div>
+<div class="rung"><span class="rdot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span><span>Captain</span></div>
+<div class="rung"><span class="rdot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span><span>Binfluencer</span></div>
+</div>
+<div class="xp" aria-hidden="true">
+<div class="xp-bar"><div class="xp-fill"></div></div>
+<div class="xp-txt"><span>Next: <b>Kerbside regular</b></span><span>0 / 1 neighbour</span></div>
+</div>
+</div>
+<h1 class="h1">You're all set<br><span>Now become a binfluencer</span></h1>
+<p class="lede">Every neighbour who joins levels you up. Five, and you're a binfluencer.</p>
+<div style="display:flex;flex-direction:column;gap:8px">
+<label for="link" class="lbl">Your invite link</label>
+<div class="linkbox">
+<input id="link" type="text" readonly value="binbot.app/j/[CODE]">
+<button type="button" class="copy" id="copy" aria-live="polite">Copy</button>
+</div>
+</div>
+<a class="pill go" id="wa-share" href="#" target="_blank" rel="noopener" style="width:100%;min-height:68px;font-size:21px">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"></path><path d="M9 10h.01M12 10h.01M15 10h.01"></path></svg>
+Share with your street
+</a>
+</div>
+</main>
+</section>
+
+<template id="bar-tpl">
+<header class="bar">
+<div style="display:flex;align-items:center;gap:6px">
+<button type="button" class="back" data-back aria-label="Back"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
+<a class="logo" href="#home" aria-label="BinBot home">
+<span class="logo-mark"><svg viewBox="0 0 40 40" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><path d="M17 26c1.8 1.4 4.2 1.4 6 0"></path></svg></span>
+<b>BinBot</b>
+</a>
+</div>
+<span class="step-of"></span>
+</header>
+<div class="progress" aria-hidden="true"><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
+</template>
+
+<script>
+(function () {
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var esc = function (t) { return String(t).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
+
+  // Shared header + progress on each flow step
+  document.querySelectorAll('[data-bar]').forEach(function (slot) {
+    var step = +slot.closest('[data-step]').dataset.step;
+    slot.appendChild($('#bar-tpl').content.cloneNode(true));
+    slot.querySelector('.step-of').textContent = 'Step ' + step + ' of 6';
+    slot.querySelectorAll('.progress .seg').forEach(function (s, i) { if (i < step) s.classList.add('on'); });
+  });
+
+  // Routing
+  var timer = null;
+  function show() {
+    var id = current;
+    var target = document.querySelector('[data-screen="' + id + '"]') ? id : 'home';
+    document.querySelectorAll('[data-screen]').forEach(function (s) { s.hidden = s.dataset.screen !== target; });
+    document.body.style.background = target === 'home' ? '#000000' : '#FFFFFF';
+    window.scrollTo(0, 0);
+    clearInterval(timer);
+    if (target === 'parsing') runParsing();
+    if (target === 'confirm') renderConfirm();
+    if (target === 'reminders') renderReminders();
+    
+    if (target === 'postcode') setTimeout(function () { $('#pc').focus(); }, 50);
+    if (target === 'phone') setTimeout(function () { $('#tel').focus(); }, 50);
+    if (target === 'binfluencer') { var rv = $('#reveal'); rv.classList.remove('play'); void rv.offsetWidth; rv.classList.add('play'); }
+  }
+  var current = 'home';
+  function go(id) { current = id; try { history.replaceState(null, '', '#' + id); } catch (e) {} show(); }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    e.preventDefault();
+    go(a.getAttribute('href').slice(1) || 'home');
+  });
+
+  // Back
+  var ORDER_SCREENS = ['home', 'postcode', 'parsing', 'confirm', 'phone', 'reminders', 'binfluencer'];
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-back]')) return;
+    if (current === 'confirm' && editing) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
+    var i = ORDER_SCREENS.indexOf(current);
+    go(ORDER_SCREENS[Math.max(0, i - 1)]);
+  });
+
+  // ---- API layer. Falls back to the built-in demo data when the API isn't reachable.
+  var API = { base: (window.BINBOT_API || '') + '/api', live: false, userId: null, council: null };
+  function api(method, path, body) {
+    return fetch(API.base + path, { method: method, headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || r.status); return j; }); });
+  }
+  api('GET', '/health').then(function () { API.live = true; }).catch(function () { API.live = false; });
+  var DAY_IN = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
+  var DAY_OUT = { Mon: 'MON', Tue: 'TUE', Wed: 'WED', Thu: 'THU', Fri: 'FRI', Sat: 'SAT', Sun: 'SUN' };
+  var FREQ_IN = { weekly: 'weekly', fortnightly: 'fortnightly', four_weekly: 'monthly', irregular: 'weekly' };
+  var FREQ_OUT = { weekly: 'weekly', fortnightly: 'fortnightly', monthly: 'four_weekly' };
+  var CAT_META = { recycling: { color: '#2F6FEB', kind: 'Blue bin' }, general: { color: '#3A3A3C', kind: 'Black bin' },
+    food: { color: '#8B5E3C', kind: 'Caddy', shape: 'caddy' }, garden: { color: '#34A853', kind: 'Green bin' },
+    glass: { color: '#2A9D8F', kind: 'Glass box' }, paper: { color: '#5B6CFF', kind: 'Paper' }, other: { color: '#AEAEB2', kind: '' } };
+  function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso + 'T12:00:00'); return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', ''); }
+  function binFromApi(b) {
+    var m = CAT_META[b.category] || CAT_META.other;
+    return { id: b.setting_id, name: b.label, kind: m.kind, days: (b.days || []).map(function (d) { return DAY_IN[d]; }),
+      freq: FREQ_IN[b.frequency] || 'weekly', next0: fmtDate(b.next), color: m.color, shape: m.shape, cat: b.category, on: b.enabled !== false };
+  }
+  function binToApi(b) {
+    var o = { setting_id: b.id && b.id.indexOf('new') !== 0 ? b.id : null, label: b.name, category: b.cat || 'other', enabled: b.on !== false };
+    // Only send a rule for bins the user changed or added; untouched bins keep council dates.
+    if (b.dirty || !o.setting_id) { o.days = b.days.map(function (d) { return DAY_OUT[d]; }); o.frequency = FREQ_OUT[b.freq] || 'weekly'; }
+    return o;
+  }
+  function saveBins() {
+    if (!API.live || !API.userId) return Promise.resolve();
+    var payload = { bins: bins.map(binToApi), removed: removedIds };
+    removedIds = [];
+    return api('PUT', '/users/' + API.userId + '/bins', payload)
+      .then(function (list) { bins = list.map(binFromApi); if (!editing) renderConfirm(); }).catch(function () {});
+  }
+  var removedIds = [];
+
+  // Postcode
+  var postcode = '';
+  $('#pc').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPostcode(); });
+  $('#pc-go').addEventListener('click', submitPostcode);
+  function submitPostcode() {
+    var v = $('#pc').value.trim().toUpperCase().replace(/\s+/g, ' ');
+    var ok = /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/.test(v);
+    $('#pc-err').hidden = ok;
+    $('#pc').setAttribute('aria-invalid', ok ? 'false' : 'true');
+    if (!ok) return;
+    postcode = v;
+    if (!API.live) { go('parsing'); return; }
+    var btn = $('#pc-go'); btn.disabled = true; btn.textContent = 'Looking up…';
+    var ref = (location.search.match(/[?&]ref=([^&]+)/) || [])[1] || null;
+    api('POST', '/signup/start', { postcode: v, referral_code: ref }).then(function (j) {
+      API.userId = j.user_id; API.council = j.council;
+      if (j.bins && j.bins.length) bins = j.bins.map(binFromApi);
+      PSTEPS[0].sub = j.council || PSTEPS[0].sub;
+      PSTEPS[3].label = 'Spotted ' + bins.length + ' bins';
+      PSTEPS[3].sub = bins.map(function (b) { return b.name; }).join(', ');
+      if (j.error) { PSTEPS[1].sub = "Couldn't read it. You can set the days yourself."; }
+      go('parsing');
+    }).catch(function (e) {
+      $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
+    }).then(function () { btn.disabled = false; btn.textContent = 'Find my bin days'; });
+  }
+
+  // Phone
+  var phone = '';
+  function submitPhone() {
+    var d = $('#tel').value.replace(/[^\d+]/g, '').replace(/^\+44/, '0').replace(/^44/, '0');
+    if (d.charAt(0) !== '0') d = '0' + d;
+    var ok = /^07\d{9}$/.test(d);
+    $('#tel-err').hidden = ok;
+    $('#tel').setAttribute('aria-invalid', ok ? 'false' : 'true');
+    if (!ok) return;
+    phone = '+44 ' + d.slice(1, 5) + ' ' + d.slice(5);
+    if (!API.live || !API.userId) { go('reminders'); return; }
+    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true }).then(function () { go('reminders'); })
+      .catch(function (e) { $('#tel-err').textContent = e.message; $('#tel-err').hidden = false; });
+  }
+  $('#tel-go').addEventListener('click', submitPhone);
+  $('#tel').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPhone(); });
+
+  // Parsing
+  var PSTEPS = [
+    { label: 'Found your council', sub: '[COUNCIL NAME]' },
+    { label: 'Read the collection calendar', sub: 'Including bank holiday changes' },
+    { label: 'Matched your road', sub: 'Tuesday collections' },
+    { label: 'Spotted 4 bins', sub: 'Recycling, general, food, garden' }
+  ];
+  function drawParsing(at) {
+    $('#psteps').innerHTML = PSTEPS.map(function (s, i) {
+      var mark = i < at ? '<div class="mark done"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></div>'
+        : i === at ? '<div class="mark"><div class="spin"></div></div>' : '<div class="mark todo"></div>';
+      return '<div class="pstep">' + mark + '<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:700;color:' + (i > at ? '#8A8A8E' : '#1A1A1A') + '">' + s.label + '</span><span class="hint">' + s.sub + '</span></div></div>';
+    }).join('');
+  }
+  function runParsing() {
+    var at = 0; drawParsing(at);
+    timer = setInterval(function () { at++; drawParsing(at); if (at >= PSTEPS.length) clearInterval(timer); }, 900);
+  }
+
+  // Confirm
+  var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var LONG = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+  var NEXT = { Fri: 'Fri 30 Oct', Sat: 'Sat 31 Oct', Sun: 'Sun 1 Nov', Mon: 'Mon 2 Nov', Tue: 'Tue 3 Nov', Wed: 'Wed 4 Nov', Thu: 'Thu 5 Nov' };
+  var ORDER = ['Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu'];
+  var FREQ = [
+    { id: 'weekly', label: 'Every week', hint: '' },
+    { id: 'fortnightly', label: 'Every 2 weeks', hint: 'Alternate weeks' },
+    { id: 'monthly', label: 'Every 4 weeks', hint: 'Or monthly' }
+  ];
+  var bins = [
+    { id: 'rec', name: 'Recycling', kind: 'Blue bin', days: ['Tue'], freq: 'fortnightly', next0: 'Tue 3 Nov', color: '#2F6FEB', cat: 'recycling', on: true },
+    { id: 'gen', name: 'General waste', kind: 'Black bin', days: ['Tue'], freq: 'fortnightly', next0: 'Tue 10 Nov', color: '#3A3A3C', cat: 'general', on: true },
+    { id: 'food', name: 'Food waste', kind: 'Caddy', days: ['Tue'], freq: 'weekly', next0: 'Tue 3 Nov', color: '#8B5E3C', shape: 'caddy', cat: 'food', on: true },
+    { id: 'gar', name: 'Garden', kind: 'Green bin', days: ['Tue'], freq: 'monthly', next0: 'Tue 17 Nov', color: '#34A853', cat: 'garden', on: true }
+  ];
+  var seq = 1, editing = false;
+  var nextOf = function (b) {
+    if (!b.days.length) return '–';
+    if (b.next0) return b.next0;
+    return NEXT[ORDER.find(function (d) { return b.days.indexOf(d) > -1; })];
+  };
+  var freqText = function (b) {
+    var n = b.days.length;
+    if (b.freq === 'weekly') return n === 2 ? 'Twice a week' : n > 2 ? n + '× a week' : 'Every week';
+    return b.freq === 'fortnightly' ? 'Every 2 weeks' : 'Every 4 weeks';
+  };
+  var find = function (id) { return bins.filter(function (b) { return b.id === id; })[0]; };
+
+  function renderConfirm() {
+    $('#c-title').innerHTML = editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
+    $('#c-lede').textContent = editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.' : '';
+    $('#c-lede').hidden = !editing;
+    $('#c-view').hidden = editing;
+    $('#c-editor').hidden = !editing;
+    if (!editing) {
+      $('#c-rows').innerHTML = bins.map(function (b) {
+        var chosen = DAYS.filter(function (d) { return b.days.indexOf(d) > -1; });
+        var chips = !chosen.length ? '<span class="hint">Not set</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
+        return '<div class="cols binrow">' +
+          '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span>' +
+          '<span class="m-only m-freq">' + freqText(b) + '</span></span></span>' +
+          '<span class="c-days">' + chips + '</span>' +
+          '<span class="c-freq">' + freqText(b) + '</span>' +
+          '</div>';
+      }).join('');
+    } else {
+      $('#c-cards').innerHTML = bins.map(function (b) {
+        var days = DAYS.map(function (d) { return '<button type="button" class="day" data-day="' + b.id + ':' + d + '" aria-pressed="' + (b.days.indexOf(d) > -1) + '" aria-label="' + LONG[d] + '">' + d.slice(0, 2) + '</button>'; }).join('');
+        var freqs = FREQ.map(function (f) { return '<button type="button" class="freq" data-freq="' + b.id + ':' + f.id + '" aria-pressed="' + (b.freq === f.id) + '"><span>' + f.label + '</span><span style="font-size:13px;font-weight:500;opacity:.7">' + f.hint + '</span></button>'; }).join('');
+        return '<div class="editcard">' +
+          '<div style="display:flex;align-items:center;gap:12px"><span class="binic">' + binSvg(b, 40) + '</span><label class="sr" for="n-' + b.id + '">Bin name</label><input id="n-' + b.id + '" class="name" data-name="' + b.id + '" value="' + esc(b.name) + '">' +
+          '<button type="button" class="x" data-remove="' + b.id + '" aria-label="Remove ' + esc(b.name) + '"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>' +
+          '<div class="editgrid"><div style="display:flex;flex-direction:column;gap:10px"><span class="sublabel" id="d-' + b.id + '">Collection day</span><div role="group" class="days" aria-labelledby="d-' + b.id + '" style="display:flex;gap:6px;flex-wrap:wrap">' + days + '</div><span style="font-size:13px;color:#6E6E73">Collected twice a week? Pick both days.</span></div>' +
+          '<div style="display:flex;flex-direction:column;gap:10px"><span class="sublabel" id="f-' + b.id + '">How often</span><div role="group" aria-labelledby="f-' + b.id + '" style="display:flex;flex-direction:column;gap:6px">' + freqs + '</div></div></div></div>';
+      }).join('');
+    }
+    renderAdder();
+  }
+  $('#c-rows').addEventListener('change', function (e) {
+    var id = e.target.dataset.toggle; if (!id) return;
+    find(id).on = e.target.checked; renderConfirm();
+  });
+  $('#c-cards').addEventListener('click', function (e) {
+    var t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.day) {
+      var p = t.dataset.day.split(':'), b = find(p[0]), i = b.days.indexOf(p[1]);
+      if (i > -1) b.days.splice(i, 1); else b.days.push(p[1]);
+      b.dirty = true;
+      t.setAttribute('aria-pressed', i === -1);
+    } else if (t.dataset.freq) {
+      var q = t.dataset.freq.split(':'); find(q[0]).freq = q[1]; find(q[0]).dirty = true; renderConfirm();
+    } else if (t.dataset.remove) {
+      if (t.dataset.remove.indexOf('new') !== 0) removedIds.push(t.dataset.remove);
+      bins = bins.filter(function (b) { return b.id !== t.dataset.remove; }); renderConfirm();
+    }
+  });
+  $('#c-cards').addEventListener('input', function (e) {
+    var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
+  });
+  $('#c-edit').addEventListener('click', function () { editing = true; renderConfirm(); });
+  $('#c-save').addEventListener('click', function () { editing = false; adding = null; saveBins(); renderConfirm(); window.scrollTo(0, 0); });
+  $('#c-view').addEventListener('click', function (e) { if (e.target.closest('a[href="#phone"]')) saveBins(); });
+  // Add a bin: type, then day(s), then how often
+  var TYPES = [
+    { id: 'rec', name: 'Recycling', kind: 'Blue bin', color: '#2F6FEB', shape: 'wheelie' },
+    { id: 'gen', name: 'General waste', kind: 'Black bin', color: '#3A3A3C', shape: 'wheelie' },
+    { id: 'gar', name: 'Garden', kind: 'Green bin', color: '#34A853', shape: 'wheelie' },
+    { id: 'food', name: 'Food waste', kind: 'Caddy', color: '#8B5E3C', shape: 'caddy' },
+    { id: 'other', name: 'Other bin', kind: 'Any colour', color: '#AEAEB2', shape: 'wheelie' }
+  ];
+  function binSvg(t, size) {
+    size = size || 52;
+    if (t.shape === 'caddy') {
+      return '<svg viewBox="0 0 60 60" width="' + size + '" height="' + size + '" aria-hidden="true"><ellipse cx="30" cy="54" rx="20" ry="2.5" fill="#E5E5EA"></ellipse><path d="M22 26c0-10 16-10 16 0" stroke="' + t.color + '" stroke-width="2.5" fill="none"></path><rect x="14" y="26" width="32" height="7" rx="3" fill="' + t.color + '"></rect><path d="M16 33h28l-3 20H19z" fill="' + t.color + '"></path></svg>';
+    }
+    return '<svg viewBox="0 0 60 60" width="' + size + '" height="' + size + '" aria-hidden="true"><ellipse cx="30" cy="55" rx="22" ry="2.5" fill="#E5E5EA"></ellipse><rect x="10" y="8" width="40" height="7" rx="3" fill="' + t.color + '"></rect><rect x="25" y="4" width="10" height="5" rx="2" fill="' + t.color + '"></rect><path d="M13 15h34l-3 38H16z" fill="' + t.color + '"></path><path d="M19 22h22" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"></path><circle cx="41" cy="53" r="3.5" fill="#1A1A1A"></circle></svg>';
+  }
+  var adding = null;
+  function renderAdder() {
+    $('#c-add').hidden = !!adding;
+    if (!adding) { $('#c-adder').innerHTML = ''; return; }
+    var a = adding;
+    var html = '<div class="editcard" style="margin-top:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><b style="font-size:19px;letter-spacing:-0.01em">Add a bin</b>' +
+      '<button type="button" class="x" data-acancel="1" aria-label="Cancel adding a bin"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>' +
+      '<div class="addsec" style="animation:none"><span class="sublabel" id="a-type">1. What type of bin?</span><div class="btypes" role="group" aria-labelledby="a-type">' +
+      TYPES.map(function (t) { return '<button type="button" class="btype" data-atype="' + t.id + '" aria-pressed="' + (a.type === t.id) + '">' + binSvg(t) + '<span>' + t.name + '</span><small>' + t.kind + '</small></button>'; }).join('') +
+      '</div></div>';
+    if (a.type) {
+      html += '<div class="addsec"><span class="sublabel" id="a-days">2. Which day is it collected?</span><div class="days" role="group" aria-labelledby="a-days" style="display:flex;gap:6px;flex-wrap:wrap">' +
+        DAYS.map(function (d) { return '<button type="button" class="day" data-aday="' + d + '" aria-pressed="' + (a.days.indexOf(d) > -1) + '" aria-label="' + LONG[d] + '">' + d.slice(0, 2) + '</button>'; }).join('') +
+        '</div><span style="font-size:13px;color:#6E6E73">Collected twice a week? Pick both days.</span></div>';
+    }
+    if (a.type && a.days.length) {
+      html += '<div class="addsec"><span class="sublabel" id="a-freq">3. How often?</span><div role="group" aria-labelledby="a-freq" style="display:flex;flex-direction:column;gap:6px">' +
+        FREQ.map(function (f) { return '<button type="button" class="freq" data-afreq="' + f.id + '" aria-pressed="' + (a.freq === f.id) + '"><span>' + f.label + '</span><span style="font-size:13px;font-weight:500;opacity:.7">' + f.hint + '</span></button>'; }).join('') +
+        '</div></div>';
+    }
+    if (a.type && a.days.length && a.freq) {
+      var t = TYPES.filter(function (x) { return x.id === a.type; })[0];
+      html += '<div class="addsec"><button type="button" class="pill solid" data-acommit="1" style="width:100%">Add ' + t.name.toLowerCase() + '</button></div>';
+    }
+    $('#c-adder').innerHTML = html + '</div>';
+  }
+  $('#c-add').addEventListener('click', function () {
+    adding = { type: null, days: [], freq: null };
+    renderAdder();
+    setTimeout(function () { var el = $('#c-adder .editcard'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); var f = $('#c-adder .btype'); if (f) f.focus({ preventScroll: true }); }, 30);
+  });
+  $('#c-adder').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !adding) return;
+    var d = b.dataset;
+    if (d.acancel) { adding = null; renderAdder(); $('#c-add').focus(); return; }
+    if (d.atype) adding.type = d.atype;
+    if (d.aday) { var i = adding.days.indexOf(d.aday); if (i > -1) adding.days.splice(i, 1); else adding.days.push(d.aday); if (!adding.days.length) adding.freq = null; }
+    if (d.afreq) adding.freq = d.afreq;
+    if (d.acommit) {
+      var t = TYPES.filter(function (x) { return x.id === adding.type; })[0];
+      bins.push({ id: 'new' + seq++, name: t.name, kind: t.id === 'other' ? '' : t.kind, days: adding.days.slice(), freq: adding.freq, next0: '', color: t.color, shape: t.shape, cat: ({rec:'recycling',gen:'general',gar:'garden',food:'food',other:'other'})[t.id], on: true });
+      adding = null; renderConfirm(); return;
+    }
+    var sel = d.atype ? '[data-atype="' + d.atype + '"]' : d.aday ? '[data-aday="' + d.aday + '"]' : d.afreq ? '[data-afreq="' + d.afreq + '"]' : null;
+    renderAdder();
+    if (sel) { var again = $('#c-adder ' + sel); if (again) again.focus({ preventScroll: true }); }
+  });
+
+  // Reminders
+  var when = 'night', time = '7:00pm';
+  function renderReminders() {
+    var W = [{ id: 'night', label: 'Night before', sub: 'Most people pick this' }, { id: 'morning', label: 'Morning of', sub: 'Before the lorry comes' }];
+    var T = when === 'night' ? ['6:00pm', '7:00pm', '8:00pm', '9:00pm'] : ['6:00am', '6:30am', '7:00am'];
+    $('#whens').innerHTML = W.map(function (w) { return '<button type="button" class="big" data-when="' + w.id + '" aria-pressed="' + (when === w.id) + '"><b>' + w.label + '</b><small>' + w.sub + '</small></button>'; }).join('');
+    $('#times').innerHTML = T.map(function (t) { return '<button type="button" class="opt" data-time="' + t + '" aria-pressed="' + (time === t) + '">' + t + '</button>'; }).join('');
+  }
+  $('#whens').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-when]'); if (!b) return;
+    when = b.dataset.when; time = when === 'night' ? '7:00pm' : '6:30am'; renderReminders();
+  });
+  $('#times').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-time]'); if (!b) return;
+    time = b.dataset.time; renderReminders();
+  });
+
+  function to24(t) { var m = t.match(/(\d+):(\d+)(am|pm)/); var h = +m[1] % 12 + (m[3] === 'pm' ? 12 : 0); return (h < 10 ? '0' : '') + h + ':' + m[2]; }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a[href="#binfluencer"]'); if (!a || !API.live || !API.userId) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    api('POST', '/users/' + API.userId + '/reminders', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time) })
+      .then(function () { return api('GET', '/users/' + API.userId + '/referral'); })
+      .then(function (r) { link = r.link.replace(/^https?:\/\//, ''); $('#link').value = link; $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent(r.share_text); })
+      .catch(function () {}).then(function () { go('binfluencer'); });
+  }, true);
+
+  // Binfluencer
+  function renderBadge() {
+    $('#b-badge').textContent = 'Reminders on' + (phone ? ' for ' + phone : '') + ' · ' + (when === 'night' ? 'night before, ' : 'morning of, ') + time;
+  }
+  var link = $('#link').value;
+  $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent('I use BinBot for bin day reminders on WhatsApp. Sign up with your postcode: https://' + link);
+  $('#copy').addEventListener('click', function () {
+    var btn = this;
+    try { navigator.clipboard.writeText('https://' + link); } catch (err) { $('#link').select(); }
+    btn.textContent = 'Copied';
+    setTimeout(function () { btn.textContent = 'Copy'; }, 1600);
+  });
+
+  try { var h = location.hash.slice(1); if (h && document.querySelector('[data-screen="' + h + '"]')) current = h; } catch (e) {}
+  // Home phone animation: notification, chat opens, reply
+  (function () {
+    var el = document.getElementById('anim'); if (!el) return;
+    var reduce = false; try { reduce = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    if (reduce) { el.dataset.s = '3'; return; }
+    var seq = [['0', 700], ['1', 2600], ['2', 2600], ['3', 3400]], i = 0;
+    (function tick() { el.dataset.s = seq[i][0]; var d = seq[i][1]; i = (i + 1) % seq.length; setTimeout(tick, d); })();
+  })();
+
+  show();
+})();
+</script>
+</body>
+</html>
