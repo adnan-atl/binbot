@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.adapters.base import AdapterError, LookupInput, RawCollection
+from app.adapters.base import AdapterError, LookupInput, NoCollectionsForAddress, RawCollection
 from app.adapters.registry import library_version, spec_for
 from app.adapters.ukbcd import UKBCDAdapter
 from app.core.config import get_settings
@@ -183,7 +183,8 @@ def refresh_round(db: Session, prop: Property, source: str = "council") -> Refre
                         adapter_version=library_version(), content_hash="", raw={},
                         ok=False, error=str(e))
         db.add(snap)
-        _mark_failure(db, council, str(e), retryable=e.retryable)
+        if not isinstance(e, NoCollectionsForAddress):
+            _mark_failure(db, council, str(e), retryable=e.retryable)
         db.commit()
         return RefreshResult(snapshot=snap, changed=False, diff={}, error=str(e))
 

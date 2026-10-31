@@ -113,3 +113,24 @@ def test_frequency_learned_from_weekly_refreshes(client, db, fake_adapter):
     db.flush()
     assert schedule_for(db, user.property)[0]["frequency"] == "fortnightly"
     assert schedule_for(db, user.property)[0]["next"] == first.isoformat()
+
+
+def test_failed_own_lookup_keeps_street_calendar_and_council_health(client, db, fake_adapter):
+    """Regression (Glasgow, 31 Oct): 'These aren't my days' picked an address the council
+    lists nothing for. That must not mark the whole council broken, and must not leave the
+    user with an empty calendar."""
+    from app.adapters.base import NoCollectionsForAddress
+    from app.models import Council, Property
+
+    sun = date.today() + timedelta(days=(6 - date.today().weekday()) % 7 or 7)
+    fake_adapter["items"] = [RawCollection("Green Bin", sun + timedelta(weeks=i)) for i in range(4)]
+    first = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    second = client.post("/api/signup/start", json={"postcode": "E8 3PB"}).json()
+    assert second["shared"] and len(second["bins"]) == 1
+
+    fake_adapter["error"] = NoCollectionsForAddress("council lists nothing for this UPRN")
+    r = client.post(f"/api/users/{second['user_id']}/own-calendar", json={"uprn": "10000099"}).json()
+    assert r["shared"] is True and r["error"] and len(r["bins"]) == 1 and r["bins"][0]["days"]
+    db.expire_all()
+    assert db.scalar(select(Council)).status == CouncilStatus.ok
+    assert {p.round_key for p in db.scalars(select(Property))} == {"pc:E09000012:E8 3PB"}

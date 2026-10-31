@@ -102,7 +102,7 @@ def signup_start(body: S.StartIn, db: Session = Depends(get_db)):
         # A neighbour already fetched this postcode's round: reuse it, no lookup at all.
         source, shared = "neighbours", True
     elif council.status != CouncilStatus.unsupported:
-        res = refresh_round(db, prop, source=source)
+        res = refresh_round(db, prop, source="demo" if source == "demo" else "council")
         if res.error:
             error = res.error
         else:
@@ -140,6 +140,7 @@ def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_
     prop = user.property
     if prop is None:
         raise HTTPException(400, "No property on this user")
+    before = (prop.round_key, prop.uprn, prop.house_number, prop.address_line)
     if body.uprn:
         prop.uprn, prop.house_number, prop.address_line = body.uprn, body.house_number, body.address_line
     elif body.house_number:
@@ -147,13 +148,18 @@ def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_
     own_round(db, prop)
     source = "demo" if get_settings().demo_mode else "council"
     res = refresh_round(db, prop, source=source)
-    error = res.error
-    if not error:
-        _seed_settings(db, user, prop)
+    if res.error:
+        # Never leave someone worse off than before: go back to the street's calendar.
+        prop.round_key, prop.uprn, prop.house_number, prop.address_line = before
+        db.commit()
+        return S.StartOut(user_id=user.id, property_id=prop.id, council=prop.council.name,
+                          source="neighbours", shared=True, bins=_bins_out(db, user),
+                          error="We couldn't find a separate calendar for that address, so "
+                                "you're still on your street's days.")
+    _seed_settings(db, user, prop)
     db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=prop.council.name,
-                      source=source if not error else "manual", error=error, shared=False,
-                      bins=_bins_out(db, user))
+                      source=source, shared=False, bins=_bins_out(db, user))
 
 
 def _bins_out(db: Session, user: User) -> list[S.BinOut]:
