@@ -35,9 +35,19 @@ class BinOut(BaseModel):
     purpose: str = ""  # what goes in it, when the label alone doesn't say
     days: list[str]
     frequency: str
+    frequency_source: str = ""  # calendar | policy | unknown | "" (resident's own rule)
     next: str | None
     enabled: bool = True
     manual: bool = False
+
+
+class CheckOut(BaseModel):
+    """Something the checker couldn't confirm: a missing bin, or two sources disagreeing."""
+    kind: str  # missing_stream | conflict
+    text: str
+    category: str | None = None
+    bin_type_id: str | None = None
+    every_days: int | None = None
 
 
 class StartOut(BaseModel):
@@ -48,6 +58,7 @@ class StartOut(BaseModel):
     bins: list[BinOut]
     shared: bool = False  # calendar reused from the postcode round, not fetched for this home
     error: str | None = None
+    checks: list[CheckOut] = []
 
 
 class OwnCalendarIn(BaseModel):

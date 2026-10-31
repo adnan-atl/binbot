@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 
 _WEEKDAYS = {"MON": 0, "TUE": 1, "WED": 2, "THU": 3, "FRI": 4, "SAT": 5, "SUN": 6}
-_PERIOD = {"weekly": 7, "fortnightly": 14, "four_weekly": 28}
+_PERIOD = {"weekly": 7, "fortnightly": 14, "three_weekly": 21, "four_weekly": 28}
 
 
 def expand_rule(rule: dict, start: date, horizon_days: int) -> list[date]:

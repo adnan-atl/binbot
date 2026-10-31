@@ -101,6 +101,8 @@ def describe_rule(dates: list[date]) -> dict:
             freq = Frequency.weekly
         elif 13 <= typical <= 15:
             freq = Frequency.fortnightly
+        elif 20 <= typical <= 22:
+            freq = Frequency.three_weekly
         elif 27 <= typical <= 29:
             freq = Frequency.four_weekly
     return {"days": kept, "frequency": freq.value, "next": ds[0].isoformat()}
