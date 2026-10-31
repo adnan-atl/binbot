@@ -506,7 +506,7 @@ Share with your street
   api('GET', '/health').then(function () { API.live = true; $('#house-wrap').hidden = false; }).catch(function () { API.live = false; });
   var DAY_IN = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
   var DAY_OUT = { Mon: 'MON', Tue: 'TUE', Wed: 'WED', Thu: 'THU', Fri: 'FRI', Sat: 'SAT', Sun: 'SUN' };
-  var FREQ_IN = { weekly: 'weekly', fortnightly: 'fortnightly', four_weekly: 'monthly', irregular: 'weekly' };
+  var FREQ_IN = { weekly: 'weekly', fortnightly: 'fortnightly', four_weekly: 'monthly', irregular: 'unknown' };
   var FREQ_OUT = { weekly: 'weekly', fortnightly: 'fortnightly', monthly: 'four_weekly' };
   var CAT_META = { recycling: { color: '#2F6FEB', kind: 'Blue bin' }, general: { color: '#3A3A3C', kind: 'Black bin' },
     food: { color: '#8B5E3C', kind: 'Caddy', shape: 'caddy' }, garden: { color: '#34A853', kind: 'Green bin' },
@@ -515,7 +515,8 @@ Share with your street
   function binFromApi(b) {
     var m = CAT_META[b.category] || CAT_META.other;
     return { id: b.setting_id, name: b.label, kind: m.kind, days: (b.days || []).map(function (d) { return DAY_IN[d]; }),
-      freq: FREQ_IN[b.frequency] || 'weekly', next0: fmtDate(b.next), color: m.color, shape: m.shape, cat: b.category, on: b.enabled !== false };
+      freq: FREQ_IN[b.frequency] || 'unknown', next0: fmtDate(b.next), color: m.color, shape: m.shape, cat: b.category, on: b.enabled !== false,
+      purpose: b.purpose || '' };
   }
   function binToApi(b) {
     var o = { setting_id: b.id && b.id.indexOf('new') !== 0 ? b.id : null, label: b.name, category: b.cat || 'other', enabled: b.on !== false };
@@ -669,8 +670,15 @@ Share with your street
   };
   var freqText = function (b) {
     var n = b.days.length;
+    if (b.freq === 'unknown') return 'How often: still checking';
     if (b.freq === 'weekly') return n === 2 ? 'Twice a week' : n > 2 ? n + '× a week' : 'Every week';
     return b.freq === 'fortnightly' ? 'Every 2 weeks' : 'Every 4 weeks';
+  };
+  // "Blue Bin" says nothing about what goes in it; the council-aware purpose line does.
+  var purposeText = function (b) {
+    if (!b.purpose) return '';
+    var key = b.purpose.split(':')[0].toLowerCase();
+    return b.name.toLowerCase().indexOf(key.split(' ')[0]) > -1 ? '' : b.purpose;
   };
   var find = function (id) { return bins.filter(function (b) { return b.id === id; })[0]; };
 
@@ -695,7 +703,7 @@ Share with your street
         var chips = !chosen.length ? '<span class="hint">Not set</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
         return '<div class="cols binrow">' +
           '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span>' +
-          '<span class="m-only m-freq">' + freqText(b) + '</span></span></span>' +
+          '<span class="m-only m-freq">' + [purposeText(b), freqText(b)].filter(Boolean).join(' · ') + '</span></span></span>' +
           '<span class="c-days">' + chips + '</span>' +
           '<span class="c-freq">' + freqText(b) + '</span>' +
           '</div>';
