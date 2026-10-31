@@ -11,7 +11,13 @@ from datetime import date, datetime, timedelta
 import httpx
 from bs4 import BeautifulSoup
 
-from app.adapters.base import AdapterError, LookupInput, MissingInput, RawCollection
+from app.adapters.base import (
+    AdapterError,
+    LookupInput,
+    MissingInput,
+    NoCollectionsForAddress,
+    RawCollection,
+)
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36")
@@ -136,7 +142,16 @@ def glasgow(lookup: LookupInput, *, html: str | None = None, today: date | None 
                 out.append(RawCollection(label=f"{mt.group(1).title()} Bin", date=d))
 
     if not out:
-        raise AdapterError("glasgow.gov.uk: page layout changed", retryable=False)
+        legend = soup.select_one("fieldset")
+        calendar = soup.select_one("table.Calendar")
+        if legend is not None or calendar is not None:
+            # The calendar page rendered, there just are no bins on it for this UPRN.
+            said = (legend.get_text(" ", strip=True) if legend else "")[:160]
+            raise NoCollectionsForAddress(
+                f"glasgow.gov.uk lists no collections for UPRN {lookup.uprn}: {said!r}")
+        title = soup.title.get_text(strip=True) if soup.title else ""
+        raise AdapterError(f"glasgow.gov.uk: page layout changed (title={title!r})",
+                           retryable=False)
     return sorted(set(out), key=lambda c: (c.date, c.label))
 
 

@@ -20,6 +20,8 @@ services:
       SELENIUM_URL: http://selenium:4444
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports: ["8000:8000"]
+    volumes:
+      - ./web:/srv/web:ro   # front-end edits apply on refresh, no rebuild
     depends_on:
       db: { condition: service_healthy }
 

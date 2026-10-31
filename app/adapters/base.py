@@ -24,6 +24,15 @@ class AdapterError(Exception):
         self.retryable = retryable
 
 
+class NoCollectionsForAddress(AdapterError):
+    """The council answered, but lists nothing for this address (flat with communal bins,
+    commercial unit, wrong UPRN). Says nothing about whether the scraper works, so it must
+    not count against the council's health."""
+
+    def __init__(self, message: str):
+        super().__init__(message, retryable=False)
+
+
 class MissingInput(AdapterError):
     def __init__(self, field: str):
         super().__init__(f"adapter needs {field}", retryable=False)
