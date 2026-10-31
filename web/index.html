@@ -216,6 +216,7 @@ button{font:inherit}
 .c-name{grid-area:name;align-items:center}
 .m-only{display:block;white-space:nowrap}
 .c-name .binic{margin-top:0}
+.m-only.m-freq{white-space:normal}
 .c-days{grid-area:days;justify-content:flex-end;align-items:center;flex-wrap:nowrap}
 .c-freq{display:none}
 .wide-main{padding:40px 16px 56px;gap:24px}
@@ -508,8 +509,8 @@ Share with your street
   api('GET', '/health').then(function () { API.live = true; $('#house-wrap').hidden = false; }).catch(function () { API.live = false; });
   var DAY_IN = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
   var DAY_OUT = { Mon: 'MON', Tue: 'TUE', Wed: 'WED', Thu: 'THU', Fri: 'FRI', Sat: 'SAT', Sun: 'SUN' };
-  var FREQ_IN = { weekly: 'weekly', fortnightly: 'fortnightly', four_weekly: 'monthly', irregular: 'unknown' };
-  var FREQ_OUT = { weekly: 'weekly', fortnightly: 'fortnightly', monthly: 'four_weekly' };
+  var FREQ_IN = { weekly: 'weekly', fortnightly: 'fortnightly', three_weekly: 'three', four_weekly: 'monthly', irregular: 'unknown' };
+  var FREQ_OUT = { weekly: 'weekly', fortnightly: 'fortnightly', three: 'three_weekly', monthly: 'four_weekly' };
   var CAT_META = { recycling: { color: '#2F6FEB', kind: 'Blue bin' }, general: { color: '#3A3A3C', kind: 'Black bin' },
     food: { color: '#8B5E3C', kind: 'Caddy', shape: 'caddy' }, garden: { color: '#34A853', kind: 'Green bin' },
     glass: { color: '#2A9D8F', kind: 'Glass box' }, paper: { color: '#5B6CFF', kind: 'Paper' }, other: { color: '#AEAEB2', kind: '' } };
@@ -520,7 +521,7 @@ Share with your street
     var m = CAT_META[b.category] || CAT_META.other;
     return { id: b.setting_id, name: b.label, kind: m.kind, days: (b.days || []).map(function (d) { return DAY_IN[d]; }),
       freq: FREQ_IN[b.frequency] || 'unknown', next0: fmtDate(b.next), color: COLOUR_HEX[b.colour] || m.color, shape: m.shape, cat: b.category, on: b.enabled !== false,
-      purpose: b.purpose || '' };
+      purpose: b.purpose || '', manual: !!b.manual };
   }
   function binToApi(b) {
     var o = { setting_id: b.id && b.id.indexOf('new') !== 0 ? b.id : null, label: b.name, category: b.cat || 'other', enabled: b.on !== false };
@@ -597,6 +598,7 @@ Share with your street
       fetching = false;
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
       note = j.shared && j.error ? j.error : '';
+      checks = j.checks || [];
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
       calendarFailed = !bins.length;
@@ -618,7 +620,7 @@ Share with your street
       $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
     }).then(done);
   }
-  var ownLookup = null, shared = false, note = '';
+  var ownLookup = null, shared = false, note = '', checks = [];
   $('#addr').addEventListener('change', function () { if (this.value) submitPostcode(); });
   // "These aren't my days": look this home up individually instead of reusing the street's round.
   document.addEventListener('click', function (e) {
@@ -678,6 +680,7 @@ Share with your street
   var FREQ = [
     { id: 'weekly', label: 'Every week', hint: '' },
     { id: 'fortnightly', label: 'Every 2 weeks', hint: 'Alternate weeks' },
+    { id: 'three', label: 'Every 3 weeks', hint: 'Rotating bins' },
     { id: 'monthly', label: 'Every 4 weeks', hint: 'Or monthly' }
   ];
   var bins = [
@@ -696,7 +699,7 @@ Share with your street
     var n = b.days.length;
     if (b.freq === 'unknown') return 'How often: still checking';
     if (b.freq === 'weekly') return n === 2 ? 'Twice a week' : n > 2 ? n + '× a week' : 'Every week';
-    return b.freq === 'fortnightly' ? 'Every 2 weeks' : 'Every 4 weeks';
+    return b.freq === 'fortnightly' ? 'Every 2 weeks' : b.freq === 'three' ? 'Every 3 weeks' : 'Every 4 weeks';
   };
   // "Blue Bin" says nothing about what goes in it; the council-aware purpose line does.
   var purposeText = function (b) {
@@ -750,13 +753,21 @@ Share with your street
           '<div style="display:flex;flex-direction:column;gap:10px"><span class="sublabel" id="f-' + b.id + '">How often</span><div role="group" aria-labelledby="f-' + b.id + '" style="display:flex;flex-direction:column;gap:6px">' + freqs + '</div></div></div>') + '</div>';
       }).join('');
     }
-    // A home almost always has recycling. If the council didn't list it, say so plainly
-    // rather than hide it, and make adding it one tap. Doesn't block confirming.
-    var hasRec = bins.some(function (b) { return ['recycling', 'glass', 'paper'].indexOf(b.cat) > -1; });
+    // What the checker couldn't confirm (missing bins, council sources disagreeing). Shown
+    // plainly, never hidden; a missing bin is one tap to add. Doesn't block confirming.
+    var have = bins.map(function (b) { return b.cat; });
+    var open = checks.filter(function (c) {
+      if (c.kind === 'missing_stream') return have.indexOf(c.category) < 0;
+      // A conflict is settled once the resident sets that bin's schedule themselves (source 1).
+      return !bins.some(function (b) { return b.cat === c.category && (b.dirty || b.manual); });
+    });
     var gap = $('#c-gap');
-    gap.hidden = editing || empty || hasRec || !API.live;
-    if (!gap.hidden) gap.innerHTML = '<span>' + esc(API.council || 'Your council') + " doesn't list a recycling collection for this address.</span>" +
-      '<button type="button" class="ghost" id="c-addrec" style="white-space:nowrap">Add recycling</button>';
+    gap.hidden = editing || empty || !open.length;
+    gap.style.flexDirection = 'column'; gap.style.alignItems = 'stretch';
+    gap.innerHTML = open.map(function (c, i) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span>' + esc(c.text) + '</span>' +
+        (c.kind === 'missing_stream' ? '<button type="button" class="ghost" data-addcheck="' + checks.indexOf(c) + '" style="white-space:nowrap">Add it</button>' : '') + '</div>';
+    }).join('');
     renderAdder();
   }
   $('#c-rows').addEventListener('change', function (e) {
@@ -782,9 +793,15 @@ Share with your street
   $('#c-cards').addEventListener('input', function (e) {
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
   });
+  var CHECK_TYPE = { recycling: 'rec', paper: 'rec', glass: 'rec', general: 'gen', food: 'food', garden: 'gar' };
+  var CHECK_FREQ = { 7: 'weekly', 14: 'fortnightly', 21: 'three', 28: 'monthly' };
+  var CHECK_NAME = { paper: 'Paper and card', glass: 'Glass' };
   document.addEventListener('click', function (e) {
-    if (!e.target.closest('#c-addrec')) return;
-    editing = true; adding = { type: 'rec', days: [], freq: null }; renderConfirm();
+    var t = e.target.closest('[data-addcheck]'); if (!t) return;
+    var c = checks[+t.dataset.addcheck];
+    editing = true;
+    adding = { type: CHECK_TYPE[c.category] || 'other', days: [], freq: CHECK_FREQ[c.every_days] || null, cat: c.category, name: CHECK_NAME[c.category] };
+    renderConfirm();
     var el = $('#c-adder'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   $('#c-edit').addEventListener('click', function () { editing = true; renderConfirm(); });
@@ -832,7 +849,7 @@ Share with your street
     }
     if (a.type && a.days.length && a.freq) {
       var t = TYPES.filter(function (x) { return x.id === a.type; })[0];
-      html += '<div class="addsec"><button type="button" class="pill solid" data-acommit="1" style="width:100%">Add ' + t.name.toLowerCase() + '</button></div>';
+      html += '<div class="addsec"><button type="button" class="pill solid" data-acommit="1" style="width:100%">Add ' + (a.name || t.name).toLowerCase() + '</button></div>';
     }
     $('#c-adder').innerHTML = html + '</div>';
   }
@@ -845,12 +862,12 @@ Share with your street
     var b = e.target.closest('button'); if (!b || !adding) return;
     var d = b.dataset;
     if (d.acancel) { adding = null; renderAdder(); $('#c-add').focus(); return; }
-    if (d.atype) adding.type = d.atype;
+    if (d.atype) { adding.type = d.atype; adding.cat = null; adding.name = null; }
     if (d.aday) { var i = adding.days.indexOf(d.aday); if (i > -1) adding.days.splice(i, 1); else adding.days.push(d.aday); if (!adding.days.length) adding.freq = null; }
     if (d.afreq) adding.freq = d.afreq;
     if (d.acommit) {
       var t = TYPES.filter(function (x) { return x.id === adding.type; })[0];
-      bins.push({ id: 'new' + seq++, name: t.name, kind: t.id === 'other' ? '' : t.kind, days: adding.days.slice(), freq: adding.freq, next0: '', color: t.color, shape: t.shape, cat: ({rec:'recycling',gen:'general',gar:'garden',food:'food',other:'other'})[t.id], on: true });
+      bins.push({ id: 'new' + seq++, name: adding.name || t.name, kind: t.id === 'other' ? '' : t.kind, days: adding.days.slice(), freq: adding.freq, next0: '', color: t.color, shape: t.shape, cat: adding.cat || ({rec:'recycling',gen:'general',gar:'garden',food:'food',other:'other'})[t.id], on: true });
       adding = null; renderConfirm(); return;
     }
     var sel = d.atype ? '[data-atype="' + d.atype + '"]' : d.aday ? '[data-aday="' + d.aday + '"]' : d.afreq ? '[data-afreq="' + d.afreq + '"]' : null;
