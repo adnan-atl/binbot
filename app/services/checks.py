@@ -1,8 +1,11 @@
 """
 Checker: is what we're about to show someone actually right?
 
-Sources, most trusted first. A higher source wins for display; a disagreement between two
-sources is never resolved silently, it becomes a check the user sees and ops can review.
+Internal only. Residents see one clean answer, picked by the hierarchy below; they never
+see our doubts, source disagreements or "still checking". Every disagreement or gap goes
+to change_log for ops to review and fix at the source (adapter, override, profile).
+
+Sources, most trusted first. The highest source that has an answer is what's shown:
 
   1. The resident, for their own home   (they see the lorry; override_rule, handled upstream)
   2. Council calendar for this address   (scraped dates; specific and current)
@@ -14,8 +17,7 @@ sources is never resolved silently, it becomes a check the user sees and ops can
 
 What matters most, for a reminder service, in order:
   which bin goes out > on which date > what day it usually is > how often > what goes in it
-  > what colour it is. So: a missing bin or a wrong date is a blocking-grade problem; a
-  frequency we can't prove is shown as "still checking" rather than guessed.
+  > what colour it is. A missing bin or a wrong date is the most urgent thing for ops to fix.
 """
 from collections import Counter
 from datetime import date
@@ -24,7 +26,7 @@ from app.services.profiles import CouncilProfile, profile_for
 
 FREQ_BY_DAYS = {7: "weekly", 14: "fortnightly", 21: "three_weekly", 28: "four_weekly"}
 WORDS = {7: "every week", 14: "every 2 weeks", 21: "every 3 weeks", 28: "every 4 weeks"}
-MIN_GAPS = 2  # 3 dates with the same spacing before we claim a frequency from dates alone
+MIN_GAPS = 2  # below this the calendar still wins for display, but a policy clash is logged
 RECYCLING_LIKE = {"recycling", "paper", "glass"}
 
 
@@ -54,7 +56,8 @@ def observe(dates: list[date], days_per_week: int = 1) -> tuple[int | None, int]
 def run(bins: list[dict], council_name: str, gss_code: str | None,
         today: date | None = None) -> list[dict]:
     """
-    Mutates each bin's "frequency" (+ adds "frequency_source") and returns the checks.
+    Mutates each bin's "frequency" (+ adds "frequency_source") and returns the checks
+    (for change_log, never for the resident).
     Each bin needs: category, label, days, history (all known dates, past and future).
     """
     prof: CouncilProfile | None = profile_for(gss_code, today)
@@ -66,9 +69,10 @@ def run(bins: list[dict], council_name: str, gss_code: str | None,
         policy = by_cat.get(b["category"])
         policy_days = policy.every_days if policy else None
 
-        if interval and evidence >= MIN_GAPS:
+        # Hierarchy: address calendar (2) > council policy (4) > nothing shown.
+        if interval:
             b["frequency"], b["frequency_source"] = FREQ_BY_DAYS[interval], "calendar"
-        elif policy_days and (interval is None or interval == policy_days):
+        elif policy_days:
             b["frequency"], b["frequency_source"] = FREQ_BY_DAYS[policy_days], "policy"
         else:
             b["frequency"], b["frequency_source"] = "irregular", "unknown"
@@ -76,9 +80,9 @@ def run(bins: list[dict], council_name: str, gss_code: str | None,
         if policy_days and interval and interval != policy_days:
             checks.append({
                 "kind": "conflict", "bin_type_id": b.get("bin_type_id"), "category": b["category"],
-                "text": f"{council_name} says {policy.name} is collected {WORDS[policy_days]}, "
-                        f"but its calendar for this address shows {WORDS[interval]}. "
-                        "BinBot will keep checking. Fix it below if you know better.",
+                "evidence": evidence, "calendar_days": interval, "policy_days": policy_days,
+                "text": f"{council_name}: policy says {policy.name} {WORDS[policy_days]}, "
+                        f"address calendar shows {WORDS[interval]} ({evidence + 1} dates).",
             })
 
     have = {b["category"] for b in bins}
@@ -88,13 +92,13 @@ def run(bins: list[dict], council_name: str, gss_code: str | None,
                 continue
             checks.append({
                 "kind": "missing_stream", "category": s.category, "every_days": s.every_days,
-                "text": f"{council_name} also collects {s.name}"
+                "text": f"{council_name}: policy lists {s.name}"
                         + (f" {WORDS[s.every_days]}" if s.every_days in WORDS else "")
-                        + ", but it isn't on the calendar for this address.",
+                        + ", address calendar has none.",
             })
     elif bins and not (have & RECYCLING_LIKE):
         checks.append({
             "kind": "missing_stream", "category": "recycling", "every_days": None,
-            "text": f"{council_name} doesn't list a recycling collection for this address.",
+            "text": f"{council_name}: no recycling on the address calendar.",
         })
     return checks

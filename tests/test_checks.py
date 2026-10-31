@@ -1,4 +1,4 @@
-"""Checker: frequency needs evidence, policy cross-checks the calendar, gaps are surfaced."""
+"""Checker: hierarchy picks one frequency; disagreements and gaps are logged for ops."""
 from datetime import date, timedelta
 
 from app.services import checks
@@ -20,12 +20,13 @@ def test_lancaster_real_response_is_flagged_not_trusted():
     found = checks.run(bins, "Lancaster", LANCASTER, TODAY)
 
     assert bins[1]["frequency"] == "weekly" and bins[1]["frequency_source"] == "calendar"
-    # Two dates 14 days apart vs a 3-weekly policy: don't claim either.
-    assert bins[0]["frequency"] == "irregular"
+    # Address calendar outranks district policy for display; the clash goes to ops.
+    assert bins[0]["frequency"] == "fortnightly" and bins[0]["frequency_source"] == "calendar"
     kinds = sorted((c["kind"], c["category"]) for c in found)
     assert kinds == [("conflict", "general"), ("missing_stream", "paper"),
                      ("missing_stream", "recycling")]
-    assert "every 3 weeks" in next(c["text"] for c in found if c["kind"] == "conflict")
+    conflict = next(c for c in found if c["kind"] == "conflict")
+    assert conflict["calendar_days"] == 14 and conflict["policy_days"] == 21
 
 
 def test_policy_fills_frequency_when_calendar_is_too_short():
@@ -45,11 +46,11 @@ def test_three_weekly_rotation_is_recognised_from_dates():
     assert found == []
 
 
-def test_two_dates_alone_dont_prove_a_frequency():
-    b = [_bin("general", "Refuse", [date(2026, 11, 3), date(2026, 11, 17)]),
-         _bin("recycling", "Recycling", [date(2026, 11, 10)])]
+def test_single_date_and_no_policy_shows_no_frequency():
+    b = [_bin("general", "Refuse", [date(2026, 11, 3)]),
+         _bin("recycling", "Recycling", [date(2026, 11, 10), date(2026, 11, 24)])]
     checks.run(b, "Somewhere", "E00000000", TODAY)
-    assert b[0]["frequency"] == "irregular"
+    assert b[0]["frequency"] == "irregular" and b[1]["frequency"] == "fortnightly"
 
 
 def test_no_profile_still_flags_missing_recycling():

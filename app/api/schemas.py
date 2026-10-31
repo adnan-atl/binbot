@@ -41,15 +41,6 @@ class BinOut(BaseModel):
     manual: bool = False
 
 
-class CheckOut(BaseModel):
-    """Something the checker couldn't confirm: a missing bin, or two sources disagreeing."""
-    kind: str  # missing_stream | conflict
-    text: str
-    category: str | None = None
-    bin_type_id: str | None = None
-    every_days: int | None = None
-
-
 class StartOut(BaseModel):
     user_id: str
     property_id: str
@@ -58,7 +49,6 @@ class StartOut(BaseModel):
     bins: list[BinOut]
     shared: bool = False  # calendar reused from the postcode round, not fetched for this home
     error: str | None = None
-    checks: list[CheckOut] = []
 
 
 class OwnCalendarIn(BaseModel):

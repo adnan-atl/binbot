@@ -66,7 +66,8 @@ def test_unchanged_fetch_is_noop(client, db, fake_adapter):
     fake_adapter["items"] = [RawCollection("Refuse", tue)]
     user = _signup_active(client, db)
     res = schedule.refresh_round(db, user.property)
-    assert not res.changed and db.scalar(select(ChangeLog)) is None
+    assert not res.changed
+    assert db.scalar(select(ChangeLog).where(ChangeLog.kind == "dates_changed")) is None
 
 
 def test_adapter_breakage_flags_council_and_keeps_old_dates(client, db, fake_adapter):
