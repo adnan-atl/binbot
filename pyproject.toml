@@ -13,6 +13,7 @@ dependencies = [
   "pydantic-settings>=2.3",
   "httpx>=0.27",
   "python-multipart>=0.0.9",
+  "beautifulsoup4>=4.12",
   "apscheduler>=3.10,<4",
   "uk-bin-collection>=0.173",
 ]

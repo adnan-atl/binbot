@@ -59,6 +59,10 @@ class UKBCDAdapter:
 
     def fetch(self, lookup: LookupInput) -> list[RawCollection]:
         self.validate(lookup)
+        from app.adapters.overrides import OVERRIDES
+
+        if self.spec.module in OVERRIDES:  # local fix for a broken upstream scraper
+            return OVERRIDES[self.spec.module](lookup)
         timeout = get_settings().scrape_timeout_seconds
         # Council modules are synchronous and sometimes hang; isolate with a timeout.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:

@@ -60,3 +60,19 @@ def test_parse_library_output():
     items = parse_output(out)
     assert [(i.label, i.date.isoformat()) for i in items] == [
         ("Refuse", "2026-11-03"), ("Recycling", "2026-11-10")]
+
+
+def test_hammersmith_override_handles_two_days():
+    """Upstream scraper raises on 'Friday and Tuesday'; our override splits it."""
+    from app.adapters.base import LookupInput
+    from app.adapters.overrides import hammersmith_and_fulham
+
+    html = ('<div class="nearest-search-results"><ol>'
+            '<li><a>Friday and Tuesday - Recycling</a></li>'
+            '<li><a>Tuesday - Food waste</a></li></ol></div>')
+    items = hammersmith_and_fulham(LookupInput(postcode="W6 9HW"), html=html,
+                                   today=date(2026, 10, 31))
+    rec = sorted(i.date for i in items if i.label == "Recycling")
+    assert describe_rule(rec) == {"days": ["TUE", "FRI"], "frequency": "weekly", "next": "2026-11-03"}
+    food = sorted(i.date for i in items if i.label == "Food waste")
+    assert describe_rule(food)["days"] == ["TUE"]
