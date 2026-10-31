@@ -283,6 +283,10 @@ button{font:inherit}
 <input id="pc" class="field" type="text" autocomplete="postal-code" placeholder="e.g. E8 3PB" value="E8 3PB" aria-describedby="pc-err">
 <span id="pc-err" class="error" hidden>Enter a UK postcode, like E8 3PB.</span>
 </div>
+<div id="house-wrap" style="display:flex;flex-direction:column;gap:8px" hidden>
+<label for="house" class="lbl">House number or name</label>
+<input id="house" class="field" type="text" autocomplete="address-line1" placeholder="e.g. 12 or Rose Cottage" style="text-transform:none;letter-spacing:0">
+</div>
 <div id="addr-wrap" style="display:flex;flex-direction:column;gap:8px" hidden>
 <label for="addr" class="lbl">Your address</label>
 <select id="addr" class="field" style="text-transform:none;letter-spacing:0;font-size:18px;appearance:auto"></select>
@@ -353,6 +357,10 @@ button{font:inherit}
 <span id="tel-err" class="error" hidden>Enter a UK mobile number, like 7700 900123.</span>
 <span id="tel-hint" class="hint">By continuing, you agree to get bin reminders on WhatsApp. Reply STOP any time.</span>
 </div>
+<label style="display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--grey);cursor:pointer">
+<input id="mkt" type="checkbox" style="width:22px;height:22px;margin:0;accent-color:var(--ink);flex:none">
+<span>BinBot is made by Alfred. Tick to hear about other home services from us now and then. Optional.</span>
+</label>
 <div><button type="button" class="pill solid" id="tel-go">Continue</button></div>
 </div>
 </main>
@@ -495,7 +503,7 @@ Share with your street
         if (!r.ok) throw new Error((j && j.detail) || 'Something went wrong on our side (' + r.status + '). Try again in a moment.');
         return j; }); });
   }
-  api('GET', '/health').then(function () { API.live = true; }).catch(function () { API.live = false; });
+  api('GET', '/health').then(function () { API.live = true; $('#house-wrap').hidden = false; }).catch(function () { API.live = false; });
   var DAY_IN = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
   var DAY_OUT = { Mon: 'MON', Tue: 'TUE', Wed: 'WED', Thu: 'THU', Fri: 'FRI', Sat: 'SAT', Sun: 'SUN' };
   var FREQ_IN = { weekly: 'weekly', fortnightly: 'fortnightly', four_weekly: 'monthly', irregular: 'weekly' };
@@ -527,6 +535,7 @@ Share with your street
   // Postcode
   var postcode = '';
   $('#pc').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPostcode(); });
+  $('#house').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPostcode(); });
   $('#pc-go').addEventListener('click', submitPostcode);
   function submitPostcode() {
     var v = $('#pc').value.trim().toUpperCase().replace(/\s+/g, ' ');
@@ -564,7 +573,8 @@ Share with your street
       addr = JSON.parse(sel.dataset.list)[+sel.value];
     }
     var ref = (location.search.match(/[?&]ref=([^&]+)/) || [])[1] || null;
-    var body = { uprn: addr && addr.uprn, house_number: addr && addr.house_number, address_line: addr && addr.line };
+    var typed = $('#house').value.trim();
+    var body = { uprn: addr && addr.uprn, house_number: (addr && addr.house_number) || typed || null, address_line: (addr && addr.line) || (typed ? typed + ', ' + v : null) };
     var req = ownLookup === 'picking' && API.userId
       ? api('POST', '/users/' + API.userId + '/own-calendar', body)
       : api('POST', '/signup/start', Object.assign({ postcode: v, referral_code: ref }, body));
@@ -610,7 +620,7 @@ Share with your street
     if (!ok) return;
     phone = '+44 ' + d.slice(1, 5) + ' ' + d.slice(5);
     if (!API.live || !API.userId) { go('reminders'); return; }
-    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true }).then(function () { go('reminders'); })
+    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true, marketing_consent: $('#mkt').checked }).then(function () { go('reminders'); })
       .catch(function (e) { $('#tel-err').textContent = e.message; $('#tel-err').hidden = false; });
   }
   $('#tel-go').addEventListener('click', submitPhone);
