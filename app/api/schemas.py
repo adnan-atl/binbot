@@ -73,6 +73,7 @@ class BinsIn(BaseModel):
 class PhoneIn(BaseModel):
     phone: str
     consent: bool = True
+    marketing_consent: bool = False  # opt-in only; never defaulted on
 
 
 class PrefsIn(BaseModel):

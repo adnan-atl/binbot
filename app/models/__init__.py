@@ -199,6 +199,9 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(String(40), default="Europe/London")
     status: Mapped[UserStatus] = mapped_column(Enum(UserStatus), default=UserStatus.pending)
     consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Separate, explicit opt-in to hear about other home services (GDPR purpose limitation:
+    # the address was given for bin reminders, nothing else, unless this is set).
+    marketing_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     referral_code: Mapped[str] = mapped_column(String(12), unique=True, index=True)
     referred_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

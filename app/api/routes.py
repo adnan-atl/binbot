@@ -236,6 +236,8 @@ def set_phone(user_id: str, body: S.PhoneIn, db: Session = Depends(get_db)):
     user.phone_e164 = phone
     if body.consent:
         user.consent_at = now()
+    if body.marketing_consent:
+        user.marketing_consent_at = now()
     db.commit()
     return {"phone": phone}
 
