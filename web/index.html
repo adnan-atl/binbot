@@ -324,6 +324,7 @@ button{font:inherit}
 </div>
 <div id="c-view">
 <fieldset class="binlist"><legend class="sr">Bins to remind me about</legend><div id="c-rows"></div></fieldset>
+<div id="c-gap" class="hint" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:14px 18px;border:1px dashed var(--line);border-radius:16px" hidden></div>
 <div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
 <a class="pill solid" id="c-yes" href="#phone" style="width:100%">Yes, these are right</a>
 <button type="button" class="ghost" id="c-edit">Something's off</button>
@@ -730,6 +731,13 @@ Share with your street
           '<div style="display:flex;flex-direction:column;gap:10px"><span class="sublabel" id="f-' + b.id + '">How often</span><div role="group" aria-labelledby="f-' + b.id + '" style="display:flex;flex-direction:column;gap:6px">' + freqs + '</div></div></div>') + '</div>';
       }).join('');
     }
+    // A home almost always has recycling. If the council didn't list it, say so plainly
+    // rather than hide it, and make adding it one tap. Doesn't block confirming.
+    var hasRec = bins.some(function (b) { return ['recycling', 'glass', 'paper'].indexOf(b.cat) > -1; });
+    var gap = $('#c-gap');
+    gap.hidden = editing || empty || hasRec || !API.live;
+    if (!gap.hidden) gap.innerHTML = '<span>' + esc(API.council || 'Your council') + " doesn't list a recycling collection for this address.</span>" +
+      '<button type="button" class="ghost" id="c-addrec" style="white-space:nowrap">Add recycling</button>';
     renderAdder();
   }
   $('#c-rows').addEventListener('change', function (e) {
@@ -754,6 +762,11 @@ Share with your street
   });
   $('#c-cards').addEventListener('input', function (e) {
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#c-addrec')) return;
+    editing = true; adding = { type: 'rec', days: [], freq: null }; renderConfirm();
+    var el = $('#c-adder'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   $('#c-edit').addEventListener('click', function () { editing = true; renderConfirm(); });
   document.addEventListener('click', function (e) {
