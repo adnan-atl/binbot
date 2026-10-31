@@ -12,7 +12,9 @@ docker compose up --build     # API on http://localhost:8000, worker alongside
 
 Open http://localhost:8000 for the sign-up flow, http://localhost:8000/docs for the API.
 
-Councils that need a real browser (~84 of 330): `docker compose --profile browser up`.
+Councils that need a real browser (~86 of 345) use the `selenium` service, which starts with everything else.
+
+Check which councils work: `docker compose exec api python -m app.workers.sweep` (add a name to filter, `--no-browser` to skip browser councils). Results go to the `councils` table.
 
 Without Docker:
 
