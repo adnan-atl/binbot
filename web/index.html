@@ -330,6 +330,7 @@ button{font:inherit}
 <button type="button" class="add" id="c-add" style="margin-top:12px">+ Add a bin</button>
 <div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
 <button type="button" class="pill solid" id="c-save" style="width:100%">Save changes</button>
+<button type="button" class="ghost" id="c-own" hidden>These aren't my days. Look up my address</button>
 <span class="hint" style="text-align:center">Or tell BinBot in the chat, in your own words.</span>
 </div>
 </div>
@@ -537,18 +538,22 @@ Share with your street
     var btn = $('#pc-go'); btn.disabled = true; btn.textContent = 'Looking up…';
     var done = function () { btn.disabled = false; btn.textContent = 'Find my bin days'; };
     var wrap = $('#addr-wrap'), sel = $('#addr');
-    // Step A: postcode changed (or first time) -> ask the API whether this council needs an address.
-    if (v !== postcode) {
+    // Step A: postcode changed (or first time) -> does this council need an address, and has a
+    // neighbour on this postcode already signed up? Only when both "yes/no" do we run the paid
+    // address lookup; otherwise the neighbours' calendar is reused and nobody pays.
+    if (v !== postcode || ownLookup === 'start') {
       postcode = v; wrap.hidden = true; sel.innerHTML = '';
+      var own = ownLookup === 'start'; if (own) ownLookup = 'picking';
       api('GET', '/postcode/' + encodeURIComponent(v)).then(function (p) {
-        if (p.addresses && p.addresses.length && (p.needs_uprn || p.needs_house_number)) {
-          sel.innerHTML = '<option value="">Pick your address…</option>' + p.addresses.map(function (a, i) {
+        var needsAddr = (p.needs_uprn || p.needs_house_number) && (own || !p.round_known);
+        if (!needsAddr) { done(); submitPostcode(); return; }
+        return api('GET', '/postcode/' + encodeURIComponent(v) + '?addresses=true').then(function (p2) {
+          if (!p2.addresses || !p2.addresses.length) { done(); submitPostcode(); return; }
+          sel.innerHTML = '<option value="">Pick your address…</option>' + p2.addresses.map(function (a, i) {
             return '<option value="' + i + '">' + esc(a.line) + '</option>'; }).join('');
-          sel.dataset.list = JSON.stringify(p.addresses);
+          sel.dataset.list = JSON.stringify(p2.addresses);
           wrap.hidden = false; done(); setTimeout(function () { sel.focus(); }, 30);
-          return;
-        }
-        done(); submitPostcode();  // no address step needed
+        });
       }).catch(function (e) { $('#pc-err').textContent = e.message; $('#pc-err').hidden = false; done(); });
       return;
     }
@@ -559,9 +564,13 @@ Share with your street
       addr = JSON.parse(sel.dataset.list)[+sel.value];
     }
     var ref = (location.search.match(/[?&]ref=([^&]+)/) || [])[1] || null;
-    api('POST', '/signup/start', { postcode: v, referral_code: ref, uprn: addr && addr.uprn,
-      house_number: addr && addr.house_number, address_line: addr && addr.line }).then(function (j) {
-      API.userId = j.user_id; API.council = j.council;
+    var body = { uprn: addr && addr.uprn, house_number: addr && addr.house_number, address_line: addr && addr.line };
+    var req = ownLookup === 'picking' && API.userId
+      ? api('POST', '/users/' + API.userId + '/own-calendar', body)
+      : api('POST', '/signup/start', Object.assign({ postcode: v, referral_code: ref }, body));
+    ownLookup = null;
+    req.then(function (j) {
+      API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
       calendarFailed = !bins.length;
@@ -572,8 +581,8 @@ Share with your street
         PSTEPS[2].label = 'Collection days'; PSTEPS[2].sub = 'Add them on the next screen';
         PSTEPS[3].label = 'No bins found yet'; PSTEPS[3].sub = 'Takes about 30 seconds';
       } else {
-        PSTEPS[1].sub = 'Including bank holiday changes';
-        PSTEPS[2].label = 'Matched your road'; PSTEPS[2].sub = (dayNames.map(function (d) { return LONG[d]; }).join(' and ') || 'Set') + ' collections';
+        PSTEPS[1].sub = shared ? 'Same round as your neighbours on ' + postcode : 'Including bank holiday changes';
+        PSTEPS[2].label = shared ? 'Matched your street' : 'Matched your road'; PSTEPS[2].sub = (dayNames.map(function (d) { return LONG[d]; }).join(' and ') || 'Set') + ' collections';
         PSTEPS[3].label = 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins');
         PSTEPS[3].sub = bins.map(function (b) { return b.name; }).join(', ');
       }
@@ -582,7 +591,13 @@ Share with your street
       $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
     }).then(done);
   }
+  var ownLookup = null, shared = false;
   $('#addr').addEventListener('change', function () { if (this.value) submitPostcode(); });
+  // "These aren't my days": look this home up individually instead of reusing the street's round.
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#c-own')) return;
+    ownLookup = 'start'; go('postcode'); setTimeout(submitPostcode, 60);
+  });
 
   // Phone
   var phone = '';
@@ -656,10 +671,12 @@ Share with your street
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
       : editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
     $('#c-lede').textContent = empty ? (calendarFailed ? "BinBot couldn't read " + (API.council || 'your council') + "'s calendar this time. Tell it your bins and it'll keep an eye on the council for changes." : 'Add each bin with its day and how often it goes out.')
-      : editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.' : '';
+      : editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.'
+      : shared ? 'Your neighbours on ' + postcode + ' get these days. Same lorry, same street.' : '';
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
-    $('#c-lede').hidden = !editing;
+    $('#c-lede').hidden = !editing && !shared;
+    $('#c-own').hidden = !(editing && shared && API.live);
     $('#c-view').hidden = editing;
     $('#c-editor').hidden = !editing;
     if (!editing) {
