@@ -1,0 +1,42 @@
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    app_env: str = "dev"
+    database_url: str = "postgresql+psycopg://binbot:binbot@localhost:5432/binbot"
+
+    # Demo mode: no outbound calls; canned postcode/address/council data.
+    demo_mode: bool = False
+
+    # Geo + address lookup
+    postcodes_io_url: str = "https://api.postcodes.io"
+    address_provider: str = "none"  # none | os_places | getaddress
+    os_places_api_key: str = ""
+    getaddress_api_key: str = ""
+
+    # Council scraping
+    scrape_timeout_seconds: int = 90
+    selenium_url: str = ""  # e.g. http://selenium:4444 for councils that need a browser
+    refresh_interval_days: int = 7
+    refresh_window_days_before_holiday: int = 21
+    horizon_days: int = 90  # how far ahead we keep events
+
+    # Messaging
+    message_provider: str = "stub"  # stub | twilio | meta
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from: str = ""  # whatsapp:+14155238886
+    meta_token: str = ""
+    meta_phone_number_id: str = ""
+
+    public_base_url: str = "http://localhost:8000"
+    timezone: str = "Europe/London"
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

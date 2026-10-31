@@ -1,0 +1,36 @@
+from dataclasses import dataclass
+from datetime import date
+from typing import Protocol
+
+
+@dataclass(frozen=True)
+class RawCollection:
+    label: str  # bin label as the council names it
+    date: date
+
+
+@dataclass(frozen=True)
+class LookupInput:
+    postcode: str
+    uprn: str | None = None
+    house_number: str | None = None
+
+
+class AdapterError(Exception):
+    """Fetch failed. `retryable` says whether a later attempt might work."""
+
+    def __init__(self, message: str, retryable: bool = True):
+        super().__init__(message)
+        self.retryable = retryable
+
+
+class MissingInput(AdapterError):
+    def __init__(self, field: str):
+        super().__init__(f"adapter needs {field}", retryable=False)
+        self.field = field
+
+
+class CalendarAdapter(Protocol):
+    name: str
+
+    def fetch(self, lookup: LookupInput) -> list[RawCollection]: ...

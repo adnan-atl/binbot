@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: binbot
+      POSTGRES_PASSWORD: binbot
+      POSTGRES_DB: binbot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U binbot"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://binbot:binbot@db:5432/binbot
+      SELENIUM_URL: http://selenium:4444
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports: ["8000:8000"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://binbot:binbot@db:5432/binbot
+      SELENIUM_URL: http://selenium:4444
+    command: python -m app.workers.main
+    depends_on:
+      db: { condition: service_healthy }
+
+  # Only needed for the ~90 councils whose sites require a real browser.
+  selenium:
+    image: selenium/standalone-chrome:latest
+    shm_size: 2g
+    profiles: ["browser"]
+    ports: ["4444:4444"]
+
+volumes:
+  pgdata:
