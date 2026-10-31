@@ -26,6 +26,7 @@ from app.models import (
 )
 from app.providers.messaging import send_message
 from app.services.reminders import dispatch_due, rebuild_reminders
+from app.services.verify import verify_round
 from app.services.schedule import refresh_round, representative_for
 
 log = logging.getLogger(__name__)
@@ -71,6 +72,8 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
         if res.error:
             stats["failed"] += 1
             continue
+        verify_round(db, prop)  # fill gaps from neighbours again (at most weekly)
+        db.commit()
         if res.changed:
             stats["changed"] += 1
             stats["notified"] += _propagate_change(db, prop, res.diff)

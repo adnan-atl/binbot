@@ -35,11 +35,14 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
-  # Only needed for the ~90 councils whose sites require a real browser.
+  # ~86 councils' sites only work in a real browser. Always on, or those councils fail.
+  # standalone-chromium is multi-arch (runs natively on Apple Silicon).
   selenium:
-    image: selenium/standalone-chrome:latest
+    image: selenium/standalone-chromium:latest
     shm_size: 2g
-    profiles: ["browser"]
+    environment:
+      SE_NODE_MAX_SESSIONS: 4
+      SE_NODE_OVERRIDE_MAX_SESSIONS: "true"
     ports: ["4444:4444"]
 
 volumes:
