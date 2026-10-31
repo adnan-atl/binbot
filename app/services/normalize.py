@@ -26,12 +26,42 @@ _COLOURS = ("blue", "green", "brown", "black", "grey", "gray", "purple", "red", 
             "orange", "white", "silver", "burgundy", "maroon", "pink")
 
 
-def categorise(label: str) -> BinCategory:
+# What a bin colour means differs by council: green is garden waste in most of England and
+# general waste in Glasgow. When a council labels bins by colour alone, look here first.
+# Keyed by GSS code. Add a council when its labels come through as bare colours.
+COUNCIL_COLOURS: dict[str, dict[str, BinCategory]] = {
+    "S12000049": {  # Glasgow City
+        "blue": BinCategory.recycling, "green": BinCategory.general, "grey": BinCategory.food,
+        "brown": BinCategory.garden, "purple": BinCategory.glass,
+    },
+    "E09000013": {  # Hammersmith & Fulham (sacks/bins by colour)
+        "blue": BinCategory.recycling, "black": BinCategory.general,
+    },
+}
+
+
+def categorise(label: str, gss_code: str | None = None) -> BinCategory:
     l = label.lower()
+    if gss_code and gss_code in COUNCIL_COLOURS:
+        c = colour_of(l)
+        if c and c in COUNCIL_COLOURS[gss_code]:
+            return COUNCIL_COLOURS[gss_code][c]
     for cat, needles in _RULES:
         if any(n in l for n in needles):
             return cat
     return BinCategory.other
+
+
+# Short "what goes in it" line for the UI when the council label is just a colour.
+PURPOSE = {
+    BinCategory.recycling: "Recycling: paper, card, cans, plastic bottles",
+    BinCategory.general: "General waste",
+    BinCategory.food: "Food waste",
+    BinCategory.garden: "Garden waste",
+    BinCategory.glass: "Glass",
+    BinCategory.paper: "Paper and card",
+    BinCategory.other: "",
+}
 
 
 def colour_of(label: str) -> str | None:
