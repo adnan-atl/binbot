@@ -116,3 +116,14 @@ def test_house_number_reaches_modules_that_read_number(monkeypatch):
     ukbcd.UKBCDAdapter(spec_for("E07000121")).fetch(
         LookupInput(postcode="LA1 1AA", house_number="12"))
     assert seen["number"] == "12" and seen["paon"] == "12"
+
+
+def test_os_door_uses_structured_fields():
+    """Regression (Lancaster): 'FLAT 3, 18 ELM ROAD' must search as '18', not 'FLAT 3 18'."""
+    from app.services.geo import os_door
+
+    assert os_door({"SUB_BUILDING_NAME": "FLAT 3", "BUILDING_NUMBER": "18",
+                    "ADDRESS": "FLAT 3, 18, ELM ROAD, LANCASTER, LA1 1AA"}) == "18"
+    assert os_door({"BUILDING_NAME": "ROSE COTTAGE",
+                    "ADDRESS": "ROSE COTTAGE, ELM ROAD, LANCASTER, LA1 1AA"}) == "ROSE COTTAGE"
+    assert os_door({"ADDRESS": "12, ELM ROAD, LANCASTER, LA1 1AA"}) == "12"

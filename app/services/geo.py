@@ -66,6 +66,17 @@ def _paon(line: str) -> str | None:
     return line.split(",")[0].strip() or None
 
 
+def os_door(dpa: dict) -> str | None:
+    """
+    What a council search box expects as "house number": the street door, not the flat.
+    OS Places splits the address for us, so use its fields instead of parsing the string:
+    "FLAT 3, 18 ELM ROAD" -> "18"; "ROSE COTTAGE, ELM ROAD" -> "ROSE COTTAGE".
+    """
+    num = (dpa.get("BUILDING_NUMBER") or "").strip()
+    name = (dpa.get("BUILDING_NAME") or "").strip()
+    return num or name or _paon(dpa.get("ADDRESS", ""))
+
+
 def lookup_addresses(postcode: str) -> list[AddressHit]:
     """
     Addresses with UPRNs for a postcode. Provider-dependent:
@@ -91,7 +102,7 @@ def lookup_addresses(postcode: str) -> list[AddressHit]:
         for item in r.json().get("results", []):
             d = item.get("DPA", {})
             line = d.get("ADDRESS", "")
-            out.append(AddressHit(uprn=str(d.get("UPRN")), line=line, house_number=_paon(line)))
+            out.append(AddressHit(uprn=str(d.get("UPRN")), line=line, house_number=os_door(d)))
         return out
     if s.address_provider == "getaddress" and s.getaddress_api_key:
         r = httpx.get(
