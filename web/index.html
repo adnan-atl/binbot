@@ -307,7 +307,7 @@ button{font:inherit}
 <h1 class="h1">BinBot's on it<br><span>Reading your council's calendar</span></h1>
 <div id="psteps" aria-live="polite"></div>
 <div class="row-actions">
-<a class="pill solid" href="#confirm">See my dates</a>
+<a class="pill solid" id="p-next" href="#confirm">See my dates</a>
 <a href="#postcode" style="font-size:15px;font-weight:600;padding:12px 4px">Change postcode</a>
 </div>
 </div>
@@ -559,6 +559,7 @@ Share with your street
       postcode = v; wrap.hidden = true; sel.innerHTML = '';
       var own = ownLookup === 'start'; if (own) ownLookup = 'picking';
       api('GET', '/postcode/' + encodeURIComponent(v)).then(function (p) {
+        API.council = p.council;
         var needsAddr = (p.needs_uprn || p.needs_house_number) && (own || !p.round_known);
         if (!needsAddr) { done(); submitPostcode(); return; }
         return api('GET', '/postcode/' + encodeURIComponent(v) + '?addresses=true').then(function (p2) {
@@ -584,7 +585,16 @@ Share with your street
       ? api('POST', '/users/' + API.userId + '/own-calendar', body)
       : api('POST', '/signup/start', Object.assign({ postcode: v, referral_code: ref }, body));
     ownLookup = null;
+    // Show progress while the council answers (seconds for some sites), instead of a frozen
+    // button followed by a replayed animation.
+    fetching = true; parseAt = 0;
+    PSTEPS[0].sub = API.council || 'Your council';
+    PSTEPS[1].sub = 'Asking ' + (API.council || 'your council') + ' for your dates';
+    PSTEPS[2] = { label: 'Match your road', sub: '' }; PSTEPS[3] = { label: 'Spot your bins', sub: '' };
+    setTimeout(function () { if (fetching) { PSTEPS[1].sub = 'Some council websites are slow. Nearly there…'; drawParsing(parseAt); } }, 6000);
+    go('parsing');
     req.then(function (j) {
+      fetching = false;
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
       note = j.shared && j.error ? j.error : '';
       // Live API: show exactly what the council gave us, never the demo bins.
@@ -602,8 +612,9 @@ Share with your street
         PSTEPS[3].label = 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins');
         PSTEPS[3].sub = bins.map(function (b) { return b.name; }).join(', ');
       }
-      go('parsing');
+      if (current === 'parsing') runParsing(); else go('parsing');
     }).catch(function (e) {
+      fetching = false; go('postcode');
       $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
     }).then(done);
   }
@@ -645,10 +656,18 @@ Share with your street
         : i === at ? '<div class="mark"><div class="spin"></div></div>' : '<div class="mark todo"></div>';
       return '<div class="pstep">' + mark + '<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:700;color:' + (i > at ? '#8A8A8E' : '#1A1A1A') + '">' + s.label + '</span><span class="hint">' + s.sub + '</span></div></div>';
     }).join('');
+    $('#p-next').hidden = at < PSTEPS.length;
   }
+  var fetching = false, parseAt = 0;
   function runParsing() {
-    var at = 0; drawParsing(at);
-    timer = setInterval(function () { at++; drawParsing(at); if (at >= PSTEPS.length) clearInterval(timer); }, 900);
+    clearInterval(timer);
+    // Council already known: tick it, spin on the calendar until the answer is in.
+    if (fetching) { parseAt = 1; drawParsing(parseAt); return; }
+    // Answer is in: finish the remaining steps quickly. Demo mode keeps the slower show.
+    var ms = API.live ? 220 : 900;
+    if (!API.live) parseAt = 0;
+    drawParsing(parseAt);
+    timer = setInterval(function () { parseAt++; drawParsing(parseAt); if (parseAt >= PSTEPS.length) clearInterval(timer); }, ms);
   }
 
   // Confirm
