@@ -283,6 +283,11 @@ button{font:inherit}
 <input id="pc" class="field" type="text" autocomplete="postal-code" placeholder="e.g. E8 3PB" value="E8 3PB" aria-describedby="pc-err">
 <span id="pc-err" class="error" hidden>Enter a UK postcode, like E8 3PB.</span>
 </div>
+<div id="addr-wrap" style="display:flex;flex-direction:column;gap:8px" hidden>
+<label for="addr" class="lbl">Your address</label>
+<select id="addr" class="field" style="text-transform:none;letter-spacing:0;font-size:18px;appearance:auto"></select>
+<span class="hint" id="addr-hint">Your council files collection days by address, not postcode.</span>
+</div>
 <div><button type="button" class="pill go" id="pc-go">Find my bin days</button></div>
 </div>
 </div>
@@ -474,7 +479,7 @@ Share with your street
   var ORDER_SCREENS = ['home', 'postcode', 'parsing', 'confirm', 'phone', 'reminders', 'binfluencer'];
   document.addEventListener('click', function (e) {
     if (!e.target.closest('[data-back]')) return;
-    if (current === 'confirm' && editing) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
+    if (current === 'confirm' && editing && bins.length) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
     var i = ORDER_SCREENS.indexOf(current);
     go(ORDER_SCREENS[Math.max(0, i - 1)]);
   });
@@ -484,7 +489,10 @@ Share with your street
   function api(method, path, body) {
     return fetch(API.base + path, { method: method, headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined })
-      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.detail || r.status); return j; }); });
+      .then(function (r) { return r.text().then(function (t) {
+        var j; try { j = JSON.parse(t); } catch (e) { j = null; }
+        if (!r.ok) throw new Error((j && j.detail) || 'Something went wrong on our side (' + r.status + '). Try again in a moment.');
+        return j; }); });
   }
   api('GET', '/health').then(function () { API.live = true; }).catch(function () { API.live = false; });
   var DAY_IN = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
@@ -525,22 +533,56 @@ Share with your street
     $('#pc-err').hidden = ok;
     $('#pc').setAttribute('aria-invalid', ok ? 'false' : 'true');
     if (!ok) return;
-    postcode = v;
-    if (!API.live) { go('parsing'); return; }
+    if (!API.live) { postcode = v; go('parsing'); return; }
     var btn = $('#pc-go'); btn.disabled = true; btn.textContent = 'Looking up…';
+    var done = function () { btn.disabled = false; btn.textContent = 'Find my bin days'; };
+    var wrap = $('#addr-wrap'), sel = $('#addr');
+    // Step A: postcode changed (or first time) -> ask the API whether this council needs an address.
+    if (v !== postcode) {
+      postcode = v; wrap.hidden = true; sel.innerHTML = '';
+      api('GET', '/postcode/' + encodeURIComponent(v)).then(function (p) {
+        if (p.addresses && p.addresses.length && (p.needs_uprn || p.needs_house_number)) {
+          sel.innerHTML = '<option value="">Pick your address…</option>' + p.addresses.map(function (a, i) {
+            return '<option value="' + i + '">' + esc(a.line) + '</option>'; }).join('');
+          sel.dataset.list = JSON.stringify(p.addresses);
+          wrap.hidden = false; done(); setTimeout(function () { sel.focus(); }, 30);
+          return;
+        }
+        done(); submitPostcode();  // no address step needed
+      }).catch(function (e) { $('#pc-err').textContent = e.message; $('#pc-err').hidden = false; done(); });
+      return;
+    }
+    // Step B: address required but not picked yet.
+    var addr = null;
+    if (!wrap.hidden) {
+      if (!sel.value) { done(); sel.focus(); return; }
+      addr = JSON.parse(sel.dataset.list)[+sel.value];
+    }
     var ref = (location.search.match(/[?&]ref=([^&]+)/) || [])[1] || null;
-    api('POST', '/signup/start', { postcode: v, referral_code: ref }).then(function (j) {
+    api('POST', '/signup/start', { postcode: v, referral_code: ref, uprn: addr && addr.uprn,
+      house_number: addr && addr.house_number, address_line: addr && addr.line }).then(function (j) {
       API.userId = j.user_id; API.council = j.council;
-      if (j.bins && j.bins.length) bins = j.bins.map(binFromApi);
+      // Live API: show exactly what the council gave us, never the demo bins.
+      bins = (j.bins || []).map(binFromApi);
+      calendarFailed = !bins.length;
+      var dayNames = []; bins.forEach(function (b) { b.days.forEach(function (d) { if (dayNames.indexOf(d) < 0) dayNames.push(d); }); });
       PSTEPS[0].sub = j.council || PSTEPS[0].sub;
-      PSTEPS[3].label = 'Spotted ' + bins.length + ' bins';
-      PSTEPS[3].sub = bins.map(function (b) { return b.name; }).join(', ');
-      if (j.error) { PSTEPS[1].sub = "Couldn't read it. You can set the days yourself."; }
+      if (calendarFailed) {
+        PSTEPS[1].sub = "Couldn't read it this time. You'll set your bins yourself.";
+        PSTEPS[2].label = 'Collection days'; PSTEPS[2].sub = 'Add them on the next screen';
+        PSTEPS[3].label = 'No bins found yet'; PSTEPS[3].sub = 'Takes about 30 seconds';
+      } else {
+        PSTEPS[1].sub = 'Including bank holiday changes';
+        PSTEPS[2].label = 'Matched your road'; PSTEPS[2].sub = (dayNames.map(function (d) { return LONG[d]; }).join(' and ') || 'Set') + ' collections';
+        PSTEPS[3].label = 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins');
+        PSTEPS[3].sub = bins.map(function (b) { return b.name; }).join(', ');
+      }
       go('parsing');
     }).catch(function (e) {
       $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
-    }).then(function () { btn.disabled = false; btn.textContent = 'Find my bin days'; });
+    }).then(done);
   }
+  $('#addr').addEventListener('change', function () { if (this.value) submitPostcode(); });
 
   // Phone
   var phone = '';
@@ -607,9 +649,16 @@ Share with your street
   };
   var find = function (id) { return bins.filter(function (b) { return b.id === id; })[0]; };
 
+  var calendarFailed = false;
   function renderConfirm() {
-    $('#c-title').innerHTML = editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
-    $('#c-lede').textContent = editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.' : '';
+    if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
+    var empty = !bins.length;
+    $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
+      : editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
+    $('#c-lede').textContent = empty ? (calendarFailed ? "BinBot couldn't read " + (API.council || 'your council') + "'s calendar this time. Tell it your bins and it'll keep an eye on the council for changes." : 'Add each bin with its day and how often it goes out.')
+      : editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.' : '';
+    $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
+    $('#c-save').disabled = empty;
     $('#c-lede').hidden = !editing;
     $('#c-view').hidden = editing;
     $('#c-editor').hidden = !editing;
