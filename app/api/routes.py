@@ -168,7 +168,8 @@ def _bins_out(db: Session, user: User) -> list[S.BinOut]:
             colour, manual = None, True
         elif s.bin_type_id in council_bins:
             cb = council_bins[s.bin_type_id]
-            rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"]}
+            rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"],
+                    "purpose": cb["purpose"]}
             colour, manual = cb["colour"], False
         else:
             rule, colour, manual = {"days": [], "frequency": "irregular", "next": None}, None, True

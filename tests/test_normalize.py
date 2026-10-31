@@ -76,3 +76,20 @@ def test_hammersmith_override_handles_two_days():
     assert describe_rule(rec) == {"days": ["TUE", "FRI"], "frequency": "weekly", "next": "2026-11-03"}
     food = sorted(i.date for i in items if i.label == "Food waste")
     assert describe_rule(food)["days"] == ["TUE"]
+
+
+def test_glasgow_override_reads_frequency_and_calendar():
+    """Upstream keeps one 'next' date; the page also states the period and a month grid."""
+    import pathlib
+    from app.adapters.base import LookupInput
+    from app.adapters.overrides import glasgow
+
+    html = pathlib.Path(__file__).with_name("fixtures_glasgow.html").read_text()
+    items = glasgow(LookupInput(postcode="G3 6AH", uprn="906700334286"), html=html,
+                    today=date(2026, 10, 31))
+    blue = sorted(i.date for i in items if i.label == "Blue Bin")
+    green = sorted(i.date for i in items if i.label == "Green Bin")
+    assert date(2026, 10, 3) in blue and date(2026, 10, 31) in blue and date(2026, 11, 14) in blue
+    assert describe_rule([d for d in blue if d >= date(2026, 10, 31)])["frequency"] == "fortnightly"
+    assert describe_rule([d for d in green if d >= date(2026, 10, 31)]) == {
+        "days": ["SUN"], "frequency": "weekly", "next": "2026-11-01"}
