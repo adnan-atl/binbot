@@ -128,10 +128,11 @@ def round_has_calendar(db: Session, round_key: str) -> bool:
 
 
 def representative_for(db: Session, round_key: str) -> Property | None:
-    """The property to fetch a round with: prefer one that has a UPRN."""
+    """The property to fetch a round with: prefer one with a UPRN, then one with a house
+    number (some councils look up by number + postcode), then the oldest."""
     return db.scalar(
         select(Property).where(Property.round_key == round_key)
-        .order_by(Property.uprn.is_(None), Property.created_at)
+        .order_by(Property.uprn.is_(None), Property.house_number.is_(None), Property.created_at)
     )
 
 
