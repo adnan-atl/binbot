@@ -135,3 +135,34 @@ def test_failed_own_lookup_keeps_street_calendar_and_council_health(client, db, 
     db.expire_all()
     assert db.scalar(select(Council)).status == CouncilStatus.ok
     assert {p.round_key for p in db.scalars(select(Property))} == {"pc:E09000012:E8 3PB"}
+
+
+def test_verify_fills_missing_recycling_from_a_neighbour(client, db, fake_adapter, monkeypatch):
+    """Loader-time verify: this address lists no recycling, a neighbour on the same postcode
+    does. Fill it, show it, and don't treat it as 'removed' on the next refresh."""
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+    refuse = [RawCollection("Refuse", tue + timedelta(weeks=2 * i)) for i in range(3)]
+    recycling = [RawCollection("Recycling", tue + timedelta(weeks=2 * i + 1)) for i in range(3)]
+    asked = []
+
+    def fetch(council, prop):
+        asked.append(prop.house_number)
+        return refuse + (recycling if prop.house_number == "10" else [])
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    start = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    assert [b["label"] for b in start["bins"]] == ["Refuse"]
+
+    bins = client.post(f"/api/users/{start['user_id']}/verify").json()
+    assert sorted(b["label"] for b in bins) == ["Recycling", "Refuse"]
+    assert "10" in asked
+    rec = next(b for b in bins if b["label"] == "Recycling")
+    assert rec["frequency"] == "fortnightly" and rec["days"] == ["TUE"]
+
+    user = db.get(User, start["user_id"])
+    res = schedule.refresh_round(db, user.property)  # address calendar still lacks recycling
+    assert not res.diff.get("removed")
+    assert len(client.post(f"/api/users/{start['user_id']}/verify").json()) == 2
+    n = len(asked)
+    client.post(f"/api/users/{start['user_id']}/verify")
+    assert len(asked) == n  # verified this week already: no more council lookups
