@@ -27,6 +27,7 @@ from app.models import (
 from app.services import geo
 from app.services.normalize import describe_rule
 from app.services.reminders import handle_inbound, rebuild_reminders
+from app.services.verify import verify_round
 from app.services.schedule import (
     get_or_create_council,
     own_round,
@@ -62,7 +63,7 @@ def postcode_lookup(postcode: str, addresses: bool = False, db: Session = Depend
         info = geo.lookup_postcode(postcode)
     except geo.BadPostcode:
         raise HTTPException(400, "That doesn't look like a UK postcode")
-    spec = spec_for(info.gss_code)
+    spec = spec_for(info.gss_code, info.district)
     council = get_or_create_council(db, info.gss_code, info.district)
     known = round_has_calendar(db, postcode_round_key(council, info.postcode))
     db.commit()
@@ -174,6 +175,19 @@ def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_
     db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=prop.council.name,
                       source=source, shared=False, bins=_bins_out(db, user))
+
+
+@router.post("/users/{user_id}/verify", response_model=list[S.BinOut])
+def verify(user_id: str, db: Session = Depends(get_db)):
+    """
+    Runs while the loader is on screen: if the checker found a gap, ask the council about
+    a neighbour or two on the same postcode and fill it. Returns the bins to show.
+    """
+    user = _user(db, user_id)
+    if user.property and verify_round(db, user.property)["filled"]:
+        _seed_settings(db, user, user.property)
+    db.commit()
+    return _bins_out(db, user)
 
 
 def _bins_out(db: Session, user: User) -> list[S.BinOut]:

@@ -41,24 +41,27 @@ log = logging.getLogger(__name__)
 
 def get_or_create_council(db: Session, gss_code: str, name: str) -> Council:
     c = db.scalar(select(Council).where(Council.gss_code == gss_code))
-    if c:
-        return c
-    spec = spec_for(gss_code)
-    c = Council(
-        gss_code=gss_code,
-        name=name,
-        country=gss_code[0],
-        adapter=spec.module if spec else None,
-        adapter_params={"url": spec.url, "skip_get_url": spec.skip_get_url} if spec else {},
-        needs_uprn=bool(spec and spec.needs_uprn),
-        needs_postcode=bool(spec and spec.needs_postcode),
-        needs_house_number=bool(spec and spec.needs_house_number),
-        needs_browser=bool(spec and spec.needs_browser),
-        status=CouncilStatus.ok if spec else CouncilStatus.unsupported,
-    )
-    db.add(c)
+    spec = spec_for(gss_code, name)
+    if c is None:
+        c = Council(gss_code=gss_code, name=name, country=gss_code[0])
+        db.add(c)
+        _apply_spec(c, spec)
+    elif spec and (c.adapter != spec.module or c.status == CouncilStatus.unsupported):
+        # A library upgrade or a registry fix gave this council an adapter: start using it.
+        _apply_spec(c, spec)
     db.flush()
     return c
+
+
+def _apply_spec(c: Council, spec) -> None:
+    c.adapter = spec.module if spec else None
+    c.adapter_params = {"url": spec.url, "skip_get_url": spec.skip_get_url} if spec else {}
+    c.needs_uprn = bool(spec and spec.needs_uprn)
+    c.needs_postcode = bool(spec and spec.needs_postcode)
+    c.needs_house_number = bool(spec and spec.needs_house_number)
+    c.needs_browser = bool(spec and spec.needs_browser)
+    c.status = CouncilStatus.ok if spec else CouncilStatus.unsupported
+    c.failure_count, c.last_error = 0, None
 
 
 def get_or_create_bin_type(db: Session, council: Council, label: str) -> BinType:
@@ -143,7 +146,7 @@ def representative_for(db: Session, round_key: str) -> Property | None:
 def _adapter_for(council: Council):
     if not council.adapter:
         return None
-    spec = spec_for(council.gss_code)
+    spec = spec_for(council.gss_code, council.name)
     return UKBCDAdapter(spec) if spec else None
 
 
@@ -224,11 +227,19 @@ def _apply_events(db: Session, round_key: str, council: Council, items: list[Raw
         select(CollectionEvent).where(CollectionEvent.round_key == round_key,
                                       CollectionEvent.date >= today)
     ).all()
-    have = {(e.bin_type_id, e.date): e for e in existing}
+    # Events filled from a neighbour by the verify step aren't this address's to diff: a
+    # fetch that doesn't list them isn't a removal. If this fetch does list one, adopt it.
+    filled = set(db.scalars(select(Snapshot.id).where(Snapshot.round_key == round_key,
+                                                      Snapshot.source == "neighbours")).all())
+    borrowed = {(e.bin_type_id, e.date): e for e in existing if e.snapshot_id in filled}
+    have = {(e.bin_type_id, e.date): e for e in existing if e.snapshot_id not in filled}
     want: dict[tuple[str, date], RawCollection] = {}
     for i in items:
         bt = get_or_create_bin_type(db, council, i.label)
         want[(bt.id, i.date)] = i
+    for key in want.keys() & borrowed.keys():
+        borrowed[key].snapshot_id = snap.id
+        have[key] = borrowed[key]
 
     added, removed, moved = [], [], []
     for key in want.keys() - have.keys():
