@@ -19,6 +19,13 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "respx>=0.21", "ruff>=0.5"]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
