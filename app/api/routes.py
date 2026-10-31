@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.models import (
     BinCategory,
+    ChangeLog,
     CouncilStatus,
     Referral,
     Reminder,
@@ -112,9 +113,20 @@ def signup_start(body: S.StartIn, db: Session = Depends(get_db)):
     if user.referred_by_id:
         db.add(Referral(referrer_id=user.referred_by_id, referred_id=user.id))
     db.commit()
+    found = _checks(db, prop) if not error else []
+    db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=council.name,
                       source=source if not error else "manual", error=error, shared=shared,
-                      bins=_bins_out(db, user))
+                      bins=_bins_out(db, user), checks=found)
+
+
+def _checks(db: Session, prop) -> list[S.CheckOut]:
+    """Run the checker; disagreements between sources also go to the change log for review."""
+    _, found = schedule_for(db, prop, with_checks=True)
+    for c in found:
+        if c["kind"] == "conflict":
+            db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="data_conflict", diff=c))
+    return [S.CheckOut(**c) for c in found]
 
 
 def _seed_settings(db: Session, user: User, prop) -> None:
@@ -157,9 +169,10 @@ def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_
                           error="We couldn't find a separate calendar for that address, so "
                                 "you're still on your street's days.")
     _seed_settings(db, user, prop)
+    found = _checks(db, prop)
     db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=prop.council.name,
-                      source=source, shared=False, bins=_bins_out(db, user))
+                      source=source, shared=False, bins=_bins_out(db, user), checks=found)
 
 
 def _bins_out(db: Session, user: User) -> list[S.BinOut]:
@@ -175,7 +188,7 @@ def _bins_out(db: Session, user: User) -> list[S.BinOut]:
         elif s.bin_type_id in council_bins:
             cb = council_bins[s.bin_type_id]
             rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"],
-                    "purpose": cb["purpose"]}
+                    "purpose": cb["purpose"], "frequency_source": cb.get("frequency_source", "")}
             colour, manual = cb["colour"], False
         else:
             rule, colour, manual = {"days": [], "frequency": "irregular", "next": None}, None, True
