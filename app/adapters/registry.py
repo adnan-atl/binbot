@@ -80,17 +80,29 @@ def load_specs() -> dict[str, AdapterSpec]:
     data = json.loads(_input_json_path().read_text())
     specs: dict[str, AdapterSpec] = {}
     for module, v in data.items():
-        gss = v.get("LAD24CD") or MISSING_LAD.get(module)
+        gss = _gss(module, v)
         if not gss:
             continue
         spec = _spec(module, v, gss)
         if spec.needs_council_id:
             continue
         # A few modules cover several councils.
-        for extra in v.get("supported_councils_LAD24CD", []) or []:
+        for extra in [*(v.get("supported_councils_LAD24CD", []) or []), *ALSO_SERVES.get(module, [])]:
             specs.setdefault(extra, spec)
         specs.setdefault(gss, spec)
+    # Councils the library has no scraper for, served by our own (overrides.py).
+    for gss, spec in CUSTOM.items():
+        specs.setdefault(gss, spec)
     return specs
+
+
+def _gss(module: str, v: dict) -> str | None:
+    """The council a module serves. input.json's own code first, unless it's known wrong."""
+    if module in LAD_FIX:
+        return LAD_FIX[module]
+    if "deprecated" in (v.get("wiki_name") or "").lower():
+        return None  # a newer module for the same council exists; don't let this one win
+    return v.get("LAD24CD") or MISSING_LAD.get(module)
 
 
 @lru_cache(maxsize=None)
@@ -159,6 +171,50 @@ MISSING_LAD = {
     "TamworthBoroughCouncil": "E07000199",
     "TorfaenCouncil": "W06000020",
 }
+
+# input.json codes that are wrong, checked against the library's own council boundaries
+# (Local_Authority_Boundaries.geojson). Each one sent a whole council's residents to the
+# wrong scraper or to none: Gosport carried Stroud's code, so Stroud got Gosport's
+# scraper; North Warwickshire carried Rugby's, so Rugby got North Warwickshire's.
+# tests/test_registry.py re-checks every code on each library upgrade.
+LAD_FIX: dict[str, str | None] = {
+    "GosportBoroughCouncil": "E07000088",            # had E07000082 (Stroud)
+    "NorthWarwickshireBoroughCouncil": "E07000218",  # had E07000220 (Rugby)
+    "EastHertsCouncil": "E07000242",                 # had E07000097 (pre-2019 code)
+    "HarrogateBoroughCouncil": None,                 # merged into North Yorkshire (own module)
+    "EdenDistrictCouncil": None,                     # Westmorland and Furness module covers it
+}
+# Modules that serve more than the one council input.json names.
+ALSO_SERVES: dict[str, list[str]] = {
+    "AdurAndWorthingCouncils": ["E07000229"],  # Worthing (input.json lists Adur only)
+}
+# Our own scrapers for councils with no library module. Key = GSS code; the spec's module
+# name is the key in overrides.OVERRIDES.
+CUSTOM: dict[str, AdapterSpec] = {
+    "E09000020": AdapterSpec(
+        module="BinBotKensingtonAndChelsea", gss_code="E09000020",
+        name="Kensington and Chelsea", url="https://www.rbkc.gov.uk/bincollections/default.aspx",
+        needs_postcode=True, needs_house_number=True,
+        note="Street lookup; the street comes from the address, the number picks the row."),
+}
+
+
+def audit() -> list[str]:
+    """Codes that don't exist, or that two modules both claim (one silently loses)."""
+    data = json.loads(_input_json_path().read_text())
+    geo = json.loads((_input_json_path().parent.parent / "Local_Authority_Boundaries.geojson")
+                     .read_text())
+    real = {f["properties"]["LAD24CD"] for f in geo["features"]}
+    claims: dict[str, list[str]] = {}
+    for module, v in data.items():
+        gss = _gss(module, v)
+        if gss:
+            claims.setdefault(gss, []).append(module)
+    issues = [f"{m}: {g} is not a current council code" for g, ms in claims.items()
+              if g not in real for m in ms]
+    issues += [f"{g}: claimed by {ms}" for g, ms in claims.items() if len(ms) > 1]
+    return issues
+
 
 _NOISE = re.compile(r"\b(london|royal|borough|city|county|district|metropolitan|council|"
                     r"of|the|and|dc|bc|cc|mbc)\b")
