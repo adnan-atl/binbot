@@ -50,7 +50,7 @@ postcode ──► postcodes.io ──► council (GSS code) ──► adapter �
    [UKBinCollectionData](https://github.com/robbrad/UKBinCollectionData) (330 councils
    as of this version). `pip install -U uk-bin-collection` picks up new ones.
 3. Councils look addresses up by **UPRN**, not postcode. Configure `ADDRESS_PROVIDER`
-   (OS Places or getAddress.io) to offer a house picker. Without one, councils that
+   (OS Places; Ideal Postcodes as `ADDRESS_FALLBACK`) to offer a house picker. Without one, councils that
    need a UPRN (218 of 330) fall back to manual entry.
    **Address lookups are paid, so they happen once per postcode, not per user.** The
    default round key is `pc:<council>:<postcode>`: the first neighbour's lookup fetches

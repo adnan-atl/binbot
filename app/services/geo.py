@@ -1,4 +1,5 @@
 """Postcode -> council (GSS code) and postcode -> addresses (UPRN)."""
+import logging
 import re
 import time
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ import httpx
 
 from app.core.config import get_settings
 
+log = logging.getLogger(__name__)
 _PC = re.compile(r"^([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})$")
 
 
@@ -102,11 +104,13 @@ def os_door(dpa: dict) -> str | None:
 
 def lookup_addresses(postcode: str) -> list[AddressHit]:
     """
-    Addresses with UPRNs for a postcode. Provider-dependent:
-      os_places  - Ordnance Survey Places API (returns UPRN; free tier exists)
-      getaddress - getAddress.io (returns UPRN on the 'expand' endpoint)
-      none       - no provider; the user types a house number and councils that need a
-                   UPRN become 'manual' until a provider is configured.
+    Addresses with UPRNs for a postcode, from ADDRESS_PROVIDER, then ADDRESS_FALLBACK when
+    the first errors (outage, rate limit, bad key) or has nothing for the postcode (a new
+    build one dataset has and the other doesn't yet):
+      os_places        Ordnance Survey Places API (UPRN; free tier)
+      ideal_postcodes  Ideal Postcodes (UPRN; pay per lookup, so only as the fallback)
+    If both come back empty the sign-up still works: the resident types a house number,
+    and councils that need a UPRN go to the neighbours or manual entry.
     """
     s = get_settings()
     pc = normalise_postcode(postcode)
@@ -121,32 +125,56 @@ def lookup_addresses(postcode: str) -> list[AddressHit]:
 
 
 def _fetch_addresses(s, pc: str) -> list[AddressHit]:
-    if s.address_provider == "os_places" and s.os_places_api_key:
-        r = httpx.get(
-            "https://api.os.uk/search/places/v1/postcode",
-            params={"postcode": pc, "key": s.os_places_api_key, "dataset": "DPA"},
-            timeout=10,
-        )
-        r.raise_for_status()
-        out = []
-        for item in r.json().get("results", []):
-            d = item.get("DPA", {})
-            line = d.get("ADDRESS", "")
-            out.append(AddressHit(uprn=str(d.get("UPRN")), line=line, house_number=os_door(d)))
-        return out
-    if s.address_provider == "getaddress" and s.getaddress_api_key:
-        r = httpx.get(
-            f"https://api.getaddress.io/find/{pc.replace(' ', '')}",
-            params={"api-key": s.getaddress_api_key, "expand": "true"},
-            timeout=10,
-        )
-        r.raise_for_status()
-        out = []
-        for a in r.json().get("addresses", []):
-            line = ", ".join(x for x in a.get("formatted_address", []) if x)
-            out.append(
-                AddressHit(uprn=str(a["uprn"]) if a.get("uprn") else None, line=line,
-                           house_number=a.get("building_number") or _paon(line))
-            )
-        return out
+    providers = [getattr(s, "address_provider", "none"), getattr(s, "address_fallback", "none")]
+    for name in dict.fromkeys(p for p in providers if p and p != "none"):
+        fetch = _PROVIDERS.get(name)
+        if fetch is None:
+            continue
+        try:
+            out = fetch(s, pc)
+        except (httpx.HTTPError, ValueError, KeyError) as e:
+            log.warning("address lookup: %s failed for %s: %s", name, pc, e)
+            continue
+        if out:
+            return out
     return []
+
+
+def _os_places(s, pc: str) -> list[AddressHit] | None:
+    if not getattr(s, "os_places_api_key", ""):
+        return None
+    r = httpx.get(
+        "https://api.os.uk/search/places/v1/postcode",
+        params={"postcode": pc, "key": s.os_places_api_key, "dataset": "DPA"},
+        timeout=10,
+    )
+    r.raise_for_status()
+    out = []
+    for item in r.json().get("results", []):
+        d = item.get("DPA", {})
+        line = d.get("ADDRESS", "")
+        out.append(AddressHit(uprn=str(d.get("UPRN")), line=line, house_number=os_door(d)))
+    return out
+
+
+def _ideal_postcodes(s, pc: str) -> list[AddressHit] | None:
+    key = getattr(s, "ideal_postcodes_api_key", "")
+    if not key:
+        return None
+    r = httpx.get(f"https://api.ideal-postcodes.co.uk/v1/postcodes/{pc.replace(' ', '')}",
+                  params={"api_key": key}, timeout=10)
+    if r.status_code == 404:  # postcode not found: an answer, not an outage
+        return []
+    r.raise_for_status()
+    out = []
+    for a in r.json().get("result", []):
+        line = ", ".join(x for x in (a.get("line_1"), a.get("line_2"), a.get("line_3"),
+                                     a.get("post_town"), a.get("postcode")) if x)
+        door = (a.get("building_number") or a.get("building_name")
+                or _paon(a.get("line_1", "")))
+        out.append(AddressHit(uprn=str(a["uprn"]) if a.get("uprn") else None, line=line,
+                              house_number=door or None))
+    return out
+
+
+_PROVIDERS = {"os_places": _os_places, "ideal_postcodes": _ideal_postcodes}
