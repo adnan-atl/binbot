@@ -19,6 +19,15 @@ def number(uprn):
     return int(uprn[-2:])
 
 
+@pytest.fixture(autouse=True)
+def splits_live(monkeypatch):
+    """These tests are about real splits; dry run has its own test."""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("SPLIT_DRY_RUN", "false")
+    get_settings.cache_clear()
+
+
 @pytest.fixture
 def street(monkeypatch):
     """Homes 1-12 on one postcode; `day(n)` says which day the council gives house n."""
@@ -91,6 +100,25 @@ def test_odd_side_gets_its_own_round(client, db, street):
     c = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "20000005"}).json()
     assert c["shared"] and days_of(client, c["user_id"]) == {"TUE"}
     assert split.disputed_rounds(db) == []
+
+
+def test_dry_run_only_logs_the_split(client, db, street, monkeypatch):
+    """Default: say what would happen, change nothing, message nobody."""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("SPLIT_DRY_RUN", "true")
+    get_settings.cache_clear()
+    street["day"] = lambda n: TUE if n % 2 else THU
+    signup(client, 2)
+    b = signup(client, 3, phone="07700900123")
+    dispute(db)
+    assert monitor.resolve_disputes(db) == {"would_split": 1}
+    checked = db.scalar(select(ChangeLog).where(ChangeLog.kind == "split_checked"))
+    assert checked.diff["rule"]["by"] == "parity" and checked.diff["would_move"] == ["20000003"]
+    assert db.scalar(select(RoundSplit)) is None
+    assert db.get(User, b).property.round_key == KEY
+    assert db.scalar(select(Outbox).where(Outbox.kind == "change")) is None
+    assert split.disputed_rounds(db) == []  # probed: not again until a new vote
 
 
 def test_split_side_verifies_only_against_its_own_side(client, db, street, monkeypatch):

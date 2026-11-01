@@ -130,5 +130,7 @@ templates for anything sent outside a 24-hour reply window.
   or more homes, and parity or one cut along the street explains them, the postcode is split
   (`round_splits`), residents on the other side are moved and told, and new sign-ups land
   on their side. Anything less certain is logged as `split_checked` for ops.
+  Splits start in dry run (`SPLIT_DRY_RUN=true`): logged as `would_split` with who would move,
+  nothing changed, until you've checked them on real councils and set it to `false`.
 - Local fixes for broken upstream scrapers live in `app/adapters/overrides.py`.
 - Bank holiday list in `monitor.py` is static; wire it to gov.uk/bank-holidays.json.
