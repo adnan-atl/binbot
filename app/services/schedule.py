@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.adapters.base import AdapterError, LookupInput, NoCollectionsForAddress, RawCollection
-from app.adapters.registry import library_version, spec_for
+from app.adapters.registry import candidates, library_version, spec_for
 from app.adapters.ukbcd import UKBCDAdapter
 from app.core.config import get_settings
 from app.models import (
@@ -152,35 +152,105 @@ def representative_for(db: Session, round_key: str) -> Property | None:
 
 
 def _adapter_for(council: Council):
+    adapters = _adapters_for(council)
+    return adapters[0] if adapters else None
+
+
+def _adapters_for(council: Council) -> list[UKBCDAdapter]:
     if not council.adapter:
-        return None
-    spec = spec_for(council.gss_code, council.name)
-    return UKBCDAdapter(spec) if spec else None
+        return []
+    return [UKBCDAdapter(spec) for spec in candidates(council.gss_code, council.name)]
 
 
 def fetch_collections(council: Council, prop: Property) -> list[RawCollection]:
+    """
+    The council's calendar for this home. Fallbacks, in order, before giving up:
+      1. every scraper that serves the council (ours, the library's, older modules)
+      2. for each, the home's full details, then postcode + house number only (some
+         scrapers misname their inputs: Westminster's "uprn" is a street id)
+    After this, sign-up still has the neighbours (verify.rescue_round) and a round that
+    had a calendar keeps its pattern going (project_round).
+    """
     s = get_settings()
     if s.demo_mode:
         from app.services.demo import demo_collections
 
         return demo_collections()
-    adapter = _adapter_for(council)
-    if adapter is None:
+    adapters = _adapters_for(council)
+    if not adapters:
         raise AdapterError("no adapter for council", retryable=False)
-    full = LookupInput(postcode=prop.postcode, uprn=prop.uprn, house_number=prop.house_number)
+    full = LookupInput(postcode=prop.postcode, uprn=prop.uprn, house_number=prop.house_number,
+                       address_line=getattr(prop, "address_line", None))
+    first: AdapterError | None = None
+    for adapter in adapters:
+        try:
+            return _fetch_one(adapter, full)
+        except AdapterError as e:
+            first = first or e
+            log.info("fetch: %s failed for %s: %s", adapter.name, prop.postcode, e)
+    raise first
+
+
+def _fetch_one(adapter: UKBCDAdapter, full: LookupInput) -> list[RawCollection]:
     try:
         return adapter.fetch(full)
     except AdapterError as first:
-        # Some scrapers misname their inputs (Westminster's "uprn" is a street id and it
-        # works out the street from the postcode by itself). If the full input failed,
-        # try once more with just postcode + house number before calling it broken.
-        if not prop.uprn or adapter.spec.needs_uprn and not adapter.spec.needs_postcode:
+        if not full.uprn or adapter.spec.needs_uprn and not adapter.spec.needs_postcode:
             raise
         try:
-            return adapter.fetch(LookupInput(postcode=prop.postcode, uprn=None,
-                                             house_number=prop.house_number), validate=False)
+            return adapter.fetch(LookupInput(postcode=full.postcode, uprn=None,
+                                             house_number=full.house_number,
+                                             address_line=full.address_line), validate=False)
         except AdapterError:
             raise first
+
+
+# Sources whose events aren't this address's own scrape: a refresh that doesn't list them
+# isn't a removal, and one that does list them adopts them.
+BORROWED_SOURCES = ("neighbours", "projected")
+PROJECT_AHEAD = timedelta(days=28)
+
+
+def project_round(db: Session, prop: Property, today: date | None = None) -> int:
+    """
+    Last fallback, for a round that had a calendar: the council's site is down (or its
+    scraper broke) and the known dates are running out. Carry each bin's own pattern
+    forward a few weeks, so reminders don't just stop. Only bins whose interval is backed
+    by at least two gaps (checks.observe); never invents a bin. The next good scrape
+    replaces these dates (BORROWED_SOURCES), and ops see a "projected" row.
+    """
+    today = today or date.today()
+    horizon = today + PROJECT_AHEAD
+    events = db.scalars(select(CollectionEvent).where(
+        CollectionEvent.round_key == prop.round_key,
+        CollectionEvent.date >= today - timedelta(days=120))).all()
+    by_bin: dict[str, set[date]] = {}
+    for e in events:
+        by_bin.setdefault(e.bin_type_id, set()).add(e.date)
+    planned: list[tuple[str, date]] = []
+    for bt_id, dates in by_bin.items():
+        interval, evidence = checker.observe(sorted(dates))
+        if not interval or evidence < 2:
+            continue
+        d = max(dates) + timedelta(days=interval)
+        while d <= horizon:
+            if d >= today:
+                planned.append((bt_id, d))
+            d += timedelta(days=interval)
+    if not planned:
+        return 0
+    snap = Snapshot(round_key=prop.round_key, council_id=prop.council_id, source="projected",
+                    adapter_version=library_version(), content_hash="", raw={
+                        "bins": [{"bin_type_id": b, "collectionDate": d.isoformat()} for b, d in planned]})
+    db.add(snap)
+    db.flush()
+    for bt_id, d in planned:
+        db.add(CollectionEvent(round_key=prop.round_key, bin_type_id=bt_id, date=d,
+                               snapshot_id=snap.id))
+    db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="projected",
+                     diff={"events": len(planned), "until": horizon.isoformat()}))
+    db.flush()
+    return len(planned)
 
 
 def _hash(items: list[RawCollection]) -> str:
@@ -210,6 +280,7 @@ def refresh_round(db: Session, prop: Property, source: str = "council") -> Refre
         db.add(snap)
         if not isinstance(e, NoCollectionsForAddress):
             _mark_failure(db, council, str(e), retryable=e.retryable)
+            _keep_going(db, prop)
         db.commit()
         return RefreshResult(snapshot=snap, changed=False, diff={}, error=str(e))
 
@@ -239,6 +310,15 @@ def refresh_round(db: Session, prop: Property, source: str = "council") -> Refre
     return RefreshResult(snapshot=snap, changed=last is not None, diff=diff)
 
 
+def _keep_going(db: Session, prop: Property) -> None:
+    """A refresh failed. If this round's known dates run out within PROJECT_AHEAD, extend
+    them from the pattern (project_round) so reminders carry on while the council's down."""
+    last = db.scalar(select(CollectionEvent.date).where(CollectionEvent.round_key == prop.round_key)
+                     .order_by(CollectionEvent.date.desc()).limit(1))
+    if last is not None and last < date.today() + PROJECT_AHEAD:
+        project_round(db, prop)
+
+
 def _apply_events(db: Session, round_key: str, council: Council, items: list[RawCollection],
                   snap: Snapshot) -> dict:
     """Upsert future events for the round; return {added, removed, moved}."""
@@ -250,7 +330,7 @@ def _apply_events(db: Session, round_key: str, council: Council, items: list[Raw
     # Events filled from a neighbour by the verify step aren't this address's to diff: a
     # fetch that doesn't list them isn't a removal. If this fetch does list one, adopt it.
     filled = set(db.scalars(select(Snapshot.id).where(Snapshot.round_key == round_key,
-                                                      Snapshot.source == "neighbours")).all())
+                                                      Snapshot.source.in_(BORROWED_SOURCES))).all())
     borrowed = {(e.bin_type_id, e.date): e for e in existing if e.snapshot_id in filled}
     have = {(e.bin_type_id, e.date): e for e in existing if e.snapshot_id not in filled}
     want: dict[tuple[str, date], RawCollection] = {}

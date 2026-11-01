@@ -169,6 +169,7 @@ def test_failed_full_lookup_retries_with_postcode_only(monkeypatch):
     calls = []
 
     class Fake:
+        name = "fake"
         spec = SimpleNamespace(needs_uprn=True, needs_postcode=True)
 
         def fetch(self, lookup, validate=True):
@@ -177,7 +178,7 @@ def test_failed_full_lookup_retries_with_postcode_only(monkeypatch):
                 raise AdapterError("street not found")
             return ["ok"]
 
-    monkeypatch.setattr(schedule, "_adapter_for", lambda c: Fake())
+    monkeypatch.setattr(schedule, "_adapters_for", lambda c: [Fake()])
     monkeypatch.setattr(schedule, "get_settings", lambda: SimpleNamespace(demo_mode=False))
     prop = SimpleNamespace(postcode="SW1A 1AA", uprn="10033540874", house_number="1")
     assert schedule.fetch_collections(SimpleNamespace(), prop) == ["ok"]
