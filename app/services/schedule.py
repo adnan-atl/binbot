@@ -159,8 +159,20 @@ def fetch_collections(council: Council, prop: Property) -> list[RawCollection]:
     adapter = _adapter_for(council)
     if adapter is None:
         raise AdapterError("no adapter for council", retryable=False)
-    return adapter.fetch(LookupInput(postcode=prop.postcode, uprn=prop.uprn,
-                                     house_number=prop.house_number))
+    full = LookupInput(postcode=prop.postcode, uprn=prop.uprn, house_number=prop.house_number)
+    try:
+        return adapter.fetch(full)
+    except AdapterError as first:
+        # Some scrapers misname their inputs (Westminster's "uprn" is a street id and it
+        # works out the street from the postcode by itself). If the full input failed,
+        # try once more with just postcode + house number before calling it broken.
+        if not prop.uprn or adapter.spec.needs_uprn and not adapter.spec.needs_postcode:
+            raise
+        try:
+            return adapter.fetch(LookupInput(postcode=prop.postcode, uprn=None,
+                                             house_number=prop.house_number), validate=False)
+        except AdapterError:
+            raise first
 
 
 def _hash(items: list[RawCollection]) -> str:
