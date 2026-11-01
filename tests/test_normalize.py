@@ -182,3 +182,14 @@ def test_failed_full_lookup_retries_with_postcode_only(monkeypatch):
     prop = SimpleNamespace(postcode="SW1A 1AA", uprn="10033540874", house_number="1")
     assert schedule.fetch_collections(SimpleNamespace(), prop) == ["ok"]
     assert calls == ["10033540874", None]
+
+
+def test_optional_code_inputs_dont_block_a_lookup():
+    """Regression (sweep, 1 Nov): 26 councils failed 'adapter needs uprn/house_number'
+    because a kwargs.get() in the scraper was treated as required. Collect it, don't demand it."""
+    from app.adapters.registry import load_specs
+
+    specs = {s.module: s for s in load_specs().values()}
+    b = specs["BrightonandHoveCityCouncil"]
+    assert b.needs_uprn and "uprn" not in b.requires
+    assert "uprn" in specs["WarwickDistrictCouncil"].requires  # UPRN in URL: truly required

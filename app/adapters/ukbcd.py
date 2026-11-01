@@ -70,9 +70,9 @@ class UKBCDAdapter:
         self.name = spec.module
 
     def validate(self, lookup: LookupInput) -> None:
-        if self.spec.needs_uprn and not lookup.uprn:
+        if "uprn" in self.spec.requires and not lookup.uprn:
             raise MissingInput("uprn")
-        if self.spec.needs_house_number and not lookup.house_number:
+        if "house_number" in self.spec.requires and not lookup.house_number:
             raise MissingInput("house_number")
 
     def fetch(self, lookup: LookupInput, validate: bool = True) -> list[RawCollection]:
