@@ -166,3 +166,34 @@ def test_verify_fills_missing_recycling_from_a_neighbour(client, db, fake_adapte
     n = len(asked)
     client.post(f"/api/users/{start['user_id']}/verify")
     assert len(asked) == n  # verified this week already: no more council lookups
+
+
+def test_failed_address_is_rescued_by_a_neighbour(client, db, fake_adapter, monkeypatch):
+    """The council can't find this address; a neighbour on the postcode works. The resident
+    gets the street's calendar instead of a blank form."""
+    from app.adapters.base import NoCollectionsForAddress
+
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+
+    def fetch(council, prop):
+        if prop.house_number in (None, "12"):
+            raise NoCollectionsForAddress("nothing for this address")
+        return [RawCollection("Refuse", tue + timedelta(weeks=i)) for i in range(4)]
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    r = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    assert r["error"] is None and [b["label"] for b in r["bins"]] == ["Refuse"]
+    assert r["bins"][0]["frequency"] == "weekly"
+
+
+def test_uprn_in_url_template_is_detected_and_filled():
+    """Regression (Warwick, Shropshire, Pembrokeshire...): the UPRN lives in the URL, so
+    input.json has no 'uprn' key. We must ask for one and substitute any-length XXXX."""
+    from app.adapters.registry import load_specs
+
+    specs = {s.module: s for s in load_specs().values()}
+    w = specs["WarwickDistrictCouncil"]
+    assert w.needs_uprn and w.placeholder == "XXXXXXXX" and w.sample_id == "100070263793"
+    sh = specs["ShropshireCouncil"]
+    assert sh.needs_uprn and len(sh.placeholder) == 11
+    assert "KingstonUponThamesCouncil" not in specs  # council-specific id: not routable yet

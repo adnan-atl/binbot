@@ -34,7 +34,7 @@ def _samples() -> dict[str, dict]:
 def _try(spec, sample: dict) -> tuple[str, str, int]:
     lookup = LookupInput(
         postcode=sample.get("postcode") or "",
-        uprn=str(sample["uprn"]) if sample.get("uprn") else None,
+        uprn=str(sample["uprn"]) if sample.get("uprn") else (spec.sample_id or None),
         house_number=str(sample.get("house_number") or sample.get("paon") or sample.get("number") or "")
         or None,
     )
