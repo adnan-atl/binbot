@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.adapters.manual import expand_rule
 from app.core.config import get_settings
 from app.models import (
+    ChangeLog,
     CollectionEvent,
     Reminder,
     ReminderMode,
@@ -92,7 +93,8 @@ def render_reminder(user: User, r: Reminder) -> str:
     else:
         head = f"{', '.join(names[:-1])} and {names[-1]} go out {when}"
     day = r.collection_date.strftime("%a %-d %b")
-    return f"{head} ({day}).\nReply DONE when it's out, or SNOOZE for a nudge later. STOP to stop."
+    return (f"{head} ({day}).\nReply DONE when it's out, SNOOZE for a nudge later, or WRONG if "
+            f"that's not your bin day. STOP to stop.")
 
 
 def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
@@ -121,7 +123,7 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
 
 
 def handle_inbound(db: Session, phone: str, text: str) -> str:
-    """Replies to a user's message (DONE / SNOOZE / STOP). Returns what we answered."""
+    """Replies to a user's message (DONE / SNOOZE / WRONG / STOP). Returns what we answered."""
     user = db.scalar(select(User).where(User.phone_e164 == phone))
     if not user:
         return "Hi! Sign up at binbot.app to get bin reminders."
@@ -148,8 +150,19 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         db.add(Reminder(user_id=user.id, collection_date=last.collection_date, bins=last.bins,
                         send_at=datetime.now(ZoneInfo("UTC")) + timedelta(hours=2)))
         reply = "No problem, I'll nudge you again in 2 hours."
+    elif cmd == "WRONG" and last:
+        # A vote against the round's calendar: the monitor's dispute job (split.py) asks the
+        # council about more homes on the street and splits the round if it's really two.
+        last.reply = "wrong"
+        if user.property:
+            db.add(ChangeLog(scope="round", scope_id=user.property.round_key, kind="wrong_day",
+                             diff={"user_id": user.id,
+                                   "collection_date": last.collection_date.isoformat()}))
+        # No promise to get back to them: nothing is sent unless their round actually changes.
+        reply = ("Thanks, noted. If your home's days are different, tap \"These aren't my "
+                 "days\" in BinBot to set your own.")
     else:
-        reply = "Reply DONE, SNOOZE or STOP."
+        reply = "Reply DONE, SNOOZE, WRONG or STOP."
     send_message(db, phone, reply, kind="reply")
     db.commit()
     return reply

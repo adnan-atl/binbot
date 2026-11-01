@@ -197,3 +197,52 @@ def test_two_calendars_with_no_pattern_are_left_for_ops(client, db, street):
     assert checked.diff["groups"] == [[2, 11, 12], [1, 4]]
     assert db.scalar(select(RoundSplit)) is None
     assert {p.round_key for p in db.scalars(select(Property))} == {KEY}
+
+
+# ---------------------------------------------------------------- residents' votes
+
+
+def test_not_my_days_that_the_council_backs_up_triggers_a_split(client, db, street):
+    """3 says "not my days"; the council gives 3 Tuesday where the round says Thursday.
+    That's a vote against the round, and the probe finds the odd side."""
+    street["day"] = lambda n: TUE if n % 2 else THU
+    signup(client, 2)
+    b = signup(client, 3)
+    r = client.post(f"/api/users/{b}/own-calendar", json={}).json()
+    assert r["error"] is None and days_of(client, b) == {"TUE"}
+    vote = db.scalar(select(ChangeLog).where(ChangeLog.kind == "resident_differs"))
+    assert vote.scope_id == KEY
+    assert split.disputed_rounds(db) == [KEY]
+    assert monitor.resolve_disputes(db) == {"split": 1}
+
+
+def test_not_my_days_the_council_disagrees_with_is_for_ops(client, db, street):
+    """Same dates from the council for their home: probing the street won't help, the
+    council's own data is what's in question."""
+    signup(client, 2)
+    b = signup(client, 3)
+    client.post(f"/api/users/{b}/own-calendar", json={})
+    assert db.scalar(select(ChangeLog).where(ChangeLog.kind == "resident_reported"))
+    assert split.disputed_rounds(db) == []
+
+
+def test_wrong_reply_is_a_vote_against_the_round(client, db, street):
+    from app.models import Reminder
+    from app.services.reminders import dispatch_due
+
+    uid = signup(client, 2, phone="07700900123")
+    first = db.scalar(select(Reminder).order_by(Reminder.send_at))
+    dispatch_due(db, now_utc=first.send_at + timedelta(minutes=1))
+    assert "WRONG" in db.scalar(select(Outbox).where(Outbox.kind == "reminder")).body
+
+    r = client.post("/api/inbound", json={"phone": "+447700900123", "text": "wrong"}).json()
+    assert "noted" in r["reply"] and "double-check" not in r["reply"]
+    vote = db.scalar(select(ChangeLog).where(ChangeLog.kind == "wrong_day"))
+    assert vote.scope_id == KEY and vote.diff["user_id"] == uid
+    assert split.disputed_rounds(db) == [KEY]
+
+
+def test_a_homes_own_round_is_never_probed(db):
+    db.add(ChangeLog(scope="round", scope_id="p:abc", kind="disputed", diff={}))
+    db.commit()
+    assert split.disputed_rounds(db) == []

@@ -104,7 +104,7 @@ POST /api/users/{id}/phone              WhatsApp number + consent
 POST /api/users/{id}/reminders          mode + time; turns reminders on
 GET  /api/users/{id}/schedule
 GET  /api/users/{id}/referral           code, link, level
-POST /api/inbound                       DONE / SNOOZE / STOP (WhatsApp webhook: /webhooks/meta)
+POST /api/inbound                       DONE / SNOOZE / WRONG / STOP (WhatsApp webhook: /webhooks/meta)
 GET  /api/health                        adapter coverage
 ```
 
@@ -128,7 +128,8 @@ the Meta app is published.
   (`app/services/quorum.py`), and `disputed` when the neighbours contradict it. Disputes and
   outvoted neighbours go to `change_log` (`disputed`, `neighbour_differs`) for ops; residents
   aren't shown them. Who gets asked rotates weekly, residents on the round first, so every
-  home confirms the round over a few weeks, not the same two. A daily job probes disputed
+  home confirms the round over a few weeks, not the same two. Residents vote too: "These aren't my days" (when the
+  council backs them up) and a WRONG reply to a reminder. A daily job probes disputed
   rounds (`app/services/split.py`): when exactly two calendars show up, each backed by two
   or more homes, and parity or one cut along the street explains them, the postcode is split
   (`round_splits`), residents on the other side are moved and told, and new sign-ups land
