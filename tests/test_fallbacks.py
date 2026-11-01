@@ -86,3 +86,72 @@ def test_calendar_without_general_waste_is_a_gap_to_fill():
     found = checks.run([{"category": "recycling", "label": "Recycling", "days": ["TUE"],
                          "history": []}], "Westminster", "E09000033")
     assert any(c["kind"] == "missing_stream" and c["category"] == "general" for c in found)
+
+
+def _addr_settings(**kw):
+    from types import SimpleNamespace
+
+    base = dict(demo_mode=False, address_provider="os_places", address_fallback="ideal_postcodes",
+                os_places_api_key="os", ideal_postcodes_api_key="ip")
+    return SimpleNamespace(**{**base, **kw})
+
+
+class _Resp:
+    def __init__(self, status, body):
+        self.status_code, self._body = status, body
+
+    def raise_for_status(self):
+        import httpx
+
+        if self.status_code >= 400:
+            raise httpx.HTTPStatusError("boom", request=None, response=None)
+
+    def json(self):
+        return self._body
+
+
+IDEAL = {"result": [{"uprn": "100023336956", "line_1": "Flat 3", "line_2": "18 Elm Road",
+                     "post_town": "London", "postcode": "E8 3PB", "building_number": "18",
+                     "sub_building_name": "Flat 3"}]}
+
+
+def test_address_lookup_falls_back_when_os_places_is_down(monkeypatch):
+    from app.services import geo
+
+    geo._cache.clear()
+    calls = []
+
+    def get(url, **kw):
+        calls.append(url)
+        return _Resp(503, {}) if "os.uk" in url else _Resp(200, IDEAL)
+
+    monkeypatch.setattr(geo.httpx, "get", get)
+    monkeypatch.setattr(geo, "get_settings", lambda: _addr_settings())
+    hits = geo.lookup_addresses("E8 3PB")
+    assert [h.uprn for h in hits] == ["100023336956"] and hits[0].house_number == "18"
+    assert "Flat 3, 18 Elm Road, London, E8 3PB" == hits[0].line
+    assert ["os.uk" in c for c in calls] == [True, False]
+    geo._cache.clear()
+
+
+def test_address_fallback_only_when_needed_and_never_crashes(monkeypatch):
+    from app.services import geo
+
+    geo._cache.clear()
+    calls = []
+    os_ok = {"results": [{"DPA": {"UPRN": 1, "BUILDING_NUMBER": "92", "ADDRESS": "92, X ROAD, E8 3PB"}}]}
+
+    def get(url, **kw):
+        calls.append(url)
+        return _Resp(200, os_ok) if "os.uk" in url else _Resp(200, IDEAL)
+
+    monkeypatch.setattr(geo.httpx, "get", get)
+    monkeypatch.setattr(geo, "get_settings", lambda: _addr_settings())
+    assert geo.lookup_addresses("E8 3PB")[0].uprn == "1"
+    assert len(calls) == 1  # OS answered: the paid fallback isn't called
+    geo._cache.clear()
+
+    # Both down: no exception, an empty list (the resident types a house number instead).
+    monkeypatch.setattr(geo.httpx, "get", lambda url, **kw: _Resp(500, {}))
+    assert geo.lookup_addresses("E8 3PB") == []
+    geo._cache.clear()
