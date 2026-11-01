@@ -102,6 +102,42 @@ def test_odd_side_gets_its_own_round(client, db, street):
     assert split.disputed_rounds(db) == []
 
 
+def test_failed_side_calendar_undoes_the_split(client, db, street, monkeypatch):
+    """The other side's calendar won't load: residents go back AND the split rule goes, so
+    new sign-ups don't land on a round with no calendar and the postcode can be probed again."""
+    from app.services.schedule import RefreshResult
+
+    street["day"] = lambda n: TUE if n % 2 else THU
+    signup(client, 2)
+    b = signup(client, 3)
+    dispute(db)
+    monkeypatch.setattr(split.sched, "refresh_round",
+                        lambda db, prop, **kw: RefreshResult(snapshot=None, changed=False, diff={}, error="council down"))
+    monitor.resolve_disputes(db)
+    db.expire_all()
+    assert db.scalar(select(RoundSplit)) is None
+    assert db.get(User, b).property.round_key == KEY
+
+
+def test_one_broken_round_does_not_stop_the_others(client, db, street, monkeypatch):
+    """A probe that blows up is logged and marked checked; the next round still gets probed."""
+    signup(client, 2)
+    other = "pc:E09000012:E8 3PA"
+    dispute(db, other)
+    dispute(db)
+    real = split.probe
+
+    def probe(db, key):
+        if key == other:
+            raise KeyError("layout changed")
+        return real(db, key)
+
+    monkeypatch.setattr(split, "probe", probe)
+    out = monitor.resolve_disputes(db)
+    assert out["error"] == 1 and sum(out.values()) == 2
+    assert other not in split.disputed_rounds(db)
+
+
 def test_dry_run_only_logs_the_split(client, db, street, monkeypatch):
     """Default: say what would happen, change nothing, message nobody."""
     from app.core.config import get_settings

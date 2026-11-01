@@ -185,6 +185,9 @@ def _apply(db: Session, round_key: str, rule: dict) -> int:
     if res.error:  # their side's calendar didn't load: they'd be worse off than before
         for p in moved:
             p.round_key = round_key
+        # Undo the split too, or new sign-ups on that side land on a round with no calendar
+        # and disputed_rounds() never looks at this postcode again.
+        db.delete(db.scalar(select(RoundSplit).where(RoundSplit.round_key == round_key)))
         db.flush()
         return 0
     for u in db.scalars(select(User).where(User.property_id.in_([p.id for p in moved]))):

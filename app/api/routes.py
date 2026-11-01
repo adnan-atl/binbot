@@ -1,8 +1,9 @@
+import logging
 import re
 import secrets
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -10,7 +11,7 @@ from app.adapters.manual import expand_rule
 from app.adapters.registry import coverage, spec_for
 from app.api import schemas as S
 from app.core.config import get_settings
-from app.core.db import get_db
+from app.core.db import get_db, session_factory
 from app.models import (
     BinCategory,
     ChangeLog,
@@ -39,6 +40,7 @@ from app.services.schedule import (
     schedule_for,
 )
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 
@@ -181,16 +183,38 @@ def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_
 
 
 @router.post("/users/{user_id}/verify", response_model=list[S.BinOut])
-def verify(user_id: str, db: Session = Depends(get_db)):
+def verify(user_id: str, background: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Runs while the loader is on screen: if the checker found a gap, ask the council about
     a neighbour or two on the same postcode and fill it. Returns the bins to show.
+    Confirming the round with a neighbour doesn't change what's shown, so it runs after the
+    response and the resident never waits for it.
     """
     user = _user(db, user_id)
-    if user.property and verify_round(db, user.property)["filled"]:
+    if user.property and verify_round(db, user.property, confirm=False)["filled"]:
         _seed_settings(db, user, user.property)
     db.commit()
-    return _bins_out(db, user)
+    out = _bins_out(db, user)
+    if user.property:
+        background.add_task(_confirm_round, user.property.id)
+    return out
+
+
+def _confirm_round(property_id: str) -> None:
+    """Background: confirm the round with a neighbour (at most once a week per round)."""
+    from app.models import Property
+
+    db = session_factory()()
+    try:
+        prop = db.get(Property, property_id)
+        if prop is not None:
+            verify_round(db, prop)
+            db.commit()
+    except Exception:  # never surfaces to the resident; ops see it in the logs
+        log.exception("confirm_round failed for %s", property_id)
+        db.rollback()
+    finally:
+        db.close()
 
 
 def _bins_out(db: Session, user: User) -> list[S.BinOut]:
