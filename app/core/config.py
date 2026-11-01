@@ -32,10 +32,7 @@ class Settings(BaseSettings):
     split_dry_run: bool = True
 
     # Messaging
-    message_provider: str = "stub"  # stub | twilio | meta
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_from: str = ""  # whatsapp:+14155238886
+    message_provider: str = "stub"  # stub | meta
     meta_token: str = ""
     meta_phone_number_id: str = ""
     meta_verify_token: str = ""  # any string you choose; paste the same one in Meta's webhook settings

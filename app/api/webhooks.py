@@ -1,5 +1,5 @@
-"""Provider webhooks that normalise into handle_inbound()."""
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+"""The WhatsApp Cloud API webhook, normalised into handle_inbound()."""
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
 from app.core.config import get_settings
@@ -9,13 +9,6 @@ from app.core.db import get_db
 from app.services.reminders import handle_inbound
 
 router = APIRouter(prefix="/webhooks")
-
-
-@router.post("/twilio")
-def twilio(From: str = Form(...), Body: str = Form(""), db: Session = Depends(get_db)):
-    # Twilio sends "whatsapp:+447700900123". We reply via the API, so return empty TwiML.
-    handle_inbound(db, From.replace("whatsapp:", ""), Body)
-    return PlainTextResponse("<Response></Response>", media_type="application/xml")
 
 
 @router.get("/meta")
