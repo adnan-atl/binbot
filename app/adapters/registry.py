@@ -29,6 +29,10 @@ class AdapterSpec:
     placeholder: str = ""  # the X-run in the URL that the UPRN replaces
     sample_id: str = ""  # the UPRN in the library's sample URL (for the sweep)
     needs_council_id: bool = False  # URL wants the council's own property id, not a UPRN
+    # needs_* = everything the scraper may read: what we collect and pass. requires = what
+    # it can't run without (the library's own sample call + a UPRN in the URL). Code reads
+    # like kwargs.get("uprn") are often optional, so they must not block a lookup.
+    requires: frozenset = frozenset()
 
 
 def _url_id(v: dict) -> tuple[str, str, bool]:
@@ -130,6 +134,9 @@ def _spec(module: str, v: dict, gss: str) -> AdapterSpec:
             needs_browser="web_driver" in v,
             note=v.get("wiki_note", ""),
             params={k: v[k] for k in ("url", "skip_get_url") if k in v},
+            requires=frozenset(
+                ({"uprn"} if "uprn" in v or ph else set())
+                | ({"house_number"} if "house_number" in v or "paon" in v else set())),
         )
 
 

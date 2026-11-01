@@ -16,6 +16,7 @@ dependencies = [
   "beautifulsoup4>=4.12",
   "apscheduler>=3.10,<4",
   "uk-bin-collection>=0.173",
+  "yarl>=1.9",  # Birmingham's scraper imports it; the library doesn't declare it
 ]
 
 [project.optional-dependencies]
