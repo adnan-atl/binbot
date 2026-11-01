@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     refresh_interval_days: int = 7
     refresh_window_days_before_holiday: int = 21
     horizon_days: int = 90  # how far ahead we keep events
+    # Splitting a postcode round moves residents and messages them. Until it's been watched
+    # on real councils, only log what it would do ("would_split" in change_log).
+    split_dry_run: bool = True
 
     # Messaging
     message_provider: str = "stub"  # stub | twilio | meta

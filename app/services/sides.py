@@ -50,6 +50,18 @@ def side_of(rule: dict, n: int | None) -> str | None:
     return "lo" if n < rule["at"] else "hi"
 
 
+def number_for(house_number: str | None, uprn: str | None, postcode: str) -> int | None:
+    """A home's street number; signed up by UPRN alone, the cached address list knows it."""
+    n = number_of(house_number)
+    if n is None and uprn:
+        try:
+            n = number_of(next((h.house_number for h in geo.lookup_addresses(postcode)
+                                if h.uprn == uprn), None))
+        except Exception:
+            n = None
+    return n
+
+
 def side_key(db: Session, base_key: str, house_number: str | None, uprn: str | None,
              postcode: str) -> str | None:
     """
@@ -62,14 +74,7 @@ def side_key(db: Session, base_key: str, house_number: str | None, uprn: str | N
         split = db.scalar(select(RoundSplit).where(RoundSplit.round_key == key))
         if split is None:
             return key
-        n = number_of(house_number)
-        if n is None and uprn:  # signed up by UPRN alone: the cached address list knows it
-            try:
-                n = number_of(next((h.house_number for h in geo.lookup_addresses(postcode)
-                                    if h.uprn == uprn), None))
-            except Exception:
-                n = None
-        side = side_of(split.rule, n)
+        side = side_of(split.rule, number_for(house_number, uprn, postcode))
         if side is None:
             return None
         key = split.rule["sides"][side]

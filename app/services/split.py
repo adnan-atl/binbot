@@ -15,6 +15,8 @@ each, and a rule that explains every home asked. Anything else is logged for ops
   no_rule          two calendars, but neither parity nor one cut along the street explains them
 
 Runs from the monitor, not the loader: probing costs up to MAX_PROBE council lookups.
+With SPLIT_DRY_RUN (the default) a split is only logged as "would_split", with the rule and
+who would move: nobody is moved or messaged until it's turned off.
 """
 import logging
 from datetime import datetime, timedelta, timezone
@@ -22,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import (
     BinCategory,
     ChangeLog,
@@ -134,7 +137,14 @@ def probe(db: Session, round_key: str) -> dict:
     if result["result"] == "split":
         rule = sides.infer_rule(groups[0][1], groups[1][1])
         result["rule"] = rule
-        result["moved"] = _apply(db, round_key, rule)
+        if get_settings().split_dry_run:
+            result["result"] = "would_split"
+            result["would_move"] = [
+                p.house_number or p.uprn for p in members
+                if sides.side_of(rule, sides.number_for(p.house_number, p.uprn, p.postcode))
+                == rule["other"]]
+        else:
+            result["moved"] = _apply(db, round_key, rule)
     db.add(ChangeLog(scope="round", scope_id=round_key, kind="split_checked", diff=result))
     db.commit()
     return result
