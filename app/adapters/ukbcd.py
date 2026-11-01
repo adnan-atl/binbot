@@ -33,6 +33,14 @@ def _run_module(spec: AdapterSpec, lookup: LookupInput) -> str:
 
     # Many councils embed the UPRN in the URL (an XXXX placeholder of varying length).
     url = spec.url
+    if spec.url_template:
+        from urllib.parse import quote
+
+        if not lookup.uprn:
+            raise MissingInput("uprn")
+        address = lookup.address_line or " ".join(filter(None, [lookup.house_number, lookup.postcode]))
+        url = spec.url_template.format(uprn=lookup.uprn, postcode=quote(lookup.postcode or ""),
+                                       address=quote(address or ""))
     if spec.placeholder:
         if not lookup.uprn:
             raise MissingInput("uprn")
