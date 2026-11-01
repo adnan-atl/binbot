@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     twilio_from: str = ""  # whatsapp:+14155238886
     meta_token: str = ""
     meta_phone_number_id: str = ""
+    meta_verify_token: str = ""  # any string you choose; paste the same one in Meta's webhook settings
 
     public_base_url: str = "http://localhost:8000"
     timezone: str = "Europe/London"

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.manual import expand_rule
 from app.adapters.registry import coverage, spec_for
+from app.providers.messaging import send_message
 from app.api import schemas as S
 from app.core.config import get_settings
 from app.core.db import get_db, session_factory
@@ -319,10 +320,29 @@ def set_prefs(user_id: str, body: S.PrefsIn, db: Session = Depends(get_db)):
     if not re.fullmatch(r"\d{2}:\d{2}", body.time):
         raise HTTPException(400, "time must be HH:MM")
     user.reminder_time = body.time
+    was_active = user.status == UserStatus.active
     user.status = UserStatus.active
     n = rebuild_reminders(db, user)
+    if not was_active:
+        send_message(db, user.phone_e164, _welcome(db, user), kind="welcome")
     db.commit()
     return {"status": "active", "scheduled": n}
+
+
+def _welcome(db: Session, user: User) -> str:
+    """First message, sent the moment reminders go on, so the resident sees BinBot works
+    (and, on WhatsApp, it opens the 24-hour window for free-form replies)."""
+    first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
+                      .order_by(Reminder.send_at))
+    when = "the night before" if user.reminder_mode == ReminderMode.night_before else "on the morning"
+    hh, mm = (int(x) for x in user.reminder_time.split(":"))
+    clock = f"{hh % 12 or 12}{f':{mm:02d}' if mm else ''}{'pm' if hh >= 12 else 'am'}"
+    msg = f"BinBot here. You're set up: I'll message you {when} of each collection, at {clock}."
+    if first:
+        names = [b["label"] for b in first.bins]
+        bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+        msg += f"\nFirst up: {bins} on {first.collection_date.strftime('%a %-d %b')}."
+    return msg + "\nReply STOP any time to turn reminders off."
 
 
 @router.get("/users/{user_id}/schedule", response_model=list[S.ReminderOut])
