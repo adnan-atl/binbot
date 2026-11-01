@@ -158,9 +158,9 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             db.add(ChangeLog(scope="round", scope_id=user.property.round_key, kind="wrong_day",
                              diff={"user_id": user.id,
                                    "collection_date": last.collection_date.isoformat()}))
-        reply = ("Thanks for telling me. I'll double-check your days with the council and your "
-                 "neighbours. If your home really is different, tap \"These aren't my days\" "
-                 "in BinBot to set your own.")
+        # No promise to get back to them: nothing is sent unless their round actually changes.
+        reply = ("Thanks, noted. If your home's days are different, tap \"These aren't my "
+                 "days\" in BinBot to set your own.")
     else:
         reply = "Reply DONE, SNOOZE, WRONG or STOP."
     send_message(db, phone, reply, kind="reply")

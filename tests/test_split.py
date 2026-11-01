@@ -236,7 +236,7 @@ def test_wrong_reply_is_a_vote_against_the_round(client, db, street):
     assert "WRONG" in db.scalar(select(Outbox).where(Outbox.kind == "reminder")).body
 
     r = client.post("/api/inbound", json={"phone": "+447700900123", "text": "wrong"}).json()
-    assert "double-check" in r["reply"]
+    assert "noted" in r["reply"] and "double-check" not in r["reply"]
     vote = db.scalar(select(ChangeLog).where(ChangeLog.kind == "wrong_day"))
     assert vote.scope_id == KEY and vote.diff["user_id"] == uid
     assert split.disputed_rounds(db) == [KEY]
