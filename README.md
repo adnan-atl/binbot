@@ -104,7 +104,7 @@ POST /api/users/{id}/phone              WhatsApp number + consent
 POST /api/users/{id}/reminders          mode + time; turns reminders on
 GET  /api/users/{id}/schedule
 GET  /api/users/{id}/referral           code, link, level
-POST /api/inbound                       DONE / SNOOZE / STOP (WhatsApp webhook: /webhooks/meta)
+POST /api/inbound                       DONE / SNOOZE / WRONG / STOP (WhatsApp webhook: /webhooks/meta)
 GET  /api/health                        adapter coverage
 ```
 
