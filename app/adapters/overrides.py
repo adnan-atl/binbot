@@ -155,9 +155,136 @@ def glasgow(lookup: LookupInput, *, html: str | None = None, today: date | None 
     return sorted(set(out), key=lambda c: (c.date, c.label))
 
 
+# ---- Kensington and Chelsea (no library module) ------------------------------------
+# rbkc.gov.uk lists collection days by street, one row per stretch of a long street:
+#   Street | Property numbers | Number details    | Further details | Waste+recycling | Food
+#   Cromwell Road | [2 - 100] | Even numbers only | North Side ...  | Monday, Thursday |
+#   Portobello Road | [2 - 80a evens] & [9 - 63 odds] | Both sides | ... | Monday, Thursday | Monday
+# General waste and recycling go out on the same days. The street comes from the address
+# (the resident picked it at sign-up); the house number picks the row.
+
+RBKC_URL = "https://www.rbkc.gov.uk/bincollections/default.aspx"
+_RANGE = re.compile(r"\[\s*(\d+)\s*[a-z]?\s*-\s*(\d+)\s*[a-z]?\s*(odds?|evens?)?\s*\]", re.I)
+
+
+def _norm_street(s: str) -> str:
+    return re.sub(r"[^A-Z0-9 ]", "", re.sub(r"\s+", " ", s.upper())).strip()
+
+
+def rbkc_street_in(address: str, streets: list[str]) -> str | None:
+    """The council's street name that appears in an address line (longest wins, so
+    'Kensington High Street' beats 'High Street')."""
+    a = f" {_norm_street(address)} "
+    hits = [st for st in streets if f" {_norm_street(st)} " in a]
+    return max(hits, key=len) if hits else None
+
+
+def rbkc_rows(html: str) -> list[dict]:
+    soup = BeautifulSoup(html, "html.parser")
+    rows = []
+    for tr in soup.select("table tbody tr"):
+        cells = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
+        if len(cells) < 5:
+            continue
+        rows.append({"numbers": cells[1], "parity": cells[2].lower(), "details": cells[3],
+                     "waste": _split_days(cells[4]) if cells[4] else [],
+                     "food": _split_days(cells[5]) if len(cells) > 5 and cells[5] else []})
+    return rows
+
+
+def _row_covers(row: dict, n: int) -> tuple[bool, int]:
+    """(covers house n, size of the stretch: smaller = more specific)."""
+    side = "odd" if "odd" in row["parity"] else "even" if "even" in row["parity"] else None
+    if row["numbers"].strip().lower() == "all":
+        return (side is None or (n % 2 == 1) == (side == "odd")), 10**6
+    best = None
+    for lo, hi, par in _RANGE.findall(row["numbers"]):
+        lo, hi = sorted((int(lo), int(hi)))
+        want = ("odd" if par.lower().startswith("odd") else "even") if par else side
+        if lo <= n <= hi and (want is None or (n % 2 == 1) == (want == "odd")):
+            best = min(best or 10**6, hi - lo)
+    return (best is not None), (best if best is not None else 10**6)
+
+
+def rbkc_pick(rows: list[dict], house: str | None) -> dict:
+    if not rows:
+        raise NoCollectionsForAddress("rbkc.gov.uk lists no collections for that street")
+    same = {(tuple(r["waste"]), tuple(r["food"])) for r in rows}
+    n = None
+    m = re.findall(r"\d+", house or "")
+    if m:
+        n = int(m[-1])  # 'Flat 3, 18' -> the building, 18
+    if n is not None:
+        covering = sorted((size, i) for i, r in enumerate(rows) for ok, size in [_row_covers(r, n)] if ok)
+        if covering:
+            return rows[covering[0][1]]
+    if len(same) == 1:  # the whole street shares one set of days
+        return rows[0]
+    if n is None:
+        raise MissingInput("house_number")
+    raise NoCollectionsForAddress(f"rbkc.gov.uk has no row for number {n} on that street")
+
+
+def rbkc_collections(row: dict, today: date) -> list[RawCollection]:
+    out = []
+    for day in row["waste"]:
+        for d in _upcoming(day, today):
+            out += [RawCollection("General waste", d), RawCollection("Recycling", d)]
+    for day in row["food"]:
+        out += [RawCollection("Food waste", d) for d in _upcoming(day, today)]
+    if not out:
+        raise NoCollectionsForAddress("rbkc.gov.uk lists no collection days for that address")
+    return sorted(out, key=lambda c: (c.date, c.label))
+
+
+def kensington_and_chelsea(lookup: LookupInput, today: date | None = None) -> list[RawCollection]:
+    today = today or date.today()
+    try:
+        with httpx.Client(headers={"User-Agent": UA}, timeout=30, follow_redirects=True) as c:
+            page = c.get(RBKC_URL)
+            page.raise_for_status()
+            soup = BeautifulSoup(page.text, "html.parser")
+            select = soup.find("select", {"name": "Street"})
+            token = soup.find("input", {"name": "__RequestVerificationToken"})
+            if select is None or token is None:
+                raise AdapterError("rbkc.gov.uk: page layout changed", retryable=False)
+            options = {o.get_text(strip=True): o.get("value", "") for o in select.find_all("option")
+                       if o.get("value", "").strip()}
+            street = _rbkc_street(lookup, list(options))
+            r = c.post(RBKC_URL, data={"Street": options[street],
+                                       "__RequestVerificationToken": token["value"]})
+            r.raise_for_status()
+    except httpx.HTTPError as e:
+        raise AdapterError(f"rbkc.gov.uk: {e}") from e
+    return rbkc_collections(rbkc_pick(rbkc_rows(r.text), lookup.house_number), today)
+
+
+def _rbkc_street(lookup: LookupInput, streets: list[str]) -> str:
+    """From the address the resident picked; failing that, the postcode's address list."""
+    if lookup.address_line:
+        st = rbkc_street_in(lookup.address_line, streets)
+        if st:
+            return st
+    from app.services import geo
+
+    try:
+        hits = geo.lookup_addresses(lookup.postcode)
+    except Exception:
+        hits = []
+    mine = [h for h in hits if (lookup.uprn and h.uprn == lookup.uprn)
+            or (lookup.house_number and h.house_number == lookup.house_number)]
+    found = {st for h in (mine or hits) for st in [rbkc_street_in(h.line, streets)] if st}
+    if len(found) == 1:
+        return found.pop()
+    if not found:
+        raise NoCollectionsForAddress(f"rbkc.gov.uk: no listed street for {lookup.postcode}")
+    raise MissingInput("house_number")  # postcode spans streets: need the exact address
+
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
+    "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
 }
 
 # Same weakness upstream, not yet reproduced against a live page: LondonBoroughLewisham,

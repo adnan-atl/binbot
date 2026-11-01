@@ -14,6 +14,7 @@ class LookupInput:
     postcode: str
     uprn: str | None = None
     house_number: str | None = None
+    address_line: str | None = None  # "10 Abingdon Road, London": street-based councils need it
 
 
 class AdapterError(Exception):

@@ -18,7 +18,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.adapters.base import AdapterError, LookupInput
-from app.adapters.registry import MISSING_LAD, _input_json_path, load_specs
+from app.adapters.registry import CUSTOM, MISSING_LAD, _input_json_path, load_specs
 from app.adapters.ukbcd import UKBCDAdapter
 from app.core.config import get_settings
 from app.core.db import session_factory
@@ -26,9 +26,17 @@ from app.models import CouncilStatus
 from app.services.schedule import _mark_success, get_or_create_council
 
 
+# Our own scrapers (registry.CUSTOM) have no library sample: one real address each.
+CUSTOM_SAMPLES = {
+    "BinBotKensingtonAndChelsea": {"postcode": "W11 2PS", "house_number": "11",
+                                   "address_line": "11 Ladbroke Grove, London"},
+}
+
+
 def _samples() -> dict[str, dict]:
     data = json.loads(_input_json_path().read_text())
-    return {m: v for m, v in data.items() if v.get("LAD24CD") or m in MISSING_LAD}
+    out = {m: v for m, v in data.items() if v.get("LAD24CD") or m in MISSING_LAD}
+    return {**out, **CUSTOM_SAMPLES}
 
 
 def _try(spec, sample: dict) -> tuple[str, str, int]:
@@ -37,6 +45,7 @@ def _try(spec, sample: dict) -> tuple[str, str, int]:
         uprn=str(sample["uprn"]) if sample.get("uprn") else (spec.sample_id or None),
         house_number=str(sample.get("house_number") or sample.get("paon") or sample.get("number") or "")
         or None,
+        address_line=sample.get("address_line"),
     )
     t = time.monotonic()
     try:
@@ -102,6 +111,7 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     specs = {s.module: s for s in load_specs().values()}
+    specs.update({s.module: s for s in CUSTOM.values()})
     samples = _samples()
     todo = [(specs[m], v) for m, v in samples.items() if m in specs
             and args.filter.lower() in (m + specs[m].name).lower()
