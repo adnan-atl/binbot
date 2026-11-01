@@ -33,6 +33,9 @@ class AdapterSpec:
     # it can't run without (the library's own sample call + a UPRN in the URL). Code reads
     # like kwargs.get("uprn") are often optional, so they must not block a lookup.
     requires: frozenset = frozenset()
+    # The scraper reads a council page whose address is built from the home's details:
+    # {uprn}, {postcode}, {address} (URL-quoted). See URL_TEMPLATES.
+    url_template: str = ""
 
 
 def _url_id(v: dict) -> tuple[str, str, bool]:
@@ -130,6 +133,21 @@ def _code_needs(module: str) -> frozenset[str]:
 def _spec(module: str, v: dict, gss: str) -> AdapterSpec:
     ph, sid, council_id = _url_id(v)
     code = _code_needs(module)
+    if module in URL_TEMPLATES:
+        return AdapterSpec(
+            module=module, gss_code=gss, name=v.get("wiki_name", module),
+            url=URL_TEMPLATES[module], url_template=URL_TEMPLATES[module],
+            needs_uprn=True, needs_postcode=True, needs_browser="web_driver" in v,
+            note=v.get("wiki_note", ""), requires=frozenset({"uprn"}))
+    if _is_societyworks(module):
+        # FixMyStreet WasteWorks councils (Bromley, Kingston, Sutton, Bexley...). The sample
+        # URL carries the council's own property id, but the shared scraper resolves a UPRN
+        # (or postcode + house number) itself. Give it the bare site, never a sample id.
+        base = re.sub(r"waste/.*$", "", v.get("wiki_command_url_override") or v.get("url", ""))
+        return AdapterSpec(
+            module=module, gss_code=gss, name=v.get("wiki_name", module), url=base,
+            needs_uprn=True, needs_postcode=True, needs_house_number=True,
+            needs_browser=False, note=v.get("wiki_note", ""))
     return AdapterSpec(
             placeholder=ph,
             sample_id=sid,
@@ -150,6 +168,25 @@ def _spec(module: str, v: dict, gss: str) -> AdapterSpec:
                 ({"uprn"} if "uprn" in v or ph else set())
                 | ({"house_number"} if "house_number" in v or "paon" in v else set())),
         )
+
+
+@lru_cache(maxsize=None)
+def _is_societyworks(module: str) -> bool:
+    import uk_bin_collection
+
+    f = Path(list(uk_bin_collection.__path__)[0]) / "uk_bin_collection" / "councils" / f"{module}.py"
+    try:
+        return "SocietyWorksClass" in f.read_text()
+    except OSError:
+        return False
+
+
+# Council pages addressed by the home's own details. The library's sample URL for these
+# has a council-specific id baked in, so they used to be skipped as unroutable.
+URL_TEMPLATES = {
+    # Server-rendered; uprn + address + postcode are enough (usrn/e/n are optional).
+    "WakefieldCityCouncil": "https://www.wakefield.gov.uk/where-i-live/?uprn={uprn}&a={address}&p={postcode}",
+}
 
 
 # Library modules that ship without a LAD24CD in input.json, so they'd never be routed and
@@ -237,6 +274,31 @@ def _by_name() -> dict[str, AdapterSpec]:
         for n in (module, v.get("wiki_name", "")):
             if n and _norm(n):
                 out.setdefault(_norm(n), spec)
+    return out
+
+
+@lru_cache
+def _alternates() -> dict[str, list[AdapterSpec]]:
+    """Every other module that claims a council (input.json's own code, before LAD_FIX):
+    Ealing's deprecated module, Eden's for Westmorland and Furness. Second chances."""
+    data = json.loads(_input_json_path().read_text())
+    out: dict[str, list[AdapterSpec]] = {}
+    for module, v in data.items():
+        for gss in {_gss(module, v), v.get("LAD24CD") or MISSING_LAD.get(module)} - {None}:
+            spec = _spec(module, v, gss)
+            if not spec.needs_council_id:
+                out.setdefault(gss, []).append(spec)
+    return out
+
+
+def candidates(gss_code: str, name: str | None = None) -> list[AdapterSpec]:
+    """Scrapers to try for a council, best first: ours (CUSTOM), the primary library
+    module, then any other module that serves it. Fetching walks this list until one works."""
+    first = spec_for(gss_code, name)
+    out = [first] if first else []
+    for spec in [CUSTOM.get(gss_code), *_alternates().get(gss_code, [])]:
+        if spec and spec.module not in {s.module for s in out}:
+            out.append(spec)
     return out
 
 
