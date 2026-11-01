@@ -305,7 +305,7 @@ button{font:inherit}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">BinBot's on it<br><span>Reading your council's calendar</span></h1>
+<h1 class="h1">BinBot's on it<br><span id="p-title">Reading your council's calendar</span></h1>
 <div id="psteps" aria-live="polite"></div>
 <div class="row-actions">
 <a class="pill solid" id="p-next" href="#confirm">See my dates</a>
@@ -593,23 +593,25 @@ Share with your street
     // then the council's calendar, then the cross-check with the street.
     fetching = true; parseAt = 0; hold = 2;
     var home = addr ? addr.line.replace(/,\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, '') : typed ? typed + ', ' + v : '';
-    PSTEPS[0] = { label: 'Found your council', sub: API.council || 'Your council' };
-    PSTEPS[1] = home ? { label: 'Found your home', sub: home } : { label: 'Found your street', sub: v };
-    PSTEPS[2] = { label: 'Read the collection calendar', sub: 'Asking ' + (API.council || 'your council') + ' for your dates' };
-    PSTEPS[3] = { label: 'Spot your bins', sub: '' };
+    // Each step reads as what's happening now (spinner), what happened (tick) or what's next.
+    PSTEPS[0] = step('Find your council', 'Finding your council', 'Found your council', '', API.council || 'Your council');
+    PSTEPS[1] = home ? step('Find your home', 'Finding your home', 'Found your home', home, home)
+                     : step('Find your street', 'Finding your street', 'Found your street', v, v);
+    PSTEPS[2] = step('Read the collection calendar', 'Reading the collection calendar', 'Read the collection calendar',
+                     'Asking ' + (API.council || 'your council') + ' for your dates', 'Including bank holiday changes');
+    PSTEPS[3] = step('Spot your bins', 'Spotting your bins', 'Spotted your bins', '', '');
     setTimeout(function () { if (fetching) { PSTEPS[hold].sub = 'Some council websites are slow. Nearly there…'; drawParsing(parseAt); } }, 8000);
     go('parsing');
     req.then(function (j) {
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
       note = j.shared && j.error ? j.error : '';
-      PSTEPS[0].sub = j.council || PSTEPS[0].sub;
+      PSTEPS[0].subDone = j.council || PSTEPS[0].subDone;
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
       if (!bins.length) return j;
       // Calendar in hand: keep the loader on while BinBot double-checks it against the
       // street (fills anything this address's calendar left out) before showing anything.
-      PSTEPS[2].sub = shared ? 'Same round as your neighbours on ' + postcode : 'Including bank holiday changes';
-      PSTEPS[3] = { label: 'Spot your bins', sub: 'Double-checking with your neighbours' };
+      if (shared) PSTEPS[2].subDone = 'Same round as your neighbours on ' + postcode;
       hold = 3; drawParsing(parseAt = 3);
       return api('POST', '/users/' + API.userId + '/verify').then(function (list) { bins = list.map(binFromApi); return j; },
                                                                 function () { return j; });
@@ -621,7 +623,8 @@ Share with your street
       // Nothing from the council or the street: no fake checklist of ticks, straight to
       // adding bins by hand.
       if (calendarFailed) { go('confirm'); return; }
-      PSTEPS[3] = { label: 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins'), sub: [bins.map(function (b) { return b.name; }).join(', '), dayNames.map(function (d) { return LONG[d]; }).join(' and ')].filter(Boolean).join(' · ') };
+      PSTEPS[3].done = 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins');
+      PSTEPS[3].subDone = [bins.map(function (b) { return b.name; }).join(', '), dayNames.map(function (d) { return LONG[d]; }).join(' and ')].filter(Boolean).join(' · ');
       if (current === 'parsing') runParsing(); else go('parsing');
     }).catch(function (e) {
       fetching = false; go('postcode');
@@ -654,14 +657,22 @@ Share with your street
   $('#tel').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPhone(); });
 
   // Parsing
+  // todo / doing / done: the label a step shows before it starts, while it runs, after it's done.
+  function step(todo, doing, done, sub, subDone) {
+    return { todo: todo, doing: doing, done: done, sub: sub, subDone: subDone };
+  }
   var PSTEPS = [
-    { label: 'Found your council', sub: '[COUNCIL NAME]' },
-    { label: 'Read the collection calendar', sub: 'Including bank holiday changes' },
-    { label: 'Matched your road', sub: 'Tuesday collections' },
-    { label: 'Spotted 4 bins', sub: 'Recycling, general, food, garden' }
+    step('Find your council', 'Finding your council', 'Found your council', '', '[COUNCIL NAME]'),
+    step('Read the collection calendar', 'Reading the collection calendar', 'Read the collection calendar', '', 'Including bank holiday changes'),
+    step('Match your road', 'Matching your road', 'Matched your road', '', 'Tuesday collections'),
+    step('Spot your bins', 'Spotting your bins', 'Spotted 4 bins', '', 'Recycling, general, food, garden')
   ];
   function drawParsing(at) {
-    $('#psteps').innerHTML = PSTEPS.map(function (s, i) {
+    var finished = at >= PSTEPS.length;
+    $('#p-title').textContent = finished ? 'Your calendar is ready' : "Reading your council's calendar";
+    $('#psteps').innerHTML = PSTEPS.map(function (st, i) {
+      var s = i < at ? { label: st.done, sub: st.subDone }
+        : i === at ? { label: st.doing, sub: st.sub } : { label: st.todo, sub: '' };
       var mark = i < at ? '<div class="mark done"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></div>'
         : i === at ? '<div class="mark"><div class="spin"></div></div>' : '<div class="mark todo"></div>';
       return '<div class="pstep">' + mark + '<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:700;color:' + (i > at ? '#8A8A8E' : '#1A1A1A') + '">' + s.label + '</span><span class="hint">' + s.sub + '</span></div></div>';
