@@ -560,7 +560,9 @@ Share with your street
       var own = ownLookup === 'start'; if (own) ownLookup = 'picking';
       api('GET', '/postcode/' + encodeURIComponent(v)).then(function (p) {
         API.council = p.council;
-        var needsAddr = (p.needs_uprn || p.needs_house_number) && (own || !p.round_known);
+        // Always pin the exact home (UPRN + house number + postcode) on a new postcode, so
+        // every council scraper gets every input it might read. Neighbours reuse it for free.
+        var needsAddr = own || !p.round_known;
         if (!needsAddr) { done(); submitPostcode(); return; }
         return api('GET', '/postcode/' + encodeURIComponent(v) + '?addresses=true').then(function (p2) {
           if (!p2.addresses || !p2.addresses.length) { done(); submitPostcode(); return; }
@@ -587,10 +589,14 @@ Share with your street
     ownLookup = null;
     // Show progress while the council answers (seconds for some sites), instead of a frozen
     // button followed by a replayed animation.
-    fetching = true; parseAt = 0; hold = 1;
-    PSTEPS[0].sub = API.council || 'Your council';
-    PSTEPS[1].sub = 'Asking ' + (API.council || 'your council') + ' for your dates';
-    PSTEPS[2] = { label: 'Match your road', sub: '' }; PSTEPS[3] = { label: 'Spot your bins', sub: '' };
+    // Steps say what's really happening for this sign-up: which home BinBot is asking about,
+    // then the council's calendar, then the cross-check with the street.
+    fetching = true; parseAt = 0; hold = 2;
+    var home = addr ? addr.line.replace(/,\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, '') : typed ? typed + ', ' + v : '';
+    PSTEPS[0] = { label: 'Found your council', sub: API.council || 'Your council' };
+    PSTEPS[1] = home ? { label: 'Found your home', sub: home } : { label: 'Found your street', sub: v };
+    PSTEPS[2] = { label: 'Read the collection calendar', sub: 'Asking ' + (API.council || 'your council') + ' for your dates' };
+    PSTEPS[3] = { label: 'Spot your bins', sub: '' };
     setTimeout(function () { if (fetching) { PSTEPS[hold].sub = 'Some council websites are slow. Nearly there…'; drawParsing(parseAt); } }, 8000);
     go('parsing');
     req.then(function (j) {
@@ -602,9 +608,9 @@ Share with your street
       if (!bins.length) return j;
       // Calendar in hand: keep the loader on while BinBot double-checks it against the
       // street (fills anything this address's calendar left out) before showing anything.
-      PSTEPS[1].sub = shared ? 'Same round as your neighbours on ' + postcode : 'Including bank holiday changes';
-      PSTEPS[2] = { label: 'Match your street', sub: 'Double-checking with your neighbours' };
-      hold = 2; drawParsing(parseAt = 2);
+      PSTEPS[2].sub = shared ? 'Same round as your neighbours on ' + postcode : 'Including bank holiday changes';
+      PSTEPS[3] = { label: 'Spot your bins', sub: 'Double-checking with your neighbours' };
+      hold = 3; drawParsing(parseAt = 3);
       return api('POST', '/users/' + API.userId + '/verify').then(function (list) { bins = list.map(binFromApi); return j; },
                                                                 function () { return j; });
     }).then(function (j) {
@@ -612,14 +618,10 @@ Share with your street
       fetching = false;
       calendarFailed = !bins.length;
       var dayNames = []; bins.forEach(function (b) { b.days.forEach(function (d) { if (dayNames.indexOf(d) < 0) dayNames.push(d); }); });
-      if (calendarFailed) {
-        PSTEPS[1].sub = "Couldn't read it this time. You'll set your bins yourself.";
-        PSTEPS[2] = { label: 'Collection days', sub: 'Add them on the next screen' };
-        PSTEPS[3] = { label: 'No bins found yet', sub: 'Takes about 30 seconds' };
-      } else {
-        PSTEPS[2] = { label: shared ? 'Matched your street' : 'Matched your road', sub: (dayNames.map(function (d) { return LONG[d]; }).join(' and ') || 'Set') + ' collections' };
-        PSTEPS[3] = { label: 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins'), sub: bins.map(function (b) { return b.name; }).join(', ') };
-      }
+      // Nothing from the council or the street: no fake checklist of ticks, straight to
+      // adding bins by hand.
+      if (calendarFailed) { go('confirm'); return; }
+      PSTEPS[3] = { label: 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins'), sub: [bins.map(function (b) { return b.name; }).join(', '), dayNames.map(function (d) { return LONG[d]; }).join(' and ')].filter(Boolean).join(' · ') };
       if (current === 'parsing') runParsing(); else go('parsing');
     }).catch(function (e) {
       fetching = false; go('postcode');
@@ -721,13 +723,13 @@ Share with your street
     var empty = !bins.length;
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
       : editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
-    $('#c-lede').textContent = empty ? (calendarFailed ? "BinBot couldn't read " + (API.council || 'your council') + "'s calendar this time. Tell it your bins and it'll keep an eye on the council for changes." : 'Add each bin with its day and how often it goes out.')
+    $('#c-lede').textContent = empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
       : editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.'
       : note ? note : shared ? 'Your neighbours on ' + postcode + ' get these days. Same lorry, same street.' : '';
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
-    $('#c-lede').hidden = !editing && !shared && !note;
-    $('#c-own').hidden = !(editing && shared && API.live);
+    $('#c-lede').hidden = !empty && !editing && !shared && !note;
+    $('#c-own').hidden = !(editing && shared && API.live && !empty);
     $('#c-view').hidden = editing;
     $('#c-editor').hidden = !editing;
     // Don't let people confirm a schedule we can't remind them about yet.
