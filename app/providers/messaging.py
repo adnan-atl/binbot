@@ -1,8 +1,8 @@
 """
-Outbound WhatsApp. One interface, three providers:
+Outbound WhatsApp. One interface, two providers:
   stub   - writes to the outbox table and the log. Default; no credentials needed.
-  twilio - Twilio WhatsApp API (sandbox works without Meta approval).
-  meta   - WhatsApp Cloud API (needs an approved business account + message templates).
+  meta   - WhatsApp Cloud API (free test number for up to 5 verified recipients; message
+           templates for anything sent outside the 24-hour reply window).
 """
 import logging
 from typing import Protocol
@@ -35,22 +35,6 @@ class StubProvider:
         return SendResult(ok=True, message_id="stub")
 
 
-class TwilioProvider:
-    name = "twilio"
-
-    def send(self, to_phone: str, body: str) -> SendResult:
-        s = get_settings()
-        r = httpx.post(
-            f"https://api.twilio.com/2010-04-01/Accounts/{s.twilio_account_sid}/Messages.json",
-            auth=(s.twilio_account_sid, s.twilio_auth_token),
-            data={"From": s.twilio_from, "To": f"whatsapp:{to_phone}", "Body": body},
-            timeout=15,
-        )
-        if r.status_code >= 300:
-            return SendResult(ok=False, error=r.text[:300])
-        return SendResult(ok=True, message_id=r.json().get("sid"))
-
-
 class MetaProvider:
     name = "meta"
 
@@ -72,7 +56,7 @@ class MetaProvider:
 
 def get_provider() -> MessageProvider:
     name = get_settings().message_provider
-    return {"twilio": TwilioProvider, "meta": MetaProvider}.get(name, StubProvider)()
+    return {"meta": MetaProvider}.get(name, StubProvider)()
 
 
 def send_message(db: Session, to_phone: str, body: str, kind: str) -> Outbox:
