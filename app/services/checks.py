@@ -101,4 +101,11 @@ def run(bins: list[dict], council_name: str, gss_code: str | None,
             "kind": "missing_stream", "category": "recycling", "every_days": None,
             "text": f"{council_name}: no recycling on the address calendar.",
         })
+    # Every council collects general waste. A calendar without it is a partial scrape (or a
+    # bin we couldn't read): flag it so verify asks the neighbours, like missing recycling.
+    if bins and "general" not in have and not any(c["category"] == "general" for c in checks):
+        checks.append({
+            "kind": "missing_stream", "category": "general", "every_days": None,
+            "text": f"{council_name}: no general waste on the address calendar.",
+        })
     return checks
