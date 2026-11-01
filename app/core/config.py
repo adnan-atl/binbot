@@ -38,3 +38,8 @@ class Settings(BaseSettings):
 
     public_base_url: str = "http://localhost:8000"
     timezone: str = "Europe/London"
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
