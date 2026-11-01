@@ -103,7 +103,8 @@ def _propagate_change(db: Session, prop: Property, diff: dict) -> int:
             send_message(db, u.phone_e164, body, kind="change")
             notified += 1
     log_row = db.scalar(
-        select(ChangeLog).where(ChangeLog.scope_id == prop.round_key)
+        select(ChangeLog).where(ChangeLog.scope_id == prop.round_key,
+                                ChangeLog.kind == "dates_changed")
         .order_by(ChangeLog.detected_at.desc())
     )
     if log_row:

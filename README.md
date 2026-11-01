@@ -24,7 +24,7 @@ export DATABASE_URL=sqlite:///binbot.db   # or a Postgres URL
 alembic upgrade head
 uvicorn app.main:app --reload             # API + UI
 python -m app.workers.main                # monitor + reminder dispatcher
-pytest                                    # 17 tests, no network needed
+pytest                                    # no network needed
 ```
 
 `DEMO_MODE=true` makes any postcode resolve to canned Hackney data with no outbound
@@ -118,7 +118,10 @@ templates for anything sent outside a 24-hour reply window.
 - Address lookup needs an API key; there is no free UPRN source.
 - Scrapers are only as good as UKBinCollectionData's; expect a few to break each month.
   The health check tells you which.
-- Postcode rounds assume one calendar per postcode. That holds for almost all of them;
-  the "not my days" path covers the exceptions, but nothing detects them automatically.
+- Postcode rounds assume one calendar per postcode. The verify step checks it: a round is
+  `confirmed` once a second address on the postcode returns the same dates
+  (`app/services/quorum.py`), and `disputed` when the neighbours contradict it. Disputes and
+  outvoted neighbours go to `change_log` (`disputed`, `neighbour_differs`) for ops; residents
+  aren't shown them. Splitting a disputed round in two (odd/even sides) isn't automatic yet.
 - Local fixes for broken upstream scrapers live in `app/adapters/overrides.py`.
 - Bank holiday list in `monitor.py` is static; wire it to gov.uk/bank-holidays.json.

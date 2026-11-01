@@ -1,13 +1,25 @@
 """
 Verify step: runs while the resident watches the loader, before they see their bins.
 
-When the checker finds a gap (a stream the council's policy lists but this address's
-calendar doesn't) or a disagreement, don't show it and don't ask the resident. Ask the
-council about one or two other homes on the same postcode, same lorry, and fill the gap
-from them (hierarchy level 5, neighbours, beats "nothing"). Filled events are tagged with a
-"neighbours" snapshot so a later refresh of this address doesn't count them as removed.
+Two jobs, both answered by asking the council about one or two other homes on the same
+postcode (same street, same lorry):
 
-Bounded: at most MAX_NEIGHBOURS extra council lookups per round, at most once a week.
+  confirm  the round's calendar rests on one scrape. A neighbour whose dates match confirms
+           it (quorum.py); one whose dates don't is a vote against, and a second neighbour
+           breaks the tie. Disagreements go to change_log for ops, never to the resident.
+  fill     a stream the council's policy lists but this calendar lacks is filled from an
+           agreeing neighbour (hierarchy level 5, neighbours, beats "nothing"). Filled events
+           are tagged with a "neighbours" snapshot so a later refresh of this address doesn't
+           count them as removed. A neighbour that disagrees on the shared streams is likely
+           on another round, so nothing is filled from it.
+
+Round status, logged on each "verified" row:
+  confirmed    a neighbour agrees (2 of 2, or 2 of 3 when another neighbour differs)
+  disputed     every neighbour that answered differs
+  unconfirmed  nobody answered, or nothing to compare
+
+Bounded: at most MAX_NEIGHBOURS extra council lookups per round, at most once a week. Usually
+one: the second is only asked for to break a tie or fill a gap the first couldn't.
 """
 import logging
 from datetime import date, datetime, timedelta, timezone
@@ -20,7 +32,7 @@ from app.adapters.base import AdapterError
 from app.adapters.registry import library_version
 from app.core.config import get_settings
 from app.models import ChangeLog, CollectionEvent, CouncilStatus, Property, Snapshot
-from app.services import geo
+from app.services import geo, quorum
 from app.services import schedule as sched
 from app.services.normalize import categorise
 
@@ -54,37 +66,82 @@ def _neighbours(prop: Property) -> list:
     return list({id(p): p for p in picks}.values())[:MAX_NEIGHBOURS]
 
 
+def _ask(council, prop: Property, n) -> list | None:
+    """The neighbour's calendar within the horizon, or None if the council had nothing."""
+    today, horizon = date.today(), get_settings().horizon_days
+    stand_in = SimpleNamespace(postcode=prop.postcode, uprn=n.uprn, house_number=n.house_number)
+    try:
+        items = sched.fetch_collections(council, stand_in)
+    except AdapterError as e:
+        log.info("verify: neighbour %s failed: %s", n.house_number, e)
+        return None
+    return [i for i in items if today <= i.date <= today + timedelta(days=horizon)] or None
+
+
+def _signature_of(council, items) -> quorum.Signature:
+    return quorum.signature((categorise(i.label, council.gss_code).value, i.date) for i in items)
+
+
+def _round_signature(db: Session, round_key: str) -> quorum.Signature:
+    events = db.scalars(select(CollectionEvent).where(CollectionEvent.round_key == round_key,
+                                                      CollectionEvent.date >= date.today())).all()
+    return quorum.signature((e.bin_type.category.value, e.date) for e in events)
+
+
+def _status(agreed: list, differed: list) -> str:
+    return "confirmed" if agreed else "disputed" if differed else "unconfirmed"
+
+
+def _log_disagreements(db: Session, round_key: str, status: str, differed: list) -> None:
+    """Disputed: the round itself is in doubt. Outvoted: one neighbour is on another round,
+    or its scrape is wrong. Either way ops want the raw comparison."""
+    if differed:
+        db.add(ChangeLog(scope="round", scope_id=round_key,
+                         kind="disputed" if status == "disputed" else "neighbour_differs",
+                         diff={"differed": differed}))
+
+
+def _borrowed_snapshot(db: Session, prop: Property, council, n, items) -> Snapshot:
+    snap = Snapshot(round_key=prop.round_key, council_id=council.id, source="neighbours",
+                    adapter_version=library_version(), content_hash="",
+                    raw={"from": n.house_number, "bins": [
+                        {"type": i.label, "collectionDate": i.date.isoformat()} for i in items]})
+    db.add(snap)
+    db.flush()
+    return snap
+
+
 def verify_round(db: Session, prop: Property) -> dict:
-    """Resolve checker findings for this round before the resident sees it."""
+    """Confirm this round's calendar with a neighbour and fill gaps before the resident sees it."""
     council = prop.council
-    _, found = sched.schedule_for(db, prop, with_checks=True)
-    gaps = {c["category"]: c for c in found if c["kind"] == "missing_stream"}
-    result = {"looked_at": 0, "filled": []}
-    if not gaps or not council or council.status == CouncilStatus.unsupported \
+    result = {"looked_at": 0, "filled": [], "status": "unconfirmed"}
+    if not council or council.status == CouncilStatus.unsupported \
             or _recently_verified(db, prop.round_key):
         return result
+    _, found = sched.schedule_for(db, prop, with_checks=True)
+    gaps = {c["category"]: c for c in found if c["kind"] == "missing_stream"}
+    ours = _round_signature(db, prop.round_key)
+    if not ours and not gaps:
+        return result
 
-    today, horizon = date.today(), get_settings().horizon_days
+    agreed, differed = [], []
     for n in _neighbours(prop):
-        if not gaps:
+        if agreed and not gaps:
             break
         result["looked_at"] += 1
-        stand_in = SimpleNamespace(postcode=prop.postcode, uprn=n.uprn, house_number=n.house_number)
-        try:
-            items = sched.fetch_collections(council, stand_in)
-        except AdapterError as e:
-            log.info("verify: neighbour %s failed: %s", n.house_number, e)
+        items = _ask(council, prop, n)
+        if items is None:
             continue
-        wanted = [i for i in items if categorise(i.label, council.gss_code).value in gaps
-                  and today <= i.date <= today + timedelta(days=horizon)]
+        verdict, differences = quorum.compare(ours, _signature_of(council, items))
+        if verdict == "differ":
+            differed.append({"from": n.house_number, "differences": differences})
+            continue
+        if verdict == "agree":
+            agreed.append(n.house_number)
+        wanted = [i for i in items if categorise(i.label, council.gss_code).value in gaps]
         if not wanted:
             continue
-        snap = Snapshot(round_key=prop.round_key, council_id=council.id, source="neighbours",
-                        adapter_version=library_version(), content_hash="",
-                        raw={"from": n.house_number, "bins": [
-                            {"type": i.label, "collectionDate": i.date.isoformat()} for i in wanted]})
-        db.add(snap)
-        db.flush()
+        snap = _borrowed_snapshot(db, prop, council, n, wanted)
         for i in wanted:
             bt = sched.get_or_create_bin_type(db, council, i.label)
             exists = db.scalar(select(CollectionEvent.id).where(
@@ -99,8 +156,11 @@ def verify_round(db: Session, prop: Property) -> dict:
                 result["filled"].append(cat)
         db.flush()
 
+    result["status"] = _status(agreed, differed)
+    _log_disagreements(db, prop.round_key, result["status"], differed)
     db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="verified",
-                     diff={**result, "still_missing": sorted(gaps)}))
+                     diff={**result, "still_missing": sorted(gaps), "agreed": agreed,
+                           "differed": differed}))
     db.flush()
     return result
 
@@ -109,32 +169,39 @@ def rescue_round(db: Session, prop: Property) -> bool:
     """
     This address's lookup failed. Before giving up (and handing the resident a blank form),
     try the same council for one or two neighbours on the postcode: same street, same lorry.
-    The first neighbour with a calendar becomes the round's calendar, tagged as borrowed.
+    The first neighbour with a calendar becomes the round's calendar, tagged as borrowed, but
+    only counts as confirmed once a second neighbour agrees with it. The rescue is the round's
+    verification for the week, so the loader's verify call doesn't ask the same homes again.
     """
     council = prop.council
     if not council or council.status == CouncilStatus.unsupported:
         return False
-    today, horizon = date.today(), get_settings().horizon_days
+    first, agreed, differed = None, [], []
     for n in _neighbours(prop):
-        stand_in = SimpleNamespace(postcode=prop.postcode, uprn=n.uprn, house_number=n.house_number)
-        try:
-            items = sched.fetch_collections(council, stand_in)
-        except AdapterError as e:
-            log.info("rescue: neighbour %s failed: %s", n.house_number, e)
+        items = _ask(council, prop, n)
+        if items is None:
             continue
-        items = [i for i in items if today <= i.date <= today + timedelta(days=horizon)]
-        if not items:
+        if first is None:
+            first = (n, items, _signature_of(council, items))
             continue
-        snap = Snapshot(round_key=prop.round_key, council_id=council.id, source="neighbours",
-                        adapter_version=library_version(), content_hash="",
-                        raw={"from": n.house_number, "bins": [
-                            {"type": i.label, "collectionDate": i.date.isoformat()} for i in items]})
-        db.add(snap)
-        db.flush()
-        sched._apply_events(db, prop.round_key, council, items, snap)
-        sched._mark_success(council)
-        db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="rescued",
-                         diff={"from": n.house_number}))
-        db.flush()
-        return True
-    return False
+        verdict, differences = quorum.compare(first[2], _signature_of(council, items))
+        if verdict == "agree":
+            agreed.append(n.house_number)
+        elif verdict == "differ":
+            differed.append({"from": n.house_number, "differences": differences})
+    if first is None:
+        return False
+
+    n, items, _ = first
+    snap = _borrowed_snapshot(db, prop, council, n, items)
+    sched._apply_events(db, prop.round_key, council, items, snap)
+    sched._mark_success(council)
+    status = _status(agreed, differed)
+    db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="rescued",
+                     diff={"from": n.house_number, "status": status}))
+    _log_disagreements(db, prop.round_key, status, differed)
+    db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="verified",
+                     diff={"looked_at": 1 + len(agreed) + len(differed), "filled": [],
+                           "status": status, "agreed": agreed, "differed": differed}))
+    db.flush()
+    return True
