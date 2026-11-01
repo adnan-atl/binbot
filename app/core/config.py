@@ -14,9 +14,11 @@ class Settings(BaseSettings):
 
     # Geo + address lookup
     postcodes_io_url: str = "https://api.postcodes.io"
-    address_provider: str = "none"  # none | os_places | getaddress
+    address_provider: str = "none"  # none | os_places | ideal_postcodes
+    # Tried when the main provider errors or returns nothing for a postcode.
+    address_fallback: str = "ideal_postcodes"  # none | os_places | ideal_postcodes
     os_places_api_key: str = ""
-    getaddress_api_key: str = ""
+    ideal_postcodes_api_key: str = ""
 
     # Council scraping
     scrape_timeout_seconds: int = 90
