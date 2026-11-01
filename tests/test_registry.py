@@ -112,3 +112,70 @@ def test_rbkc_live_page_shape():
     assert ov.rbkc_pick(rows, "100") == {"numbers": "[70 - 150]", "parity": "even numbers only",
                                          "details": "East Side From Arundel Gardens To Cambridge Gardens",
                                          "waste": ["Tuesday", "Friday"], "food": ["Friday"]}
+
+
+# ---- fallbacks ---------------------------------------------------------------------
+
+
+def test_council_id_modules_that_take_a_uprn_are_routed():
+    """Bromley and Kingston (WasteWorks) resolve a UPRN themselves; Wakefield's page is
+    addressed by uprn + address + postcode. All three used to be skipped as unroutable."""
+    from app.adapters.registry import candidates
+
+    assert candidates("E09000006")[0].url == "https://recyclingservices.bromley.gov.uk/"
+    w = candidates("E08000036")[0]
+    assert "{uprn}" in w.url_template and w.requires == frozenset({"uprn"})
+
+
+def test_wakefield_url_is_built_from_the_home(monkeypatch):
+    from app.adapters import ukbcd
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("SELENIUM_URL", "http://selenium:4444")
+    get_settings.cache_clear()
+    from app.adapters.registry import candidates
+
+    seen = {}
+
+    class Mod:
+        class CouncilClass:
+            def template_method(self, url, **kw):
+                seen["url"] = url
+                return '{"bins": [{"type": "Household waste", "collectionDate": "04/11/2026"}]}'
+
+    import uk_bin_collection.uk_bin_collection.collect_data as cd
+    orig = cd.import_council_module
+    cd.import_council_module = lambda name: Mod
+    try:
+        spec = candidates("E08000036")[0]
+        out = ukbcd._run_module(spec, LookupInput(postcode="WF10 3RR", uprn="63035490",
+                                                  address_line="115 Elizabeth Drive, Castleford"))
+    finally:
+        cd.import_council_module = orig
+    assert seen["url"] == ("https://www.wakefield.gov.uk/where-i-live/?uprn=63035490"
+                           "&a=115%20Elizabeth%20Drive%2C%20Castleford&p=WF10%203RR")
+    assert "Household waste" in out
+
+
+def test_second_scraper_is_tried_when_the_first_fails(monkeypatch):
+    from types import SimpleNamespace
+    from app.adapters.base import AdapterError
+    from app.services import schedule
+
+    class A:
+        name = "primary"
+        spec = SimpleNamespace(needs_uprn=False, needs_postcode=True)
+
+        def fetch(self, lookup, validate=True):
+            raise AdapterError("site changed")
+
+    class B(A):
+        name = "alternate"
+
+        def fetch(self, lookup, validate=True):
+            return ["ok"]
+
+    monkeypatch.setattr(schedule, "_adapters_for", lambda c: [A(), B()])
+    monkeypatch.setattr(schedule, "get_settings", lambda: SimpleNamespace(demo_mode=False))
+    prop = SimpleNamespace(postcode="W5 1AA", uprn=None, house_number="1")
+    assert schedule.fetch_collections(SimpleNamespace(), prop) == ["ok"]

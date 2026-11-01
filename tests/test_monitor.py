@@ -196,4 +196,5 @@ def test_uprn_in_url_template_is_detected_and_filled():
     assert w.needs_uprn and w.placeholder == "XXXXXXXX" and w.sample_id == "100070263793"
     sh = specs["ShropshireCouncil"]
     assert sh.needs_uprn and len(sh.placeholder) == 11
-    assert "KingstonUponThamesCouncil" not in specs  # council-specific id: not routable yet
+    k = specs["KingstonUponThamesCouncil"]  # WasteWorks: resolves a UPRN itself
+    assert k.url == "https://waste-services.kingston.gov.uk/" and not k.placeholder
