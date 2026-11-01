@@ -103,3 +103,38 @@ def verify_round(db: Session, prop: Property) -> dict:
                      diff={**result, "still_missing": sorted(gaps)}))
     db.flush()
     return result
+
+
+def rescue_round(db: Session, prop: Property) -> bool:
+    """
+    This address's lookup failed. Before giving up (and handing the resident a blank form),
+    try the same council for one or two neighbours on the postcode: same street, same lorry.
+    The first neighbour with a calendar becomes the round's calendar, tagged as borrowed.
+    """
+    council = prop.council
+    if not council or council.status == CouncilStatus.unsupported:
+        return False
+    today, horizon = date.today(), get_settings().horizon_days
+    for n in _neighbours(prop):
+        stand_in = SimpleNamespace(postcode=prop.postcode, uprn=n.uprn, house_number=n.house_number)
+        try:
+            items = sched.fetch_collections(council, stand_in)
+        except AdapterError as e:
+            log.info("rescue: neighbour %s failed: %s", n.house_number, e)
+            continue
+        items = [i for i in items if today <= i.date <= today + timedelta(days=horizon)]
+        if not items:
+            continue
+        snap = Snapshot(round_key=prop.round_key, council_id=council.id, source="neighbours",
+                        adapter_version=library_version(), content_hash="",
+                        raw={"from": n.house_number, "bins": [
+                            {"type": i.label, "collectionDate": i.date.isoformat()} for i in items]})
+        db.add(snap)
+        db.flush()
+        sched._apply_events(db, prop.round_key, council, items, snap)
+        sched._mark_success(council)
+        db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="rescued",
+                         diff={"from": n.house_number}))
+        db.flush()
+        return True
+    return False
