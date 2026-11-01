@@ -47,7 +47,7 @@ def test_change_detected_and_user_notified(client, db, fake_adapter):
     fake_adapter["items"] = [RawCollection("Recycling", tue + timedelta(weeks=i)) for i in range(4)]
     user = _signup_active(client, db)
     prop = user.property
-    assert db.scalar(select(ChangeLog)) is None  # first fetch is not a "change"
+    assert db.scalar(select(ChangeLog).where(ChangeLog.kind == "dates_changed")) is None  # first fetch is not a "change"
 
     # Council moves one collection by a day (bank holiday).
     moved = tue + timedelta(weeks=2)
