@@ -199,3 +199,118 @@ def test_uprn_in_url_template_is_detected_and_filled():
     k = specs.pop("KingstonUponThamesCouncil")  # WasteWorks now: resolves a UPRN itself
     assert k.url == "https://waste-services.kingston.gov.uk/" and not k.placeholder
     assert "KingstonUponThamesCouncil" not in specs  # council-specific id: not routable yet
+
+
+def _verify_log(db):
+    return [c.diff for c in db.scalars(select(ChangeLog).where(ChangeLog.kind == "verified"))]
+
+
+def test_verify_confirms_the_round_with_one_neighbour(client, db, fake_adapter, monkeypatch):
+    """Nothing missing, but the round still rests on one scrape: one matching neighbour
+    confirms it, and that's the only extra lookup."""
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+    asked = []
+
+    def fetch(council, prop):
+        asked.append(prop.house_number)
+        return [RawCollection("Refuse", tue + timedelta(weeks=i)) for i in range(4)] + \
+               [RawCollection("Recycling", tue + timedelta(weeks=i)) for i in range(4)]
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    start = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    client.post(f"/api/users/{start['user_id']}/verify")
+    assert asked == [None, "10"]
+    assert _verify_log(db)[0]["status"] == "confirmed"
+
+
+def test_loader_verify_spends_no_lookup_when_nothing_is_missing(client, db, fake_adapter,
+                                                                  monkeypatch):
+    """The loader's call only asks the council when a bin is missing; confirming the round is
+    left to the background call."""
+    from app.services.verify import verify_round
+
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+    asked = []
+
+    def fetch(council, prop):
+        asked.append(prop.house_number)
+        return [RawCollection("Refuse", tue + timedelta(weeks=i)) for i in range(4)] + \
+               [RawCollection("Recycling", tue + timedelta(weeks=i)) for i in range(4)]
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    start = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    user = db.get(User, start["user_id"])
+    assert verify_round(db, user.property, confirm=False)["looked_at"] == 0
+    assert asked == [None] and not _verify_log(db)
+
+
+def test_outvoted_neighbour_is_logged_and_not_used(client, db, fake_adapter, monkeypatch):
+    """First neighbour says Wednesday (another round, or a bad scrape), second says Tuesday
+    like us: 2 of 3, confirmed. Its recycling isn't borrowed; the agreeing one's is."""
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+
+    def fetch(council, prop):
+        day = tue + timedelta(days=1) if prop.house_number == "10" else tue
+        refuse = [RawCollection("Refuse", day + timedelta(weeks=i)) for i in range(4)]
+        recycling = [RawCollection("Recycling", day + timedelta(weeks=i, days=2)) for i in range(4)]
+        return refuse + ([] if prop.house_number is None else recycling)
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    start = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    bins = client.post(f"/api/users/{start['user_id']}/verify").json()
+
+    rec = next(b for b in bins if b["label"] == "Recycling")
+    assert rec["next"] == (tue + timedelta(days=2)).isoformat()  # from 16, not from 10
+    v = _verify_log(db)[0]
+    assert v["status"] == "confirmed" and v["agreed"] == ["16"] and v["differed"][0]["from"] == "10"
+    assert db.scalar(select(ChangeLog).where(ChangeLog.kind == "neighbour_differs"))
+
+
+def test_round_every_neighbour_contradicts_is_disputed(client, db, fake_adapter, monkeypatch):
+    """Our scrape says Tuesday, both neighbours say Thursday: ops need to look. The resident
+    still gets one answer (theirs, from the council for their address)."""
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+
+    def fetch(council, prop):
+        day = tue if prop.house_number is None else tue + timedelta(days=2)
+        return [RawCollection("Refuse", day + timedelta(weeks=i)) for i in range(4)] + \
+               [RawCollection("Recycling", day + timedelta(weeks=i)) for i in range(4)]
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    start = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    bins = client.post(f"/api/users/{start['user_id']}/verify").json()
+    assert {b["days"][0] for b in bins} == {"TUE"}
+    assert _verify_log(db)[0]["status"] == "disputed"
+    d = db.scalar(select(ChangeLog).where(ChangeLog.kind == "disputed"))
+    assert [x["from"] for x in d.diff["differed"]] == ["10", "16"]
+
+
+def test_rescue_uses_first_neighbour_and_confirms_later(client, db, fake_adapter, monkeypatch):
+    """This address fails: the resident gets the first neighbour's calendar after one extra
+    lookup, not two. Confirming happens afterwards, with a different home than the one we
+    borrowed from (asking that one again would only agree with itself)."""
+    from app.adapters.base import NoCollectionsForAddress
+
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+    asked = []
+
+    def fetch(council, prop):
+        asked.append(prop.house_number)
+        if prop.house_number is None:
+            raise NoCollectionsForAddress("nothing for this address")
+        day = tue if prop.house_number == "10" else tue + timedelta(days=3)
+        return [RawCollection("Refuse", day + timedelta(weeks=i)) for i in range(4)]
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    r = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    assert r["error"] is None and r["bins"][0]["days"] == ["TUE"]
+    assert asked.count("10") == 1 and "16" not in asked
+    rescued = db.scalar(select(ChangeLog).where(ChangeLog.kind == "rescued"))
+    assert rescued.diff == {"from": "10"}
+
+    client.post(f"/api/users/{r['user_id']}/verify")  # confirm runs after the response
+    assert asked.count("10") == 1 and "16" in asked
+    assert _verify_log(db)[0]["status"] == "disputed"
+    n = len(asked)
+    client.post(f"/api/users/{r['user_id']}/verify")
+    assert len(asked) == n
