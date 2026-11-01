@@ -157,3 +157,28 @@ def test_postcode_and_address_lookups_are_cached(monkeypatch):
         assert geo.lookup_addresses("LA1 1NN")[0].house_number == "92"
     assert len(calls) == 2
     geo._cache.clear()
+
+
+def test_failed_full_lookup_retries_with_postcode_only(monkeypatch):
+    """Regression (Westminster): its 'uprn' kwarg is a street id; a real UPRN breaks it,
+    the postcode alone works. Retry without the UPRN before giving up."""
+    from types import SimpleNamespace
+    from app.adapters.base import AdapterError
+    from app.services import schedule
+
+    calls = []
+
+    class Fake:
+        spec = SimpleNamespace(needs_uprn=True, needs_postcode=True)
+
+        def fetch(self, lookup, validate=True):
+            calls.append(lookup.uprn)
+            if lookup.uprn:
+                raise AdapterError("street not found")
+            return ["ok"]
+
+    monkeypatch.setattr(schedule, "_adapter_for", lambda c: Fake())
+    monkeypatch.setattr(schedule, "get_settings", lambda: SimpleNamespace(demo_mode=False))
+    prop = SimpleNamespace(postcode="SW1A 1AA", uprn="10033540874", house_number="1")
+    assert schedule.fetch_collections(SimpleNamespace(), prop) == ["ok"]
+    assert calls == ["10033540874", None]

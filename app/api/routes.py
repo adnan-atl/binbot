@@ -27,7 +27,7 @@ from app.models import (
 from app.services import geo
 from app.services.normalize import describe_rule
 from app.services.reminders import handle_inbound, rebuild_reminders
-from app.services.verify import verify_round
+from app.services.verify import rescue_round, verify_round
 from app.services.schedule import (
     get_or_create_council,
     own_round,
@@ -105,7 +105,9 @@ def signup_start(body: S.StartIn, db: Session = Depends(get_db)):
         source, shared = "neighbours", True
     elif council.status != CouncilStatus.unsupported:
         res = refresh_round(db, prop, source="demo" if source == "demo" else "council")
-        if res.error:
+        if res.error and rescue_round(db, prop):
+            source = "neighbours"  # this address failed; a neighbour's calendar worked
+        elif res.error:
             error = res.error
         else:
             source = source if source == "demo" else "council"
