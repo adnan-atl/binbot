@@ -46,18 +46,41 @@ MOVED_MESSAGE = ("Your side of the street has different collection days from the
                  "your postcode. I've moved your reminders to your side's days.")
 
 
+# Votes against a round: from neighbours' scrapes (verify.py) and from residents ("not my
+# days" when the council agrees their home differs; a WRONG reply to a reminder).
+VOTES = ("disputed", "neighbour_differs", "resident_differs", "wrong_day")
+
+
 def disputed_rounds(db: Session) -> list[str]:
-    """Rounds with a recent disagreement that haven't been probed since."""
+    """Postcode rounds with a recent vote against them that haven't been probed since."""
     since = datetime.now(timezone.utc) - LOOK_BACK
     rows = db.execute(select(ChangeLog.scope_id, ChangeLog.kind, ChangeLog.detected_at)
                       .where(ChangeLog.scope == "round", ChangeLog.detected_at >= since,
-                             ChangeLog.kind.in_(("disputed", "neighbour_differs", "split_checked")))
+                             ChangeLog.kind.in_((*VOTES, "split_checked")))
                       .order_by(ChangeLog.detected_at)).all()
     latest: dict[str, str] = {}
     for key, kind, _ in rows:
         latest[key] = kind
     split = set(db.scalars(select(RoundSplit.round_key)).all())
-    return [k for k, kind in latest.items() if kind != "split_checked" and k not in split]
+    # A home's own round ("p:...") is one home: there's nothing to split.
+    return [k for k, kind in latest.items()
+            if kind != "split_checked" and k not in split and k.startswith("pc:")]
+
+
+def own_calendar_vote(db: Session, left: str, prop: Property) -> None:
+    """
+    A resident said "these aren't my days" and got their own calendar. If the council gives
+    their home different dates from the round they left, that's a vote against the round
+    (maybe it's two rounds). If the council gives the same dates, the resident is telling us
+    the council's own data is wrong: no probe can fix that, so it's for ops.
+    """
+    verdict, differences = quorum.compare(verify._round_signature(db, left),
+                                          verify._round_signature(db, prop.round_key))
+    if verdict == "inconclusive":
+        return
+    db.add(ChangeLog(scope="round", scope_id=left,
+                     kind="resident_differs" if verdict == "differ" else "resident_reported",
+                     diff={"from": prop.house_number or prop.uprn, "differences": differences}))
 
 
 def _probe_picks(numbers: list[int]) -> list[int]:

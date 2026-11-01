@@ -24,7 +24,7 @@ from app.models import (
     level_for,
     now,
 )
-from app.services import geo
+from app.services import geo, split
 from app.services.normalize import describe_rule
 from app.services.reminders import handle_inbound, rebuild_reminders
 from app.services.verify import rescue_round, verify_round
@@ -174,6 +174,7 @@ def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_
                                 "you're still on your street's days.")
     _seed_settings(db, user, prop)
     _log_checks(db, prop)
+    split.own_calendar_vote(db, before[0], prop)
     db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=prop.council.name,
                       source=source, shared=False, bins=_bins_out(db, user))
