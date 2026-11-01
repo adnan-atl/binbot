@@ -155,3 +155,29 @@ def test_address_fallback_only_when_needed_and_never_crashes(monkeypatch):
     monkeypatch.setattr(geo.httpx, "get", lambda url, **kw: _Resp(500, {}))
     assert geo.lookup_addresses("E8 3PB") == []
     geo._cache.clear()
+
+
+def test_turning_reminders_on_sends_a_welcome(client, db, monkeypatch):
+    from app.models import Outbox
+
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+    prop, _ = _signup(client, db, monkeypatch, [RawCollection("Recycling", tue)])
+    uid = db.scalar(select(User.id))
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123"})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    w = db.scalar(select(Outbox).where(Outbox.kind == "welcome"))
+    assert "at 7pm" in w.body and "First up: Recycling on" in w.body
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "20:00"})
+    assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome")).all()) == 1
+
+
+def test_meta_webhook_verification(client, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("META_VERIFY_TOKEN", "bins")
+    get_settings.cache_clear()
+    ok = client.get("/webhooks/meta", params={"hub.mode": "subscribe", "hub.verify_token": "bins",
+                                              "hub.challenge": "123"})
+    assert ok.status_code == 200 and ok.text == "123"
+    assert client.get("/webhooks/meta", params={"hub.mode": "subscribe",
+                                                "hub.verify_token": "nope"}).status_code == 403
