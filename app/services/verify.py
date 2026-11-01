@@ -49,20 +49,35 @@ def _recently_verified(db: Session, round_key: str) -> bool:
     ) is not None
 
 
-def _neighbours(prop: Property) -> list:
-    """Other homes on the postcode, spread out (first and middle), never this one."""
+def _week(today: date) -> int:
+    return today.toordinal() // 7
+
+
+def _neighbours(db: Session, prop: Property) -> list:
+    """
+    Other homes on the postcode, never this one, two spread-out picks (first and middle).
+    Residents on the round come first: theirs are the calendars that matter. The picks
+    rotate weekly, so over a few weeks every home confirms the round, not the same two, and
+    a home whose scrape is wrong (or that's on another round) shows up as a disagreement.
+    """
+    pool, seen = [], {prop.house_number}
+    members = db.scalars(select(Property).where(Property.round_key == prop.round_key,
+                                                Property.id != prop.id)
+                         .order_by(Property.created_at)).all()
     try:
         hits = geo.lookup_addresses(prop.postcode)  # cached; usually already fetched at sign-up
-    except Exception as e:  # address provider down: nothing to cross-check with
+    except Exception as e:  # address provider down: only residents to cross-check with
         log.warning("verify: address lookup failed for %s: %s", prop.postcode, e)
-        return []
-    others, seen = [], {prop.house_number}
-    for h in hits:
+        hits = []
+    for h in [*members, *hits]:
         if not h.house_number or h.house_number in seen or (prop.uprn and h.uprn == prop.uprn):
             continue
         seen.add(h.house_number)
-        others.append(h)
-    picks = [others[0], others[len(others) // 2]] if len(others) > 1 else others
+        pool.append(h)
+    if len(pool) < 2:
+        return pool
+    start = _week(date.today()) % len(pool)
+    picks = [pool[start], pool[(start + len(pool) // 2) % len(pool)]]
     return list({id(p): p for p in picks}.values())[:MAX_NEIGHBOURS]
 
 
@@ -125,7 +140,7 @@ def verify_round(db: Session, prop: Property) -> dict:
         return result
 
     agreed, differed = [], []
-    for n in _neighbours(prop):
+    for n in _neighbours(db, prop):
         if agreed and not gaps:
             break
         result["looked_at"] += 1
@@ -177,7 +192,7 @@ def rescue_round(db: Session, prop: Property) -> bool:
     if not council or council.status == CouncilStatus.unsupported:
         return False
     first, agreed, differed = None, [], []
-    for n in _neighbours(prop):
+    for n in _neighbours(db, prop):
         items = _ask(council, prop, n)
         if items is None:
             continue
