@@ -48,6 +48,37 @@ def _try(spec, sample: dict) -> tuple[str, str, int]:
         return "fail", f"{type(e).__name__}: {e}"[:200], int(time.monotonic() - t)
 
 
+def _run(todo, workers):
+    """Results in the same order as `todo`."""
+    out = [None] * len(todo)
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(_try, s, v): i for i, (s, v) in enumerate(todo)}
+        for n, f in enumerate(as_completed(futs), 1):
+            i = futs[f]
+            s = todo[i][0]
+            status, detail, secs = f.result()
+            out[i] = (s, status, detail, secs)
+            print(f"[{n}/{len(todo)}] {status:4} {s.name:40} {secs:3}s  {detail[:90]}", flush=True)
+    return out
+
+
+def _wait_for_browser(limit: int = 90) -> None:
+    """Selenium takes a while to boot; don't blame the first councils for that."""
+    import httpx
+
+    url = (get_settings().selenium_url or "").rstrip("/")
+    if not url:
+        return
+    for _ in range(limit):
+        try:
+            if httpx.get(f"{url}/status", timeout=3).json().get("value", {}).get("ready"):
+                return
+        except Exception:
+            pass
+        time.sleep(1)
+    print(f"Warning: browser at {url} not ready after {limit}s.")
+
+
 def _kind(err: str) -> str:
     """Bucket errors so the report says what to fix, not 300 different strings."""
     e = err.lower()
@@ -81,15 +112,16 @@ def main(argv=None) -> int:
     if any(s.needs_browser for s, _ in todo) and not get_settings().selenium_url:
         print("Note: SELENIUM_URL is not set; browser councils will fail.")
 
+    if any(s.needs_browser for s, _ in todo):
+        _wait_for_browser()
     print(f"Sweeping {len(todo)} councils with {args.workers} workers…", flush=True)
-    results = []
-    with ThreadPoolExecutor(max_workers=args.workers) as ex:
-        futs = {ex.submit(_try, s, v): s for s, v in todo}
-        for i, f in enumerate(as_completed(futs), 1):
-            s = futs[f]
-            status, detail, secs = f.result()
-            results.append((s, status, detail, secs))
-            print(f"[{i}/{len(todo)}] {status:4} {s.name:40} {secs:3}s  {detail[:90]}", flush=True)
+    results = _run(todo, args.workers)
+    # Second pass, gently: a lot of first-pass failures are a busy site or a cold browser.
+    retry = [(s, v) for (s, st, _, _), (_, v) in zip(results, todo) if st != "ok"]
+    if retry:
+        print(f"\nRetrying {len(retry)} failures one at a time…", flush=True)
+        again = {r[0].module: r for r in _run(retry, 1)}
+        results = [again.get(r[0].module, r) for r in results]
 
     db = session_factory()()
     try:
@@ -111,6 +143,9 @@ def main(argv=None) -> int:
         for kind, n in Counter(_kind(r[2]) for r in bad).most_common():
             names = ", ".join(r[0].name for r in bad if _kind(r[2]) == kind)
             print(f"  {n:3}  {kind}: {names[:300]}")
+        print("\nDetails:")
+        for s, _, detail, secs in sorted(bad, key=lambda r: r[0].name):
+            print(f"  {s.name} [{s.module}] {secs}s: {detail}")
     return 0
 
 

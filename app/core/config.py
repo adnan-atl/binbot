@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # Council scraping
     scrape_timeout_seconds: int = 90
+    browser_sessions: int = 4  # must match SE_NODE_MAX_SESSIONS in docker-compose.yml
     selenium_url: str = ""  # e.g. http://selenium:4444 for councils that need a browser
     refresh_interval_days: int = 7
     refresh_window_days_before_holiday: int = 21

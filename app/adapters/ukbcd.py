@@ -1,5 +1,6 @@
 """Wraps a UKBinCollectionData council module as a CalendarAdapter."""
 import concurrent.futures
+import threading
 import json
 import logging
 from datetime import date, datetime
@@ -49,6 +50,16 @@ def _run_module(spec: AdapterSpec, lookup: LookupInput) -> str:
     )
 
 
+_SLOTS: threading.BoundedSemaphore | None = None
+
+
+def _browser_slots() -> threading.BoundedSemaphore:
+    global _SLOTS
+    if _SLOTS is None:
+        _SLOTS = threading.BoundedSemaphore(max(1, get_settings().browser_sessions))
+    return _SLOTS
+
+
 class UKBCDAdapter:
     def __init__(self, spec: AdapterSpec):
         self.spec = spec
@@ -66,6 +77,14 @@ class UKBCDAdapter:
 
         if self.spec.module in OVERRIDES:  # local fix for a broken upstream scraper
             return OVERRIDES[self.spec.module](lookup)
+        if self.spec.needs_browser:
+            # Selenium runs a fixed number of browser sessions; queue for one instead of
+            # failing with "could not start a new session" when sign-ups overlap.
+            with _browser_slots():
+                return self._fetch(lookup)
+        return self._fetch(lookup)
+
+    def _fetch(self, lookup: LookupInput) -> list[RawCollection]:
         timeout = get_settings().scrape_timeout_seconds
         # Council modules are synchronous and sometimes hang; isolate with a timeout.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
