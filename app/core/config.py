@@ -29,10 +29,7 @@ class Settings(BaseSettings):
     horizon_days: int = 90  # how far ahead we keep events
 
     # Messaging
-    message_provider: str = "stub"  # stub | twilio | meta
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_from: str = ""  # whatsapp:+14155238886
+    message_provider: str = "stub"  # stub | meta
     meta_token: str = ""
     meta_phone_number_id: str = ""
     meta_verify_token: str = ""  # any string you choose; paste the same one in Meta's webhook settings

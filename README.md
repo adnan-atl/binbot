@@ -102,16 +102,19 @@ POST /api/users/{id}/phone              WhatsApp number + consent
 POST /api/users/{id}/reminders          mode + time; turns reminders on
 GET  /api/users/{id}/schedule
 GET  /api/users/{id}/referral           code, link, level
-POST /api/inbound                       DONE / SNOOZE / STOP (webhooks: /webhooks/twilio, /webhooks/meta)
+POST /api/inbound                       DONE / SNOOZE / STOP (WhatsApp webhook: /webhooks/meta)
 GET  /api/health                        adapter coverage
 ```
 
 ## WhatsApp
 
 `MESSAGE_PROVIDER=stub` (default) writes every message to the `outbox` table and the
-log, so the whole flow runs without credentials. `twilio` works with the Twilio
-sandbox in minutes; `meta` needs an approved WhatsApp Business account and message
-templates for anything sent outside a 24-hour reply window.
+log, so the whole flow runs without credentials. `meta` sends through the WhatsApp
+Cloud API: create an app at developers.facebook.com with the WhatsApp use case and its
+free test number messages up to five verified recipients straight away. Free-form text
+only goes through within 24 hours of the resident last messaging you; reminders outside
+that window need approved message templates. Replies only reach `/webhooks/meta` once
+the Meta app is published.
 
 ## Known gaps
 
