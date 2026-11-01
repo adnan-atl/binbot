@@ -149,7 +149,16 @@ def health_check(db: Session) -> dict:
 def resolve_disputes(db: Session) -> dict:
     out: dict[str, int] = {}
     for key in split.disputed_rounds(db):
-        result = split.probe(db, key)["result"]
+        try:
+            result = split.probe(db, key)["result"]
+        except Exception as e:  # one broken round mustn't stop the rest, tonight or any night
+            log.exception("resolve_disputes: probe failed for %s", key)
+            db.rollback()
+            result = "error"
+            # Marks it probed, so it waits for a fresh vote instead of failing first every night.
+            db.add(ChangeLog(scope="round", scope_id=key, kind="split_checked",
+                             diff={"result": "error", "error": f"{type(e).__name__}: {e}"[:300]}))
+            db.commit()
         out[result] = out.get(result, 0) + 1
     return out
 
