@@ -58,3 +58,31 @@ def test_no_projection_without_a_pattern(client, db, monkeypatch):
     state["error"] = AdapterError("site down", retryable=True)
     schedule.refresh_round(db, prop)
     assert db.scalar(select(ChangeLog).where(ChangeLog.kind == "projected")) is None
+
+
+def test_daily_collections_keep_their_days():
+    """Regression (Westminster, NW1 5AY): rubbish goes out every day. 14 dates over two
+    weeks used to come out as no day at all, so the resident saw no rubbish day."""
+    from app.services.normalize import describe_rule
+
+    mon = date(2026, 11, 2)
+    daily = describe_rule([mon + timedelta(days=i) for i in range(14)])
+    assert daily["days"] == ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+    assert daily["frequency"] == "weekly"
+    weekdays = describe_rule([mon + timedelta(days=i) for i in range(14) if (mon + timedelta(days=i)).weekday() < 5])
+    assert weekdays["days"] == ["MON", "TUE", "WED", "THU", "FRI"]
+    # Still filters a one-off bank holiday shift on a weekly round.
+    tue = date(2026, 11, 3)
+    shifted = [tue + timedelta(weeks=i) for i in range(8)]
+    shifted[5] += timedelta(days=1)
+    assert describe_rule(shifted)["days"] == ["TUE"]
+
+
+def test_calendar_without_general_waste_is_a_gap_to_fill():
+    """A scrape that returns recycling but no rubbish is partial: the checker flags it, so
+    the verify step asks the neighbours before the resident sees a calendar without it."""
+    from app.services import checks
+
+    found = checks.run([{"category": "recycling", "label": "Recycling", "days": ["TUE"],
+                         "history": []}], "Westminster", "E09000033")
+    assert any(c["kind"] == "missing_stream" and c["category"] == "general" for c in found)

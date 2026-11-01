@@ -85,9 +85,14 @@ def describe_rule(dates: list[date]) -> dict:
         return {"days": [], "frequency": Frequency.irregular.value, "next": None}
     days = [_WEEKDAYS[d.weekday()] for d in ds]
     common = [d for d, _ in Counter(days).most_common()]
-    # Keep days that appear in at least a third of events (filters bank-holiday shifts).
-    threshold = max(1, len(ds) / 3)
+    # Keep days that turn up often enough to be the pattern, not a bank-holiday shift. Count
+    # against weeks as well as events: Westminster's daily rubbish is 14 events in 2 weeks,
+    # 2 per weekday, which a per-event threshold (14/3) used to throw away entirely.
+    weeks = (ds[-1] - ds[0]).days // 7 + 1
+    threshold = max(1, min(len(ds), weeks) / 3)
     kept = [d for d in common if days.count(d) >= threshold]
+    if not kept:  # never show a bin with dates but no day: fall back to the next dates' days
+        kept = list(dict.fromkeys(_WEEKDAYS[d.weekday()] for d in ds[:7]))
     kept.sort(key=_WEEKDAYS.index)
 
     gaps = [(b - a).days for a, b in zip(ds, ds[1:])]

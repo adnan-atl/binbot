@@ -598,7 +598,7 @@ Share with your street
     PSTEPS[1] = home ? step('Find your home', 'Finding your home', 'Found your home', home, home)
                      : step('Find your street', 'Finding your street', 'Found your street', v, v);
     PSTEPS[2] = step('Read the collection calendar', 'Reading the collection calendar', 'Read the collection calendar',
-                     'Asking ' + (API.council || 'your council') + ' for your dates', 'Including bank holiday changes');
+                     'Asking ' + (API.council || 'your council') + ' for your dates', 'Straight from ' + (API.council || 'your council'));
     PSTEPS[3] = step('Spot your bins', 'Spotting your bins', 'Spotted your bins', '', '');
     setTimeout(function () { if (fetching) { PSTEPS[hold].sub = 'Some council websites are slow. Nearly there…'; drawParsing(parseAt); } }, 8000);
     go('parsing');
@@ -624,7 +624,7 @@ Share with your street
       // adding bins by hand.
       if (calendarFailed) { go('confirm'); return; }
       PSTEPS[3].done = 'Spotted ' + bins.length + (bins.length === 1 ? ' bin' : ' bins');
-      PSTEPS[3].subDone = [bins.map(function (b) { return b.name; }).join(', '), dayNames.map(function (d) { return LONG[d]; }).join(' and ')].filter(Boolean).join(' · ');
+      PSTEPS[3].subDone = [bins.map(function (b) { return b.name; }).join(', '), (dayNames.length === 7 ? 'Every day' : dayNames.map(function (d) { return LONG[d]; }).join(' and '))].filter(Boolean).join(' · ');
       if (current === 'parsing') runParsing(); else go('parsing');
     }).catch(function (e) {
       fetching = false; go('postcode');
@@ -717,7 +717,7 @@ Share with your street
   var freqText = function (b) {
     var n = b.days.length;
     if (b.freq === 'unknown') return '';  // never show doubt; the row just shows the day
-    if (b.freq === 'weekly') return n === 2 ? 'Twice a week' : n > 2 ? n + '× a week' : 'Every week';
+    if (b.freq === 'weekly') return n === 7 ? 'Every day' : n === 2 ? 'Twice a week' : n > 2 ? n + '× a week' : 'Every week';
     return b.freq === 'fortnightly' ? 'Every 2 weeks' : b.freq === 'three' ? 'Every 3 weeks' : 'Every 4 weeks';
   };
   // "Blue Bin" says nothing about what goes in it; the council-aware purpose line does.
@@ -751,7 +751,7 @@ Share with your street
     if (!editing) {
       $('#c-rows').innerHTML = bins.map(function (b) {
         var chosen = DAYS.filter(function (d) { return b.days.indexOf(d) > -1; });
-        var chips = b.on === false ? '<span class="daychip" style="background:var(--line);color:var(--grey)">Off</span>' : !chosen.length ? '<span class="hint">Not set</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
+        var chips = b.on === false ? '<span class="daychip" style="background:var(--line);color:var(--grey)">Off</span>' : !chosen.length ? '<span class="hint">Not set</span>' : chosen.length === 7 ? '<span class="daychip">Daily</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
         return '<div class="cols binrow' + (b.on === false ? ' off' : '') + '">' +
           '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span>' +
           '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : [purposeText(b), freqText(b)].filter(Boolean).join(' · ')) + '</span></span></span>' +
