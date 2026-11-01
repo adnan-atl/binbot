@@ -221,6 +221,27 @@ def test_verify_confirms_the_round_with_one_neighbour(client, db, fake_adapter, 
     assert _verify_log(db)[0]["status"] == "confirmed"
 
 
+def test_loader_verify_spends_no_lookup_when_nothing_is_missing(client, db, fake_adapter,
+                                                                  monkeypatch):
+    """The loader's call only asks the council when a bin is missing; confirming the round is
+    left to the background call."""
+    from app.services.verify import verify_round
+
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+    asked = []
+
+    def fetch(council, prop):
+        asked.append(prop.house_number)
+        return [RawCollection("Refuse", tue + timedelta(weeks=i)) for i in range(4)] + \
+               [RawCollection("Recycling", tue + timedelta(weeks=i)) for i in range(4)]
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    start = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    user = db.get(User, start["user_id"])
+    assert verify_round(db, user.property, confirm=False)["looked_at"] == 0
+    assert asked == [None] and not _verify_log(db)
+
+
 def test_outvoted_neighbour_is_logged_and_not_used(client, db, fake_adapter, monkeypatch):
     """First neighbour says Wednesday (another round, or a bad scrape), second says Tuesday
     like us: 2 of 3, confirmed. Its recycling isn't borrowed; the agreeing one's is."""
@@ -262,10 +283,10 @@ def test_round_every_neighbour_contradicts_is_disputed(client, db, fake_adapter,
     assert [x["from"] for x in d.diff["differed"]] == ["10", "16"]
 
 
-def test_rescue_needs_a_second_neighbour_to_confirm(client, db, fake_adapter, monkeypatch):
-    """This address fails and the two neighbours disagree: the resident still gets the first
-    neighbour's calendar, the round is logged as disputed, and the loader's verify call
-    doesn't ask the same homes again."""
+def test_rescue_uses_first_neighbour_and_confirms_later(client, db, fake_adapter, monkeypatch):
+    """This address fails: the resident gets the first neighbour's calendar after one extra
+    lookup, not two. Confirming happens afterwards, with a different home than the one we
+    borrowed from (asking that one again would only agree with itself)."""
     from app.adapters.base import NoCollectionsForAddress
 
     tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
@@ -281,8 +302,13 @@ def test_rescue_needs_a_second_neighbour_to_confirm(client, db, fake_adapter, mo
     monkeypatch.setattr(schedule, "fetch_collections", fetch)
     r = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
     assert r["error"] is None and r["bins"][0]["days"] == ["TUE"]
+    assert asked.count("10") == 1 and "16" not in asked
     rescued = db.scalar(select(ChangeLog).where(ChangeLog.kind == "rescued"))
-    assert rescued.diff == {"from": "10", "status": "disputed"}
+    assert rescued.diff == {"from": "10"}
+
+    client.post(f"/api/users/{r['user_id']}/verify")  # confirm runs after the response
+    assert asked.count("10") == 1 and "16" in asked
+    assert _verify_log(db)[0]["status"] == "disputed"
     n = len(asked)
     client.post(f"/api/users/{r['user_id']}/verify")
     assert len(asked) == n
