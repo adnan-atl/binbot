@@ -31,8 +31,12 @@ def _run_module(spec: AdapterSpec, lookup: LookupInput) -> str:
     if spec.needs_browser and not settings.selenium_url:
         raise AdapterError("council needs a browser; set SELENIUM_URL", retryable=False)
 
-    # Many councils embed the UPRN in the URL (XXXXXXXX placeholder).
-    url = spec.url.replace("XXXXXXXX", lookup.uprn or "")
+    # Many councils embed the UPRN in the URL (an XXXX placeholder of varying length).
+    url = spec.url
+    if spec.placeholder:
+        if not lookup.uprn:
+            raise MissingInput("uprn")
+        url = url.replace(spec.placeholder, lookup.uprn)
     module = import_council_module(spec.module)
     return module.CouncilClass().template_method(
         url,
@@ -71,8 +75,9 @@ class UKBCDAdapter:
         if self.spec.needs_house_number and not lookup.house_number:
             raise MissingInput("house_number")
 
-    def fetch(self, lookup: LookupInput) -> list[RawCollection]:
-        self.validate(lookup)
+    def fetch(self, lookup: LookupInput, validate: bool = True) -> list[RawCollection]:
+        if validate:
+            self.validate(lookup)
         from app.adapters.overrides import OVERRIDES
 
         if self.spec.module in OVERRIDES:  # local fix for a broken upstream scraper
