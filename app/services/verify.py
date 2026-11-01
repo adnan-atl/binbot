@@ -126,8 +126,22 @@ def _borrowed_snapshot(db: Session, prop: Property, council, n, items) -> Snapsh
     return snap
 
 
-def verify_round(db: Session, prop: Property) -> dict:
-    """Confirm this round's calendar with a neighbour and fill gaps before the resident sees it."""
+def _borrowed_from(db: Session, round_key: str) -> set[str]:
+    """Homes this round already borrowed dates from. Asking them again would only agree with
+    their own dates, so they can't confirm anything."""
+    raws = db.scalars(select(Snapshot.raw).where(Snapshot.round_key == round_key,
+                                                 Snapshot.source == "neighbours")).all()
+    return {str(r.get("from")) for r in raws if r and r.get("from")}
+
+
+def verify_round(db: Session, prop: Property, confirm: bool = True) -> dict:
+    """
+    Fill gaps and confirm this round's calendar with a neighbour.
+
+    confirm=False is the loader's call: it only spends a council lookup when a bin is
+    missing, because that changes what the resident sees. Confirming a round is for ops, so
+    the API runs it after the response (confirm=True, in the background).
+    """
     council = prop.council
     result = {"looked_at": 0, "filled": [], "status": "unconfirmed"}
     if not council or council.status == CouncilStatus.unsupported \
@@ -135,6 +149,9 @@ def verify_round(db: Session, prop: Property) -> dict:
         return result
     _, found = sched.schedule_for(db, prop, with_checks=True)
     gaps = {c["category"]: c for c in found if c["kind"] == "missing_stream"}
+    if not confirm and not gaps:
+        return result
+    unconfirmed_fill, borrowed = [], _borrowed_from(db, prop.round_key)
     ours = _round_signature(db, prop.round_key)
     if not ours and not gaps:
         return result
@@ -143,6 +160,10 @@ def verify_round(db: Session, prop: Property) -> dict:
     for n in _neighbours(db, prop):
         if agreed and not gaps:
             break
+        if not gaps and not confirm:
+            break
+        if n.house_number in borrowed:
+            continue
         result["looked_at"] += 1
         items = _ask(council, prop, n)
         if items is None:
@@ -156,6 +177,8 @@ def verify_round(db: Session, prop: Property) -> dict:
         wanted = [i for i in items if categorise(i.label, council.gss_code).value in gaps]
         if not wanted:
             continue
+        if verdict == "inconclusive":  # nothing shared to compare: could be another round
+            unconfirmed_fill.append(n.house_number)
         snap = _borrowed_snapshot(db, prop, council, n, wanted)
         for i in wanted:
             bt = sched.get_or_create_bin_type(db, council, i.label)
@@ -173,9 +196,12 @@ def verify_round(db: Session, prop: Property) -> dict:
 
     result["status"] = _status(agreed, differed)
     _log_disagreements(db, prop.round_key, result["status"], differed)
-    db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="verified",
+    # The loader's call that only filled a gap hasn't confirmed anything: log it as "filled"
+    # so the background confirm still runs this week.
+    kind = "verified" if confirm or result["status"] != "unconfirmed" else "filled"
+    db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind=kind,
                      diff={**result, "still_missing": sorted(gaps), "agreed": agreed,
-                           "differed": differed}))
+                           "differed": differed, "filled_unconfirmed_from": unconfirmed_fill}))
     db.flush()
     return result
 
@@ -184,9 +210,9 @@ def rescue_round(db: Session, prop: Property) -> bool:
     """
     This address's lookup failed. Before giving up (and handing the resident a blank form),
     try the same council for one or two neighbours on the postcode: same street, same lorry.
-    The first neighbour with a calendar becomes the round's calendar, tagged as borrowed, but
-    only counts as confirmed once a second neighbour agrees with it. The rescue is the round's
-    verification for the week, so the loader's verify call doesn't ask the same homes again.
+    The first neighbour with a calendar becomes the round's calendar, tagged as borrowed,
+    straight away: the resident is waiting. Confirming it with another home happens after
+    the response (verify_round), which skips the home we borrowed from.
     """
     council = prop.council
     if not council or council.status == CouncilStatus.unsupported:
@@ -196,27 +222,16 @@ def rescue_round(db: Session, prop: Property) -> bool:
         items = _ask(council, prop, n)
         if items is None:
             continue
-        if first is None:
-            first = (n, items, _signature_of(council, items))
-            continue
-        verdict, differences = quorum.compare(first[2], _signature_of(council, items))
-        if verdict == "agree":
-            agreed.append(n.house_number)
-        elif verdict == "differ":
-            differed.append({"from": n.house_number, "differences": differences})
+        first = (n, items)
+        break
     if first is None:
         return False
 
-    n, items, _ = first
+    n, items = first
     snap = _borrowed_snapshot(db, prop, council, n, items)
     sched._apply_events(db, prop.round_key, council, items, snap)
     sched._mark_success(council)
-    status = _status(agreed, differed)
     db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="rescued",
-                     diff={"from": n.house_number, "status": status}))
-    _log_disagreements(db, prop.round_key, status, differed)
-    db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="verified",
-                     diff={"looked_at": 1 + len(agreed) + len(differed), "filled": [],
-                           "status": status, "agreed": agreed, "differed": differed}))
+                     diff={"from": n.house_number}))
     db.flush()
     return True
