@@ -1,0 +1,135 @@
+"""Splitting a postcode round that's really two (odd/even sides, two ends). No network."""
+from datetime import date, timedelta
+
+import pytest
+from sqlalchemy import select
+
+from app.adapters.base import RawCollection
+from app.models import ChangeLog, Outbox, Property, RoundSplit, User
+from app.services import geo, schedule, sides, split
+from app.services.geo import AddressHit
+from app.workers import monitor
+
+TUE = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+THU = TUE + timedelta(days=2)
+KEY = "pc:E09000012:E8 3PB"
+
+
+def number(uprn):
+    return int(uprn[-2:])
+
+
+@pytest.fixture
+def street(monkeypatch):
+    """Homes 1-12 on one postcode; `day(n)` says which day the council gives house n."""
+    state = {"day": lambda n: THU}
+    hits = [AddressHit(uprn=f"200000{n:02d}", line=f"{n}, Long Road, London",
+                       house_number=str(n)) for n in range(1, 13)]
+    monkeypatch.setattr(geo, "lookup_addresses", lambda pc: hits)
+
+    def fetch(council, prop):
+        n = number(prop.uprn) if prop.uprn else sides.number_of(prop.house_number)
+        d = state["day"](n)
+        return [RawCollection("Refuse", d + timedelta(weeks=i)) for i in range(4)] + \
+               [RawCollection("Recycling", d + timedelta(weeks=i)) for i in range(4)]
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    return state
+
+
+def signup(client, n, phone=None):
+    uid = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": f"200000{n:02d}"}).json()["user_id"]
+    if phone:
+        client.post(f"/api/users/{uid}/phone", json={"phone": phone})
+        client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    return uid
+
+
+def dispute(db, key=KEY):
+    db.add(ChangeLog(scope="round", scope_id=key, kind="disputed", diff={}))
+    db.commit()
+
+
+def days_of(client, uid):
+    return {b["days"][0] for b in client.get(f"/api/users/{uid}/bins").json()}
+
+
+def test_house_numbers():
+    assert sides.number_of("12") == 12 and sides.number_of("12A") == 12
+    assert sides.number_of("Flat 3, 18") == 18 and sides.number_of("Rose Cottage") is None
+
+
+def test_rules():
+    assert sides.infer_rule([2, 4, 12], [1, 11])["by"] == "parity"
+    cut = sides.infer_rule([1, 2, 3], [8, 9])
+    assert cut["by"] == "threshold" and cut["at"] == 5.5 and cut["base"] == "lo"
+    assert sides.infer_rule([2, 11, 12], [1, 4]) is None
+
+
+def test_probe_tests_both_sides_and_both_ends():
+    assert split._probe_picks(list(range(1, 13))) == [1, 2, 11, 12]
+
+
+def test_odd_side_gets_its_own_round(client, db, street):
+    """Evens are Thursday, odds Tuesday. The round's calendar came from 2 (Thursday), so 3
+    was shown the wrong days. The probe finds two calendars split by parity, moves 3 to the
+    odd side, fetches its days and tells them. New sign-ups land on the right side."""
+    street["day"] = lambda n: TUE if n % 2 else THU
+    a = signup(client, 2)
+    b = signup(client, 3, phone="07700900123")
+    assert days_of(client, b) == {"THU"}  # shared the postcode round: wrong side
+
+    dispute(db)
+    assert monitor.resolve_disputes(db) == {"split": 1}
+    db.expire_all()
+    rule = db.scalar(select(RoundSplit)).rule
+    assert rule["by"] == "parity" and rule["sides"] == {"even": KEY, "odd": KEY + "~odd"}
+    assert db.get(User, b).property.round_key == KEY + "~odd"
+    assert days_of(client, b) == {"TUE"} and days_of(client, a) == {"THU"}
+    assert db.scalar(select(Outbox).where(Outbox.kind == "change"))
+
+    c = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "20000005"}).json()
+    assert c["shared"] and days_of(client, c["user_id"]) == {"TUE"}
+    assert split.disputed_rounds(db) == []
+
+
+def test_split_side_verifies_only_against_its_own_side(client, db, street, monkeypatch):
+    """After the split, the even side's verify mustn't ask odd homes and dispute itself."""
+    from app.services import verify
+
+    monkeypatch.setattr(verify, "_week", lambda today: 0)
+    street["day"] = lambda n: TUE if n % 2 else THU
+    a = signup(client, 2)
+    signup(client, 3)
+    dispute(db)
+    monitor.resolve_disputes(db)
+    db.expire_all()
+    prop = db.get(User, a).property
+    assert all(int(h.house_number) % 2 == 0 for h in verify._neighbours(db, prop))
+
+
+def test_passing_bad_scrape_is_not_a_split(client, db, street):
+    signup(client, 2)
+    dispute(db)
+    assert monitor.resolve_disputes(db) == {"one_calendar": 1}
+    assert db.scalar(select(RoundSplit)) is None
+
+
+def test_round_whose_own_calendar_is_the_odd_one_out(client, db, street):
+    """Only house 2 says Thursday: that's a suspect scrape, not a second round."""
+    street["day"] = lambda n: THU if n == 2 else TUE
+    signup(client, 2)
+    dispute(db)
+    assert monitor.resolve_disputes(db) == {"anchor_outvoted": 1}
+    assert db.scalar(select(RoundSplit)) is None
+
+
+def test_two_calendars_with_no_pattern_are_left_for_ops(client, db, street):
+    street["day"] = lambda n: TUE if n in (2, 11, 12) else THU
+    signup(client, 2)
+    dispute(db)
+    assert monitor.resolve_disputes(db) == {"no_rule": 1}
+    checked = db.scalar(select(ChangeLog).where(ChangeLog.kind == "split_checked"))
+    assert checked.diff["groups"] == [[2, 11, 12], [1, 4]]
+    assert db.scalar(select(RoundSplit)) is None
+    assert {p.round_key for p in db.scalars(select(Property))} == {KEY}

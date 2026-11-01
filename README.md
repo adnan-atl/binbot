@@ -71,6 +71,7 @@ postcode ──► postcodes.io ──► council (GSS code) ──► adapter �
 | `dispatch`     | every minute                | sends reminders that are due                                            |
 | `refresh_stale`| hourly                      | re-fetches rounds older than 7 days (2 days in the 3 weeks before a bank holiday), diffs, rebuilds reminders, messages users whose dates moved |
 | `health_check` | daily 04:15                 | probes every council we serve; flips status to `broken` after 3 failures, logs `adapter_broken` / `adapter_recovered` in `change_log` |
+| `resolve_disputes` | daily 04:45            | probes rounds neighbours contradicted; splits a postcode that's really two rounds (odd/even, two ends) |
 
 A broken adapter never silences anyone: reminders keep running on the last good snapshot.
 
@@ -82,6 +83,7 @@ A broken adapter never silences anyone: reminders keep running on the last good 
 | `bin_types`         | the council's bin labels, mapped to `recycling/general/food/garden/glass/paper/other` |
 | `properties`        | UPRN, postcode, house number, `round_key` (cache key for the calendar) |
 | `snapshots`         | every fetch, raw, with a content hash                               |
+| `round_splits`      | postcodes that are two rounds, and the rule (parity or a cut) that says which side a home is on |
 | `collection_events` | one row per bin per date; `moved_from` when a date shifted         |
 | `users`             | phone (E.164), property, reminder time/mode, status, referral code  |
 | `user_bin_settings` | per-user enable/disable and manual rules                            |
@@ -123,6 +125,10 @@ templates for anything sent outside a 24-hour reply window.
   (`app/services/quorum.py`), and `disputed` when the neighbours contradict it. Disputes and
   outvoted neighbours go to `change_log` (`disputed`, `neighbour_differs`) for ops; residents
   aren't shown them. Who gets asked rotates weekly, residents on the round first, so every
-  home confirms the round over a few weeks, not the same two. Splitting a disputed round in two (odd/even sides) isn't automatic yet.
+  home confirms the round over a few weeks, not the same two. A daily job probes disputed
+  rounds (`app/services/split.py`): when exactly two calendars show up, each backed by two
+  or more homes, and parity or one cut along the street explains them, the postcode is split
+  (`round_splits`), residents on the other side are moved and told, and new sign-ups land
+  on their side. Anything less certain is logged as `split_checked` for ops.
 - Local fixes for broken upstream scrapers live in `app/adapters/overrides.py`.
 - Bank holiday list in `monitor.py` is static; wire it to gov.uk/bank-holidays.json.
