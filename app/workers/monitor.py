@@ -1,11 +1,13 @@
 """
 Stage 2: the monitor agent.
 
-Three jobs, run by the worker process (see app/workers/main.py):
+Four jobs, run by the worker process (see app/workers/main.py):
   health_check()   daily   one probe per council adapter; flips status, logs breakage
   refresh_stale()  hourly  re-fetch rounds older than REFRESH_INTERVAL_DAYS (tighter
                            before bank holidays); diff; rebuild reminders; tell users
   dispatch()       minute  send reminders that are due
+  resolve_disputes() daily probe rounds neighbours contradicted; split the ones that are
+                           really two rounds (split.py)
 """
 import logging
 from datetime import date, datetime, timedelta, timezone
@@ -25,6 +27,7 @@ from app.models import (
     UserStatus,
 )
 from app.providers.messaging import send_message
+from app.services import split
 from app.services.reminders import dispatch_due, rebuild_reminders
 from app.services.verify import verify_round
 from app.services.schedule import refresh_round, representative_for
@@ -140,6 +143,23 @@ def health_check(db: Session) -> dict:
             if was == CouncilStatus.broken:
                 db.add(ChangeLog(scope="council", scope_id=c.id, kind="adapter_recovered", diff={}))
     db.commit()
+    return out
+
+
+def resolve_disputes(db: Session) -> dict:
+    out: dict[str, int] = {}
+    for key in split.disputed_rounds(db):
+        try:
+            result = split.probe(db, key)["result"]
+        except Exception as e:  # one broken round mustn't stop the rest, tonight or any night
+            log.exception("resolve_disputes: probe failed for %s", key)
+            db.rollback()
+            result = "error"
+            # Marks it probed, so it waits for a fresh vote instead of failing first every night.
+            db.add(ChangeLog(scope="round", scope_id=key, kind="split_checked",
+                             diff={"result": "error", "error": f"{type(e).__name__}: {e}"[:300]}))
+            db.commit()
+        out[result] = out.get(result, 0) + 1
     return out
 
 

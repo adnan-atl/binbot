@@ -163,6 +163,22 @@ class Snapshot(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
 
+class RoundSplit(Base):
+    """
+    A postcode round that turned out to be two (odd and even sides, or two ends of a long
+    street). The side the original calendar came from keeps the base key; the other gets
+    its own. rule: {"by": "parity", "sides": {"odd": key, "even": key}} or
+    {"by": "threshold", "at": 20.5, "sides": {"lo": key, "hi": key}}.
+    """
+
+    __tablename__ = "round_splits"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
+    round_key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    rule: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
 class CollectionEvent(Base):
     """A concrete collection date for one bin type on one round."""
 

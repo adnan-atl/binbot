@@ -30,7 +30,7 @@ from app.models import (
     now,
 )
 from app.services import checks as checker
-from app.services import geo
+from app.services import geo, sides
 from app.services.normalize import PURPOSE, categorise, colour_of, describe_rule
 
 log = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ def resolve_property(
         prop = Property(uprn=uprn, postcode=info.postcode, house_number=house_number,
                         address_line=address_line, council_id=council.id,
                         lat=info.lat, lng=info.lng,
-                        round_key=postcode_round_key(council, info.postcode))
+                        round_key=round_key_for(db, council, info.postcode, house_number, uprn))
         db.add(prop)
         db.flush()
     return prop
@@ -116,6 +116,14 @@ def postcode_round_key(council: Council, postcode: str) -> str:
     own_round().
     """
     return f"pc:{council.gss_code}:{postcode}"
+
+
+def round_key_for(db: Session, council: Council, postcode: str, house_number: str | None,
+                  uprn: str | None) -> str:
+    """The postcode round, or this home's side of it when the postcode is split (sides.py).
+    A home whose side we can't tell joins the base round: it's where the calendar began."""
+    base = postcode_round_key(council, postcode)
+    return sides.side_key(db, base, house_number, uprn, postcode) or base
 
 
 def own_round(db: Session, prop: Property) -> None:

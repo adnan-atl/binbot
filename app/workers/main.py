@@ -27,6 +27,7 @@ def main():
     sched.add_job(_with_db(monitor.dispatch), "interval", minutes=1, id="dispatch")
     sched.add_job(_with_db(monitor.refresh_stale), "interval", hours=1, id="refresh")
     sched.add_job(_with_db(monitor.health_check), "cron", hour=4, minute=15, id="health")
+    sched.add_job(_with_db(monitor.resolve_disputes), "cron", hour=4, minute=45, id="disputes")
     log.info("worker up")
     sched.start()
 
