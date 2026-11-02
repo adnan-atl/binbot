@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>BinBot – bin day reminders on WhatsApp</title>
+<title>{{BRAND}} – bin day reminders on WhatsApp</title>
 <style>
 :root{--ink:#1A1A1A;--grey:#6E6E73;--soft:#8A8A8E;--tile:#F4F4F5;--line:#E5E5EA;--green:#45C654}
 *{box-sizing:border-box}
@@ -16,22 +16,34 @@ button{font:inherit}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* Home */
-#home{background:#000000;color:#FFFFFF;height:100vh;height:100svh;min-height:0;overflow:hidden;position:relative}
-.home-head{width:100%;max-width:1200px;margin:0 auto;padding:24px 32px 0}
-.badge{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:10px;background:#FFFFFF;color:#000000;text-decoration:none;font-size:22px;font-weight:700;letter-spacing:-0.02em}
+#home{background:#FFFFFF;color:var(--ink);height:100vh;height:100svh;min-height:0;overflow:hidden}
+/* Brow: white strip with the logo and site nav; the black hero is a card under it */
+.brow{flex:none}
+.brow-in{width:100%;max-width:1200px;margin:0 auto;height:64px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.badge{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:10px;background:#000000;color:#FFFFFF;text-decoration:none;font-size:22px;font-weight:700;letter-spacing:-0.02em}
+.brow-nav{display:flex;gap:20px}
+.brow-nav a{color:var(--ink);font-size:17px;font-weight:500;text-decoration:none;white-space:nowrap;border-radius:4px}
+.brow-nav a:hover,.brow-nav a:focus-visible{text-decoration:underline;text-underline-offset:4px}
+.badge:focus-visible,.brow-nav a:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.brow-nav a[aria-current="page"]{font-weight:700;text-decoration:underline;text-underline-offset:4px}
+.hero{flex:1;min-height:0;position:relative;overflow:hidden;display:flex;flex-direction:column;background:#000000;color:#FFFFFF;border-radius:28px 28px 0 0}
+@media (min-width:601px){.brow-in{height:76px;padding:0 32px}.brow-nav{gap:28px}.brow-nav a{font-size:19px}.hero{border-radius:36px 36px 0 0}}
 .home-main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:clamp(28px,5vh,56px) 32px 0;display:flex;flex-direction:column;align-items:stretch;min-height:0}
 .home-copy{flex:none;display:flex;flex-direction:column;gap:clamp(16px,2.4vh,24px);max-width:1040px}
-.home-h{margin:0;font-size:clamp(50px,9.4vw,124px);line-height:.96;font-weight:800;letter-spacing:-0.045em}
+/* About 40px at 375, 64px at 768, 92px at 1280, never above 100px: the headline leads, the mockup supports it */
+.home-h{margin:0;font-size:clamp(38px,calc(5.75vw + 18.5px),100px);line-height:.96;font-weight:800;letter-spacing:-0.045em;text-wrap:balance}
 .home-p{margin:0;max-width:640px;font-size:clamp(19px,2.1vw,26px);line-height:1.35;font-weight:500;color:#9A9A9E}
 .home-p svg{vertical-align:-3px}
-.phone-col{display:flex;justify-content:center;flex:none;margin-top:clamp(48px,11vh,120px)}
+/* A touch more air above the mockup now the headline is smaller, so less of the phone shows */
+.phone-col{display:flex;justify-content:center;flex:none;margin-top:clamp(64px,13vh,136px)}
 .home-cta{position:fixed;left:50%;transform:translateX(-50%);width:min(520px,calc(100% - 32px));bottom:calc(20px + env(safe-area-inset-bottom));margin:0 !important;z-index:10}
 .home-cta .cta{width:100%;min-height:68px;border-radius:999px;font-size:21px;color:#0B0B0B;box-shadow:0 12px 34px rgba(0,0,0,.5)}
 .cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 32px;border-radius:14px;text-decoration:none;font-size:19px;font-weight:600;color:#FFFFFF;background:var(--green);transition:filter .15s ease}
 .cta:hover{filter:brightness(1.06)}
-.phone-outline{position:relative;width:320px;height:650px;border-radius:52px;border:2.5px solid #E5E5EA;background:#000000;flex:none;box-shadow:0 0 0 7px #121214,0 -10px 80px rgba(255,255,255,.07)}
-.phone-outline i{position:absolute;display:block;border-radius:2px;background:#E5E5EA;width:3px}
-.island{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:96px;height:28px;border-radius:999px;background:#1C1C1E;z-index:5}
+/* Quiet frame and island so the mockup doesn't compete with the headline */
+.phone-outline{position:relative;width:320px;height:650px;border-radius:52px;border:1.5px solid #3A3A3C;background:#000000;flex:none;box-shadow:0 0 0 7px #121214,0 -10px 80px rgba(255,255,255,.035)}
+.phone-outline i{position:absolute;display:block;border-radius:2px;background:#3A3A3C;width:3px}
+.island{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:72px;height:22px;border-radius:999px;background:#000000;z-index:5}
 .pscreen{position:absolute;inset:8px;border-radius:42px;overflow:hidden;background:#0D0D0F;color:#FFFFFF}
 .layer{position:absolute;inset:0;transition:opacity .5s ease}
 .lock{display:flex;flex-direction:column;align-items:center;padding-top:58px}
@@ -64,6 +76,23 @@ button{font:inherit}
 .s3 + .s3{animation-delay:.6s}
 @keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.layer,.notif,.bub,.qr{transition:none}.s3{animation:none}}
+/* Home footer: one row under the button on phones and tablets, the two corners on wide screens */
+.home-foot{position:absolute;left:0;right:0;bottom:0;z-index:11;display:flex;justify-content:space-between;align-items:flex-end;gap:8px 16px;flex-wrap:wrap;padding:28px 20px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(rgba(0,0,0,0),#000000 22px);color:#B8B8BD;font-size:14px;font-weight:500;line-height:1.4}
+.home-foot p{margin:0}
+.home-foot a{color:inherit;text-decoration:none;border-radius:4px}
+.home-foot a:hover,.home-foot a:focus-visible{text-decoration:underline;text-underline-offset:3px;color:#FFFFFF}
+.home-foot a:focus-visible{outline:2px solid #FFFFFF;outline-offset:3px}
+.foot-links{display:flex;gap:16px}
+#home .home-cta{bottom:calc(64px + env(safe-area-inset-bottom))}
+@media (max-width:400px){.home-foot{font-size:13px;column-gap:12px}.foot-links{gap:12px}}
+/* Same side padding as the hero content, which is centred at 1200px max */
+@media (min-width:601px){.home-foot{padding-left:max(32px,calc(50% - 568px));padding-right:max(32px,calc(50% - 568px))}}
+@media (min-width:1100px){
+.home-foot{background:none;padding-top:0;padding-bottom:calc(28px + env(safe-area-inset-bottom));font-size:22px;pointer-events:none}
+.home-foot > *{pointer-events:auto}
+.foot-links{flex-direction:column;gap:0;align-items:flex-start}
+#home .home-cta{bottom:calc(20px + env(safe-area-inset-bottom))}
+}
 
 /* Flow shared */
 .bar{width:100%;max-width:1120px;margin:0 auto;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
@@ -91,6 +120,56 @@ button{font:inherit}
 .row-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .lbl{font-size:15px;font-weight:600}
 .hint{font-size:14px;color:var(--grey)}
+
+/* About and FAQs: same brow as home, content in the black card. Unlike home, these scroll. */
+.page-card{flex:1;background:#000000;color:#FFFFFF;border-radius:28px 28px 0 0}
+@media (min-width:601px){.page-card{border-radius:36px 36px 0 0}}
+/* Same 1200px column as the brow, so the title lines up under the badge; text kept to a readable width */
+.page-main{width:100%;max-width:1200px;margin:0 auto;padding:48px 32px 80px;display:flex;flex-direction:column;gap:20px}
+.page-main > *{max-width:680px}
+.page-card .h1{color:#FFFFFF;font-size:44px;line-height:1;letter-spacing:-0.035em;margin-bottom:8px}
+.page-card .lede{color:#9A9A9E;font-size:19px;line-height:1.5}
+.page-card a:not(.pill){color:#FFFFFF;text-decoration:underline;text-underline-offset:3px;border-radius:4px}
+.page-card a:focus-visible{outline:2px solid #FFFFFF;outline-offset:3px}
+.page-cta{align-self:stretch;width:100%;margin-top:16px;min-height:68px;padding:15px 32px;font-size:21px}
+.faqs{display:flex;flex-direction:column;gap:10px}
+.faq{background:#1C1C1E;border-radius:20px}
+.faq summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;font-size:18px;font-weight:600;line-height:1.35;color:#FFFFFF;border-radius:20px}
+.faq summary::-webkit-details-marker{display:none}
+/* Plus that turns into a minus: the vertical bar rotates flat as the answer opens */
+.pm{position:relative;flex:none;width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.14)}
+.pm::before,.pm::after{content:"";position:absolute;left:50%;top:50%;width:12px;height:2px;margin:-1px 0 0 -6px;border-radius:2px;background:#FFFFFF;transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.pm::after{transform:rotate(90deg)}
+.faq.is-open .pm::after,html:not(.js) .faq[open] .pm::after{transform:rotate(0deg)}
+/* Answer height animates from 0 to its natural size (grid rows 0fr to 1fr), text fades in.
+   Without JS, <details> still opens and closes, just without the animation. */
+.faq-a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s cubic-bezier(.2,.8,.2,1)}
+.faq-a > div{overflow:hidden;min-height:0}
+.faq-a p{opacity:0;transform:translateY(-4px);transition:opacity .25s ease,transform .4s cubic-bezier(.2,.8,.2,1)}
+.faq.is-open .faq-a,html:not(.js) .faq[open] .faq-a{grid-template-rows:1fr}
+.faq.is-open .faq-a p,html:not(.js) .faq[open] .faq-a p{opacity:1;transform:none;transition-delay:.08s,0s}
+.faq summary:focus-visible{outline:2px solid #FFFFFF;outline-offset:2px}
+.faq p{margin:0;padding:0 20px 20px;font-size:17px;line-height:1.5;color:#9A9A9E}
+@media (max-width:600px){.page-main{padding:32px 20px 64px}.page-card .h1{font-size:34px}.page-card .lede{font-size:17px}.faq summary{font-size:17px;padding:16px 18px}.faq p{font-size:16px;padding:0 18px 18px}}
+
+/* Moving between home, About and FAQs. The brow and the black card stay put; the content fades out
+   quickly (View Transitions, where supported) and the new content rises in, items one after another. */
+html.vt .home-main{view-transition-name:home-content}
+html.vt .home-foot{view-transition-name:home-foot}
+html.vt [data-screen="about"] .page-main{view-transition-name:about-content}
+html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.2s}
+::view-transition-old(home-content),::view-transition-old(home-foot),::view-transition-old(about-content),::view-transition-old(faqs-content){animation:page-out .2s ease both}
+::view-transition-new(home-content),::view-transition-new(home-foot),::view-transition-new(about-content),::view-transition-new(faqs-content){animation:none}
+@keyframes page-out{to{opacity:0;transform:translateY(8px)}}
+@keyframes page-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@keyframes page-fade{from{opacity:0}to{opacity:1}}
+.enter .anim-in{animation:page-in .45s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(180ms + var(--i,0) * 50ms)}
+.enter .anim-fade{animation:page-fade .45s ease both;animation-delay:calc(180ms + var(--i,0) * 50ms)}
+@media (prefers-reduced-motion:reduce){
+.enter .anim-in,.enter .anim-fade{animation:page-fade .2s ease both;animation-delay:0s}
+.faq-a,.faq-a p,.pm::before,.pm::after{transition:none}
+}
 
 /* Postcode */
 .field{width:100%;font:inherit;font-size:22px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:18px 20px;border-radius:18px;border:0;background:var(--tile);color:var(--ink);outline:none;min-height:64px}
@@ -208,7 +287,7 @@ button{font:inherit}
 .copy{font-size:15px;font-weight:600;border:0;border-radius:999px;padding:10px 16px;min-height:44px;background:var(--ink);color:#FFFFFF;cursor:pointer;flex:none}
 .levelcard{background:var(--tile);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:12px}
 
-@media (max-width:600px){.home-head{padding:20px 20px 0}.home-main{padding:28px 20px 0}.home-p{max-width:none}}
+@media (max-width:600px){.home-main{padding:28px 20px 0}.home-p{max-width:none}}
 @media (max-width:760px){
 .h1{font-size:36px}.lede{font-size:17px}
 .thead{display:none}
@@ -233,7 +312,8 @@ button{font:inherit}
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="home-head"><a class="badge" href="#home" aria-label="BinBot home">BinBot</a></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a><nav class="brow-nav" aria-label="Site"><a href="#about">about</a><a href="#faqs">FAQs</a></nav></div></header>
+<div class="hero">
 <main class="home-main">
 <div class="home-copy">
 <h1 class="home-h">Miss your bin collection dates?</h1>
@@ -249,11 +329,11 @@ button{font:inherit}
 <div class="lock-date">Monday 2 November</div>
 <div class="notif">
 <div class="notif-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"></path></svg></div>
-<div style="flex:1;min-width:0"><div class="notif-top"><span>WhatsApp</span><span>now</span></div><b>BinBot</b><p>Recycling goes out tomorrow. Blue bin, kerbside by 7am.</p></div>
+<div style="flex:1;min-width:0"><div class="notif-top"><span>WhatsApp</span><span>now</span></div><b>{{BRAND}}</b><p>Recycling goes out tomorrow. Blue bin, kerbside by 7am.</p></div>
 </div>
 </div>
 <div class="layer chat">
-<div class="chat-top"><div class="chat-av"><svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle></svg></div><div><div style="font-size:15px;font-weight:700">BinBot</div><div style="font-size:11px;color:#8E8E93">online</div></div></div>
+<div class="chat-top"><div class="chat-av"><svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle></svg></div><div><div style="font-size:15px;font-weight:700">{{BRAND}}</div><div style="font-size:11px;color:#8E8E93">online</div></div></div>
 <div class="chat-body">
 <div class="bub in">Evening! Recycling goes out tomorrow, Tue 3 Nov.<br>Blue bin, kerbside by 7am.<small>19:00</small></div>
 <div class="qr"><span>Done, it's out</span><span>Remind me at 9pm</span></div>
@@ -270,6 +350,47 @@ button{font:inherit}
 </div>
 </div>
 </main>
+<footer class="home-foot">
+<a href="{{PARENT_URL}}" target="_blank" rel="noopener">A product of {{PARENT_NAME}}</a>
+<nav class="foot-links" aria-label="Legal"><a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">Privacy</a><a href="{{TERMS_URL}}" target="_blank" rel="noopener">Terms &amp; Conditions</a></nav>
+</footer>
+</div>
+</section>
+
+<!-- About (from the brow). Plain copy: edit it here. -->
+<section class="screen" data-screen="about" hidden>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">about</a><a href="#faqs">FAQs</a></nav></div></header>
+<div class="page-card">
+<main class="page-main">
+<h1 class="h1">About {{BRAND}}</h1>
+<p class="lede">{{BRAND}} is a WhatsApp bot that tells you which bins go out, the day before collection or on the morning.</p>
+<p class="lede">It reads your council's own collection calendar. It keeps checking it for changes, like bank holidays, and messages you if your dates move.</p>
+<p class="lede">{{BRAND}} is made by {{PARENT_NAME}}, the household bills membership. It's free for everyone and included with {{PARENT_NAME}} membership.</p>
+<a class="pill go page-cta" href="#postcode">Add to WhatsApp</a>
+</main>
+</div>
+</section>
+
+<!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
+<section class="screen" data-screen="faqs" hidden>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a><nav class="brow-nav" aria-label="Site"><a href="#about">about</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
+<div class="page-card">
+<main class="page-main">
+<h1 class="h1">FAQs</h1>
+<div class="faqs">
+<details class="faq"><summary>How does {{BRAND}} know my bin days?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>It reads your council's own website, using your postcode or address. It checks it again every week, and more often before bank holidays.</p></div></div></details>
+<details class="faq"><summary>Does it work for my council?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>It covers most councils in the UK. If yours isn't covered, you can add your bin days yourself and still get reminders.</p></div></div></details>
+<details class="faq"><summary>How much does it cost?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>Nothing. {{BRAND}} is free for everyone, and included with {{PARENT_NAME}} membership.</p></div></div></details>
+<details class="faq"><summary>What if my collection day changes?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>{{BRAND}} spots changes on your council's calendar, such as bank holiday moves, and messages you with the new date.</p></div></div></details>
+<details class="faq"><summary>The days look wrong for my home.<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>Reply WRONG to a reminder, or tap "These aren't my days" when you check your bins. {{BRAND}} then looks up your home on its own.</p></div></div></details>
+<details class="faq"><summary>Can I change my reminder time or bins?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>Yes. Message {{BRAND}} SETTINGS on WhatsApp to change your reminder time or turn bins on and off.</p></div></div></details>
+<details class="faq"><summary>How do I stop the messages?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>Reply STOP. Reply START to turn them back on.</p></div></div></details>
+<details class="faq"><summary>What do you do with my data?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>We use your address and WhatsApp number to send your reminders. See our <a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">privacy policy</a>.</p></div></div></details>
+<details class="faq"><summary>Who makes {{BRAND}}?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p><a href="{{PARENT_URL}}" target="_blank" rel="noopener">{{PARENT_NAME}}</a>.</p></div></div></details>
+</div>
+<a class="pill go page-cta" href="#postcode">Add to WhatsApp</a>
+</main>
+</div>
 </section>
 
 <!-- 2 · Postcode -->
@@ -278,7 +399,7 @@ button{font:inherit}
 <main class="flow-main">
 <div class="col">
 <h1 class="h1">What's your postcode?</h1>
-<p class="lede">BinBot looks up your council and your road. You'll check the dates next, then choose where reminders go.</p>
+<p class="lede">{{BRAND}} looks up your council and your road. You'll check the dates next, then choose where reminders go.</p>
 <div id="pc-form" style="display:flex;flex-direction:column;gap:24px">
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="pc" class="lbl">Postcode</label>
@@ -305,7 +426,7 @@ button{font:inherit}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">BinBot's on it<br><span id="p-title">Reading your council's calendar</span></h1>
+<h1 class="h1">{{BRAND}}'s on it<br><span id="p-title">Reading your council's calendar</span></h1>
 <div id="psteps" aria-live="polite"></div>
 <div class="row-actions">
 <a class="pill solid" id="p-next" href="#confirm">See my dates</a>
@@ -337,7 +458,7 @@ button{font:inherit}
 <div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
 <button type="button" class="pill solid" id="c-save" style="width:100%">Save changes</button>
 <button type="button" class="ghost" id="c-own" hidden>These aren't my days. Look up my address</button>
-<span class="hint" style="text-align:center">Or tell BinBot in the chat, in your own words.</span>
+<span class="hint" style="text-align:center">Or tell {{BRAND}} in the chat, in your own words.</span>
 </div>
 </div>
 </main>
@@ -348,8 +469,8 @@ button{font:inherit}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">Where should BinBot<br>message you?</h1>
-<p class="lede">Your WhatsApp number. BinBot only uses it to send your bin reminders.</p>
+<h1 class="h1">Where should {{BRAND}}<br>message you?</h1>
+<p class="lede">Your WhatsApp number. {{BRAND}} only uses it to send your bin reminders.</p>
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="tel" class="lbl">WhatsApp number</label>
 <div style="display:flex;gap:8px">
@@ -357,11 +478,11 @@ button{font:inherit}
 <input id="tel" class="field" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="7700 900123" value="7700 900123" aria-describedby="tel-err tel-hint" style="text-transform:none;letter-spacing:0.02em">
 </div>
 <span id="tel-err" class="error" hidden>Enter a UK mobile number, like 7700 900123.</span>
-<span id="tel-hint" class="hint">BinBot is made by Alfred. By continuing, you agree to Alfred's terms and privacy policy, and to get bin reminders and BinBot updates on WhatsApp. Alfred may also tell you about its other home admin services. Reply STOP any time.</span>
+<span id="tel-hint" class="hint">{{BRAND}} is made by {{PARENT_NAME}}. By continuing, you agree to {{PARENT_NAME}}'s <a href="{{TERMS_URL}}" target="_blank" rel="noopener">terms</a> and <a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">privacy policy</a>, and to get bin reminders and {{BRAND}} updates on WhatsApp. {{PARENT_NAME}} may also tell you about its other home admin services. Reply STOP any time.</span>
 </div>
 <label style="display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--grey);cursor:pointer">
 <input id="no-offers" type="checkbox" style="width:22px;height:22px;margin:0;accent-color:var(--ink);flex:none">
-<span>Don't tell me about other Alfred services.</span>
+<span>Don't tell me about other {{PARENT_NAME}} services.</span>
 </label>
 <div><button type="button" class="pill solid" id="tel-go">Continue</button></div>
 </div>
@@ -373,7 +494,7 @@ button{font:inherit}
 <div data-bar></div>
 <main class="flow-main" style="padding-top:56px">
 <div class="col" style="gap:44px">
-<h1 class="h1">When should<br>BinBot nudge you?</h1>
+<h1 class="h1">When should<br>{{BRAND}} nudge you?</h1>
 <div style="display:flex;flex-direction:column;gap:10px">
 <span class="lbl" id="when-l">Day</span>
 <div role="group" aria-labelledby="when-l" id="whens" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px"></div>
@@ -386,6 +507,22 @@ button{font:inherit}
 <a class="pill go" href="#binfluencer" style="width:100%;min-height:68px;font-size:21px">Turn on reminders</a>
 <span class="hint" style="text-align:center">Reply STOP to turn them off.</span>
 </div>
+</div>
+</main>
+</section>
+
+<!-- 6b · Say hi: the resident messages us first, which proves the number is theirs (live only) -->
+<section class="screen" data-screen="hi" data-step="5" hidden>
+<div data-bar></div>
+<main class="flow-main">
+<div class="col">
+<h1 class="h1">Last step:<br>say hi to {{BRAND}}</h1>
+<p class="lede">Tap the button to open WhatsApp with your message ready. Send it, and {{BRAND}} replies straight away to start your reminders.</p>
+<a class="pill go" id="hi-go" href="https://wa.me/" target="_blank" rel="noopener" style="width:100%;min-height:68px;font-size:21px">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"></path></svg>
+Say hi on WhatsApp
+</a>
+<span class="hint" style="text-align:center">{{BRAND}} only messages the number that says hi.</span>
 </div>
 </main>
 </section>
@@ -421,7 +558,7 @@ button{font:inherit}
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="link" class="lbl">Your invite link</label>
 <div class="linkbox">
-<input id="link" type="text" readonly value="binbot.app/j/[CODE]">
+<input id="link" type="text" readonly value="">
 <button type="button" class="copy" id="copy" aria-live="polite">Copy</button>
 </div>
 </div>
@@ -437,9 +574,9 @@ Share with your street
 <header class="bar">
 <div style="display:flex;align-items:center;gap:6px">
 <button type="button" class="back" data-back aria-label="Back"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
-<a class="logo" href="#home" aria-label="BinBot home">
+<a class="logo" href="#home" aria-label="{{BRAND}} home">
 <span class="logo-mark"><svg viewBox="0 0 40 40" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><path d="M17 26c1.8 1.4 4.2 1.4 6 0"></path></svg></span>
-<b>BinBot</b>
+<b>{{BRAND}}</b>
 </a>
 </div>
 <span class="step-of"></span>
@@ -449,6 +586,7 @@ Share with your street
 
 <script>
 (function () {
+  var BRAND = {{BRAND_JSON}};  // set by the server from BRAND_NAME
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var esc = function (t) { return String(t).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
 
@@ -462,11 +600,12 @@ Share with your street
 
   // Routing
   var timer = null;
-  function show() {
+  function show(enter) {
     var id = current;
     var target = document.querySelector('[data-screen="' + id + '"]') ? id : 'home';
     document.querySelectorAll('[data-screen]').forEach(function (s) { s.hidden = s.dataset.screen !== target; });
-    document.body.style.background = target === 'home' ? '#000000' : '#FFFFFF';
+    if (enter) animateIn(document.querySelector('[data-screen="' + target + '"]'));
+    document.body.style.background = '#FFFFFF';
     window.scrollTo(0, 0);
     clearInterval(timer);
     if (target === 'parsing') runParsing();
@@ -478,7 +617,58 @@ Share with your street
     if (target === 'binfluencer') { var rv = $('#reveal'); rv.classList.remove('play'); void rv.offsetWidth; rv.classList.add('play'); }
   }
   var current = 'home';
-  function go(id) { current = id; try { history.replaceState(null, '', '#' + id); } catch (e) {} show(); }
+  // About and FAQs get their own history entry so the browser's back button returns from them;
+  // sign-up steps replace the entry as before.
+  function go(id) {
+    var from = current;
+    var push = (id === 'about' || id === 'faqs') && id !== current;
+    current = id;
+    try { history[push ? 'pushState' : 'replaceState'](null, '', '#' + id); } catch (e) {}
+    swap(from);
+  }
+  window.addEventListener('popstate', function () {
+    var from = current, h = location.hash.slice(1) || 'home';
+    current = document.querySelector('[data-screen="' + h + '"]') ? h : 'home';
+    swap(from);
+  });
+  // Between home, About and FAQs: the old content fades out (View Transitions where the browser
+  // has them) and the new content rises in. Elsewhere, or with reduced motion, screens just swap.
+  var PAGES = { home: 1, about: 1, faqs: 1 };
+  var REDUCE = false; try { REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  function swap(from) {
+    var pageMove = from !== current && PAGES[from] && PAGES[current];
+    if (pageMove && !REDUCE && document.startViewTransition) {
+      var root = document.documentElement;
+      root.classList.add('vt');
+      try {
+        var t = document.startViewTransition(function () { show(true); });
+        t.finished.then(function () { root.classList.remove('vt'); }, function () { root.classList.remove('vt'); });
+        return;
+      } catch (e) { root.classList.remove('vt'); }
+    }
+    show(!!pageMove);
+  }
+  // Content of the incoming page, in the order it should rise in.
+  function enterItems(screen) {
+    if (screen.id === 'home') return [['.home-h', 'in'], ['.home-p', 'in'], ['.home-cta', 'fade'], ['.phone-col', 'in'], ['.home-foot', 'fade']]
+      .map(function (x) { var el = $(x[0], screen); el.dataset.anim = x[1]; return el; });
+    var out = [];
+    screen.querySelectorAll('.page-main > *').forEach(function (el) {
+      if (el.classList.contains('faqs')) el.querySelectorAll('.faq').forEach(function (f) { out.push(f); });
+      else out.push(el);
+    });
+    return out;
+  }
+  function animateIn(screen) {
+    screen.classList.remove('enter');
+    enterItems(screen).forEach(function (el, i) {
+      el.classList.remove('anim-in', 'anim-fade');
+      el.classList.add(el.dataset.anim === 'fade' ? 'anim-fade' : 'anim-in');
+      el.style.setProperty('--i', i);
+    });
+    void screen.offsetWidth;  // restart the animations on every visit
+    screen.classList.add('enter');
+  }
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[href^="#"]');
     if (!a) return;
@@ -487,12 +677,14 @@ Share with your street
   });
 
   // Back
-  var ORDER_SCREENS = ['home', 'postcode', 'parsing', 'confirm', 'phone', 'reminders', 'binfluencer'];
+  var ORDER_SCREENS = ['home', 'postcode', 'parsing', 'confirm', 'phone', 'reminders', 'hi', 'binfluencer'];
   document.addEventListener('click', function (e) {
     if (!e.target.closest('[data-back]')) return;
     if (current === 'confirm' && editing && bins.length) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
     var i = ORDER_SCREENS.indexOf(current);
-    go(ORDER_SCREENS[Math.max(0, i - 1)]);
+    var prev = ORDER_SCREENS[Math.max(0, i - 1)];
+    if (prev === 'hi' && !hiLink) prev = 'reminders';  // the say-hi step only exists when it's live
+    go(prev);
   });
 
   // ---- API layer. Falls back to the built-in demo data when the API isn't reachable.
@@ -520,7 +712,7 @@ Share with your street
     var m = CAT_META[b.category] || CAT_META.other;
     return { id: b.setting_id, name: b.label, kind: m.kind, days: (b.days || []).map(function (d) { return DAY_IN[d]; }),
       freq: FREQ_IN[b.frequency] || 'unknown', next0: fmtDate(b.next), color: COLOUR_HEX[b.colour] || m.color, shape: m.shape, cat: b.category, on: b.enabled !== false,
-      purpose: b.purpose || '', manual: !!b.manual };
+      purpose: b.purpose || '', manual: !!b.manual, upcoming: b.upcoming || [] };
   }
   function binToApi(b) {
     var o = { setting_id: b.id && b.id.indexOf('new') !== 0 ? b.id : null, label: b.name, category: b.cat || 'other', enabled: b.on !== false };
@@ -589,7 +781,7 @@ Share with your street
     ownLookup = null;
     // Show progress while the council answers (seconds for some sites), instead of a frozen
     // button followed by a replayed animation.
-    // Steps say what's really happening for this sign-up: which home BinBot is asking about,
+    // Steps say what's really happening for this sign-up: which home we're asking about,
     // then the council's calendar, then the cross-check with the street.
     fetching = true; parseAt = 0; hold = 2;
     var home = addr ? addr.line.replace(/,\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, '') : typed ? typed + ', ' + v : '';
@@ -609,7 +801,7 @@ Share with your street
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
       if (!bins.length) return j;
-      // Calendar in hand: keep the loader on while BinBot double-checks it against the
+      // Calendar in hand: keep the loader on while we double-check it against the
       // street (fills anything this address's calendar left out) before showing anything.
       if (shared) PSTEPS[2].subDone = 'Same round as your neighbours on ' + postcode;
       hold = 3; drawParsing(parseAt = 3);
@@ -727,7 +919,17 @@ Share with your street
     return b.name.toLowerCase().indexOf(key.split(' ')[0]) > -1 ? '' : b.purpose;
   };
   var find = function (id) { return bins.filter(function (b) { return b.id === id; })[0]; };
-
+  // Grey line under each bin: what goes in it, how often, and the next date it goes out.
+  // Phones drop how often so the line stays short: just the next date.
+  var narrowMq = null; try { narrowMq = matchMedia('(max-width:420px)'); } catch (e) {}
+  var subline = function (b) {
+    var nx = b.upcoming && b.upcoming.length ? fmtDate(b.upcoming[0]) : b.next0;
+    var narrow = !!(narrowMq && narrowMq.matches);
+    return [purposeText(b), narrow && nx ? '' : freqText(b), nx ? 'next ' + nx : ''].filter(Boolean).join(' · ');
+  };
+  // Re-draw the rows when the screen crosses the phone width (rotating a phone, resizing).
+  if (narrowMq) { var onMq = function () { if (current === 'confirm' && !editing) renderConfirm(); };
+    if (narrowMq.addEventListener) narrowMq.addEventListener('change', onMq); else if (narrowMq.addListener) narrowMq.addListener(onMq); }
   var calendarFailed = false;
   function renderConfirm() {
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
@@ -735,7 +937,7 @@ Share with your street
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
       : editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
     $('#c-lede').textContent = empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
-      : editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.'
+      : editing ? 'Change the day, how often, or the name. Add any bin ' + BRAND + ' missed.'
       : note ? note : shared ? 'Your neighbours on ' + postcode + ' get these days. Same lorry, same street.' : '';
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
@@ -754,7 +956,7 @@ Share with your street
         var chips = b.on === false ? '<span class="daychip" style="background:var(--line);color:var(--grey)">Off</span>' : !chosen.length ? '<span class="hint">Not set</span>' : chosen.length === 7 ? '<span class="daychip">Daily</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
         return '<div class="cols binrow' + (b.on === false ? ' off' : '') + '">' +
           '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span>' +
-          '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : [purposeText(b), freqText(b)].filter(Boolean).join(' · ')) + '</span></span></span>' +
+          '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : esc(subline(b))) + '</span></span></span>' +
           '<span class="c-days">' + chips + '</span>' +
           '<span class="c-freq">' + freqText(b) + '</span>' +
           '</div>';
@@ -890,17 +1092,25 @@ Share with your street
     var a = e.target.closest('a[href="#binfluencer"]'); if (!a || !API.live || !API.userId) return;
     e.preventDefault(); e.stopImmediatePropagation();
     api('POST', '/users/' + API.userId + '/reminders', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time) })
-      .then(function () { return api('GET', '/users/' + API.userId + '/referral'); })
+      .then(function (res) { hiLink = (res && res.start_link) || ''; return api('GET', '/users/' + API.userId + '/referral'); })
       .then(function (r) { link = r.link.replace(/^https?:\/\//, ''); $('#link').value = link; $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent(r.share_text); })
-      .catch(function () {}).then(function () { go('binfluencer'); });
+      .catch(function () {}).then(function () {
+        // Live with a business number: one more step, saying hi from their own WhatsApp.
+        if (hiLink) { $('#hi-go').href = hiLink; go('hi'); } else go('binfluencer');
+      });
   }, true);
+  // Say hi: WhatsApp opens in a new tab or the app; this page moves on to the invite step.
+  var hiLink = '';
+  $('#hi-go').addEventListener('click', function () { setTimeout(function () { go('binfluencer'); }, 400); });
 
   // Binfluencer
   function renderBadge() {
     $('#b-badge').textContent = 'Reminders on' + (phone ? ' for ' + phone : '') + ' · ' + (when === 'night' ? 'day before, ' : 'morning of, ') + time;
   }
+  // Placeholder until the real invite link comes back from the API (demo mode keeps it).
+  if (!$('#link').value) $('#link').value = location.host + '/?ref=[CODE]';
   var link = $('#link').value;
-  $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent('I use BinBot for bin day reminders on WhatsApp. Sign up with your postcode: https://' + link);
+  $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent('I use ' + BRAND + ' for bin day reminders on WhatsApp. Sign up with your postcode: https://' + link);
   $('#copy').addEventListener('click', function () {
     var btn = this;
     try { navigator.clipboard.writeText('https://' + link); } catch (err) { $('#link').select(); }
@@ -909,6 +1119,32 @@ Share with your street
   });
 
   try { var h = location.hash.slice(1); if (h && document.querySelector('[data-screen="' + h + '"]')) current = h; } catch (e) {}
+  // FAQ answers open and close smoothly. <details> keeps working without JS; with JS the
+  // close is held until the answer has folded away, so it animates too.
+  document.documentElement.classList.add('js');
+  document.querySelectorAll('.faq').forEach(function (d) {
+    var a = d.querySelector('.faq-a');
+    var finish = function () { if (!d.classList.contains('is-open')) d.open = false; };
+    d.querySelector('summary').addEventListener('click', function (e) {
+      e.preventDefault();
+      if (d.classList.contains('is-open')) {
+        d.classList.remove('is-open');
+        if (REDUCE) { finish(); return; }
+        var onEnd = function (ev) { if (ev.target !== a) return; a.removeEventListener('transitionend', onEnd); finish(); };
+        a.addEventListener('transitionend', onEnd);
+        setTimeout(finish, 500);
+      } else {
+        d.open = true;
+        void a.offsetHeight;  // start from the folded size so the height animates
+        d.classList.add('is-open');
+      }
+    });
+    // Opened or closed some other way (find in page, for instance): keep the class in step.
+    d.addEventListener('toggle', function () {
+      if (d.open && !d.classList.contains('is-open')) { void a.offsetHeight; d.classList.add('is-open'); }
+      else if (!d.open) d.classList.remove('is-open');
+    });
+  });
   // Home phone animation: notification, chat opens, reply
   (function () {
     var el = document.getElementById('anim'); if (!el) return;

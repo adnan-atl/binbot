@@ -1,6 +1,6 @@
-# BinBot
+# Binny
 
-Bin collection reminders on WhatsApp. Enter a postcode, BinBot finds your council's
+Bin collection reminders on WhatsApp. Enter a postcode, Binny finds your council's
 collection calendar, you confirm the bins, and it messages you the night before.
 
 ## Run it
@@ -11,6 +11,10 @@ docker compose up --build     # API on http://localhost:8000, worker alongside
 ```
 
 Open http://localhost:8000 for the sign-up flow, http://localhost:8000/docs for the API.
+
+**Branding:** the product name lives in one setting. Set `BRAND_NAME` in `.env`, then
+`docker compose up -d --force-recreate api worker` (no rebuild; it's read at startup).
+If you've changed Python files too, add `--build`.
 
 Councils that need a real browser (~86 of 345) use the `selenium` service, which starts with everything else.
 
@@ -24,7 +28,7 @@ export DATABASE_URL=sqlite:///binbot.db   # or a Postgres URL
 alembic upgrade head
 uvicorn app.main:app --reload             # API + UI
 python -m app.workers.main                # monitor + reminder dispatcher
-pytest                                    # 17 tests, no network needed
+pytest                                    # no network needed
 ```
 
 `DEMO_MODE=true` makes any postcode resolve to canned Hackney data with no outbound
@@ -71,6 +75,7 @@ postcode ──► postcodes.io ──► council (GSS code) ──► adapter �
 | `dispatch`     | every minute                | sends reminders that are due                                            |
 | `refresh_stale`| hourly                      | re-fetches rounds older than 7 days (2 days in the 3 weeks before a bank holiday), diffs, rebuilds reminders, messages users whose dates moved |
 | `health_check` | daily 04:15                 | probes every council we serve; flips status to `broken` after 3 failures, logs `adapter_broken` / `adapter_recovered` in `change_log` |
+| `resolve_disputes` | daily 04:45            | probes rounds neighbours contradicted; splits a postcode that's really two rounds (odd/even, two ends) |
 
 A broken adapter never silences anyone: reminders keep running on the last good snapshot.
 
@@ -82,6 +87,7 @@ A broken adapter never silences anyone: reminders keep running on the last good 
 | `bin_types`         | the council's bin labels, mapped to `recycling/general/food/garden/glass/paper/other` |
 | `properties`        | UPRN, postcode, house number, `round_key` (cache key for the calendar) |
 | `snapshots`         | every fetch, raw, with a content hash                               |
+| `round_splits`      | postcodes that are two rounds, and the rule (parity or a cut) that says which side a home is on |
 | `collection_events` | one row per bin per date; `moved_from` when a date shifted         |
 | `users`             | phone (E.164), property, reminder time/mode, status, referral code  |
 | `user_bin_settings` | per-user enable/disable and manual rules                            |
@@ -102,7 +108,7 @@ POST /api/users/{id}/phone              WhatsApp number + consent
 POST /api/users/{id}/reminders          mode + time; turns reminders on
 GET  /api/users/{id}/schedule
 GET  /api/users/{id}/referral           code, link, level
-POST /api/inbound                       DONE / SNOOZE / STOP (WhatsApp webhook: /webhooks/meta)
+POST /api/inbound                       DONE / SNOOZE / WRONG / STOP (WhatsApp webhook: /webhooks/meta)
 GET  /api/health                        adapter coverage
 ```
 
@@ -121,7 +127,18 @@ the Meta app is published.
 - Address lookup needs an API key; there is no free UPRN source.
 - Scrapers are only as good as UKBinCollectionData's; expect a few to break each month.
   The health check tells you which.
-- Postcode rounds assume one calendar per postcode. That holds for almost all of them;
-  the "not my days" path covers the exceptions, but nothing detects them automatically.
+- Postcode rounds assume one calendar per postcode. The verify step checks it: a round is
+  `confirmed` once a second address on the postcode returns the same dates
+  (`app/services/quorum.py`), and `disputed` when the neighbours contradict it. Disputes and
+  outvoted neighbours go to `change_log` (`disputed`, `neighbour_differs`) for ops; residents
+  aren't shown them. Who gets asked rotates weekly, residents on the round first, so every
+  home confirms the round over a few weeks, not the same two. Residents vote too: "These aren't my days" (when the
+  council backs them up) and a WRONG reply to a reminder. A daily job probes disputed
+  rounds (`app/services/split.py`): when exactly two calendars show up, each backed by two
+  or more homes, and parity or one cut along the street explains them, the postcode is split
+  (`round_splits`), residents on the other side are moved and told, and new sign-ups land
+  on their side. Anything less certain is logged as `split_checked` for ops.
+  Splits start in dry run (`SPLIT_DRY_RUN=true`): logged as `would_split` with who would move,
+  nothing changed, until you've checked them on real councils and set it to `false`.
 - Local fixes for broken upstream scrapers live in `app/adapters/overrides.py`.
 - Bank holiday list in `monitor.py` is static; wire it to gov.uk/bank-holidays.json.

@@ -1,0 +1,6 @@
+# DOMAIN comes from deploy/.env.production. Caddy gets and renews the HTTPS certificate itself;
+# the DNS A record must point at this server and ports 80 and 443 must be open.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy api:8000
+}
