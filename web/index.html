@@ -17,14 +17,16 @@ button{font:inherit}
 
 /* Home */
 #home{background:#000000;color:#FFFFFF;height:100vh;height:100svh;min-height:0;overflow:hidden;position:relative}
-.home-head{width:100%;max-width:1200px;margin:0 auto;padding:24px 32px 0}
+.home-head{width:100%;max-width:1200px;margin:0 auto;padding:24px 32px 0;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .badge{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:10px;background:#FFFFFF;color:#000000;text-decoration:none;font-size:22px;font-weight:700;letter-spacing:-0.02em}
 .home-main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:clamp(28px,5vh,56px) 32px 0;display:flex;flex-direction:column;align-items:stretch;min-height:0}
 .home-copy{flex:none;display:flex;flex-direction:column;gap:clamp(16px,2.4vh,24px);max-width:1040px}
 .home-h{margin:0;font-size:clamp(50px,9.4vw,124px);line-height:.96;font-weight:800;letter-spacing:-0.045em}
 .home-p{margin:0;max-width:640px;font-size:clamp(19px,2.1vw,26px);line-height:1.35;font-weight:500;color:#9A9A9E}
 .home-p svg{vertical-align:-3px}
-.phone-col{display:flex;justify-content:center;flex:none;margin-top:clamp(48px,11vh,120px)}
+/* Members line sits tight under the lede; the phone moves up by exactly its height (6px + 22px line), so nothing below shifts */
+.home-members{margin:calc(6px - clamp(16px,2.4vh,24px)) 0 0;max-width:640px;font-size:16px;line-height:22px;font-weight:500;color:#9A9A9E}
+.phone-col{display:flex;justify-content:center;flex:none;margin-top:calc(clamp(48px,11vh,120px) - 28px)}
 .home-cta{position:fixed;left:50%;transform:translateX(-50%);width:min(520px,calc(100% - 32px));bottom:calc(20px + env(safe-area-inset-bottom));margin:0 !important;z-index:10}
 .home-cta .cta{width:100%;min-height:68px;border-radius:999px;font-size:21px;color:#0B0B0B;box-shadow:0 12px 34px rgba(0,0,0,.5)}
 .cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 32px;border-radius:14px;text-decoration:none;font-size:19px;font-weight:600;color:#FFFFFF;background:var(--green);transition:filter .15s ease}
@@ -71,14 +73,21 @@ button{font:inherit}
 .home-foot a:hover,.home-foot a:focus-visible{text-decoration:underline;text-underline-offset:3px;color:#FFFFFF}
 .home-foot a:focus-visible{outline:2px solid #FFFFFF;outline-offset:3px}
 .foot-links{display:flex;gap:16px}
-#home .home-cta{bottom:calc(84px + env(safe-area-inset-bottom))}
-@media (max-width:400px){.home-foot{font-size:13px;column-gap:12px}.foot-links{gap:12px}}
+/* "A product of ...": top right of the header on phones and tablets, bottom-left corner on wide screens. Only one is ever displayed. */
+.head-parent{color:#B8B8BD;font-size:15px;font-weight:500;line-height:1.4;text-decoration:none;white-space:nowrap;border-radius:4px}
+.head-parent:hover,.head-parent:focus-visible{text-decoration:underline;text-underline-offset:3px;color:#FFFFFF}
+.head-parent:focus-visible{outline:2px solid #FFFFFF;outline-offset:3px}
+.foot-parent{display:none}
+#home .home-cta{bottom:calc(64px + env(safe-area-inset-bottom))}
+@media (max-width:400px){.home-foot{font-size:13px;column-gap:12px}.foot-links{gap:12px}.head-parent{font-size:14px}}
 /* Same side padding as the home header, which is centred at 1200px max */
 @media (min-width:601px){.home-foot{padding-left:max(32px,calc(50% - 568px));padding-right:max(32px,calc(50% - 568px))}}
 @media (min-width:1100px){
 .home-foot{background:none;padding-top:0;padding-bottom:calc(28px + env(safe-area-inset-bottom));font-size:22px;pointer-events:none}
 .home-foot > *{pointer-events:auto}
 .foot-links{flex-direction:column;gap:0;align-items:flex-start}
+.foot-parent{display:block}
+.head-parent{display:none}
 #home .home-cta{bottom:calc(20px + env(safe-area-inset-bottom))}
 }
 
@@ -225,7 +234,8 @@ button{font:inherit}
 .copy{font-size:15px;font-weight:600;border:0;border-radius:999px;padding:10px 16px;min-height:44px;background:var(--ink);color:#FFFFFF;cursor:pointer;flex:none}
 .levelcard{background:var(--tile);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:12px}
 
-@media (max-width:600px){.home-head{padding:20px 20px 0}.home-main{padding:28px 20px 0}.home-p{max-width:none}}
+@media (max-width:600px){.home-head{padding:20px 20px 0}.home-main{padding:28px 20px 0}.home-p{max-width:none}.home-members{font-size:14px;line-height:20px}.phone-col{margin-top:calc(clamp(48px,11vh,120px) - 26px)}}
+@media (max-width:400px){.home-members{font-size:13px}}  /* keeps the members line on one line at 375px */
 @media (max-width:760px){
 .h1{font-size:36px}.lede{font-size:17px}
 .thead{display:none}
@@ -250,11 +260,12 @@ button{font:inherit}
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="home-head"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a></header>
+<header class="home-head"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a><a class="head-parent" href="{{PARENT_URL}}" target="_blank" rel="noopener">A product of {{PARENT_NAME}}</a></header>
 <main class="home-main">
 <div class="home-copy">
 <h1 class="home-h">Miss your bin collection dates?</h1>
 <p class="home-p">A <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#45C654"></circle><path d="M8.6 7.4c.3-.3.8-.3 1 .1l1 1.7c.2.3.1.7-.1 1l-.6.6c.5 1.1 1.3 1.9 2.4 2.4l.6-.6c.3-.2.7-.3 1-.1l1.7 1c.4.2.4.7.1 1l-.7.7c-.6.6-1.5.7-2.3.3-2-1-3.6-2.6-4.6-4.6-.4-.8-.3-1.7.3-2.3z" fill="#FFFFFF"></path></svg> <span style="color:#FFFFFF">WhatsApp</span> bot that reminds you which bin to put out, the night before collection.</p>
+<p class="home-members">Free for everyone. Included with {{PARENT_NAME}} membership.</p>
 <div class="home-cta" style="margin-top:18px"><a class="cta" href="#postcode">Add to WhatsApp</a></div>
 </div>
 <div class="phone-col" aria-hidden="true">
@@ -288,7 +299,7 @@ button{font:inherit}
 </div>
 </main>
 <footer class="home-foot">
-<div><p>Born in London 🇬🇧</p><p><a href="{{PARENT_URL}}" target="_blank" rel="noopener">A product of {{PARENT_NAME}}</a></p></div>
+<div><p>Born in London 🇬🇧</p><p class="foot-parent"><a href="{{PARENT_URL}}" target="_blank" rel="noopener">A product of {{PARENT_NAME}}</a></p></div>
 <nav class="foot-links" aria-label="Legal"><a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">Privacy</a><a href="{{TERMS_URL}}" target="_blank" rel="noopener">Terms &amp; Conditions</a></nav>
 </footer>
 </section>

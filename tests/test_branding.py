@@ -48,6 +48,9 @@ def test_footer_links_and_parent_name(client, monkeypatch):
     assert 'href="https://alfred.co.uk/privacy" target="_blank" rel="noopener">Privacy<' in page
     assert 'href="https://alfred.co.uk/legal" target="_blank" rel="noopener">Terms &amp; Conditions<' in page
     assert ">A product of Alfred</a>" in page and "Don't tell me about other Alfred services." in page
+    # header copy (phones) and footer copy (wide screens); CSS shows only one
+    assert page.count('class="head-parent"') == 1 and page.count('class="foot-parent"') == 1
+    assert "Free for everyone. Included with Alfred membership." in page
 
     monkeypatch.setenv("PARENT_NAME", "Fred & Co")
     monkeypatch.setenv("PARENT_URL", "https://fred.example/")
@@ -60,7 +63,9 @@ def test_footer_links_and_parent_name(client, monkeypatch):
         for k in ("PARENT_NAME", "PARENT_URL", "PRIVACY_URL", "TERMS_URL"):
             monkeypatch.delenv(k)
         get_settings.cache_clear()
-    assert '<a href="https://fred.example/" target="_blank" rel="noopener">A product of Fred &amp; Co</a>' in page
+    assert page.count('<a href="https://fred.example/" target="_blank" rel="noopener">A product of Fred &amp; Co</a>') == 1
+    assert page.count('href="https://fred.example/" target="_blank" rel="noopener">A product of Fred &amp; Co</a>') == 2
+    assert "Included with Fred &amp; Co membership." in page
     assert page.count('href="https://fred.example/p?a=1&amp;b=2"') == 2  # footer and consent text
     assert page.count('href="https://fred.example/t&quot;x"') == 2
     assert "is made by Fred &amp; Co." in page and "{{" not in page
