@@ -221,6 +221,9 @@ class User(Base):
     marketing_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     referral_code: Mapped[str] = mapped_column(String(12), unique=True, index=True)
     referred_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    # Code in the "Hi, start my reminders <code>" message the resident sends us to finish sign-up
+    # (META_DISPLAY_NUMBER set). Cleared once used.
+    start_code: Mapped[str | None] = mapped_column(String(8), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
     property: Mapped[Property | None] = relationship()

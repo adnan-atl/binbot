@@ -4,6 +4,7 @@ Rebuilt from scratch for a user whenever any input changes (idempotent).
 """
 import re
 from datetime import date, datetime, time, timedelta
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -125,6 +126,60 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
             sent += 1
     db.commit()
     return sent
+
+
+def welcome_message(db: Session, user: User) -> str:
+    """First message, sent the moment reminders go on, so the resident sees the service works
+    (and, on WhatsApp, it opens the 24-hour window for free-form replies)."""
+    first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
+                      .order_by(Reminder.send_at))
+    # "night_before" is the day before at any time the resident picks (4pm is an option).
+    when = ("the day before each collection" if user.reminder_mode == ReminderMode.night_before
+            else "on the morning of each collection")
+    hh, mm = (int(x) for x in user.reminder_time.split(":"))
+    clock = f"{hh % 12 or 12}{f':{mm:02d}' if mm else ''}{'pm' if hh >= 12 else 'am'}"
+    msg = f"{get_settings().brand_name} here. You're set up: I'll message you {when}, at {clock}."
+    if first:
+        names = [b["label"] for b in first.bins]
+        bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+        msg += f"\nFirst up: {bins} on {first.collection_date.strftime('%a %-d %b')}."
+    return msg + "\nReply STOP any time to turn reminders off."
+
+
+def start_link(code: str) -> str:
+    """wa.me link that opens WhatsApp with "Hi <brand>, start my reminders <code>" ready to send."""
+    s = get_settings()
+    digits = re.sub(r"\D", "", s.meta_display_number)
+    return f"https://wa.me/{digits}?text={quote(f'Hi {s.brand_name}, start my reminders {code}')}"
+
+
+_START_RE = re.compile(r"\bstart my reminders\s+([A-Za-z0-9]{6})\b", re.IGNORECASE)
+
+
+def _handle_hi(db: Session, phone: str, text: str) -> tuple[str, str] | None:
+    """'Hi <brand>, start my reminders <code>': the resident proving the number is theirs.
+    Turns their reminders on and sends the welcome (free text: they've just messaged us).
+    If they wrote from a different number than they typed, the one they wrote from wins."""
+    m = _START_RE.search(text)
+    if not m:
+        return None
+    user = db.scalar(select(User).where(User.start_code == m.group(1).upper()))
+    if not user:
+        sender = db.scalar(select(User).where(User.phone_e164 == phone))
+        if sender and sender.status == UserStatus.active:
+            return "Your reminders are already on. Send SETTINGS to change them.", "reply"
+        return None
+    holder = db.scalar(select(User).where(User.phone_e164 == phone, User.id != user.id))
+    if holder:  # an older sign-up on this number: the person holding the phone moves over
+        holder.phone_e164 = None
+        holder.status = UserStatus.stopped
+        rebuild_reminders(db, holder)
+        db.flush()
+    user.phone_e164 = phone
+    user.start_code = None
+    user.status = UserStatus.active
+    rebuild_reminders(db, user)
+    return welcome_message(db, user), "welcome"
 
 
 # ---- WhatsApp commands: change reminder time and bins -------------------------------------------
@@ -293,8 +348,14 @@ def _command(db: Session, user: User, text: str) -> str | None:
 
 
 def handle_inbound(db: Session, phone: str, text: str) -> str:
-    """Replies to a user's message: DONE / SNOOZE / WRONG / STOP / START, and the settings
-    commands (SETTINGS, TIME, MORNING, DAY BEFORE, BINS, ON, OFF). Returns what we answered."""
+    """Replies to a user's message: the sign-up hi ("start my reminders <code>"), DONE / SNOOZE /
+    WRONG / STOP / START, and the settings commands (SETTINGS, TIME, MORNING, DAY BEFORE, BINS,
+    ON, OFF). Returns what we answered."""
+    hi = _handle_hi(db, phone, text)
+    if hi:
+        send_message(db, phone, hi[0], kind=hi[1])
+        db.commit()
+        return hi[0]
     user = db.scalar(select(User).where(User.phone_e164 == phone))
     if not user:
         site = re.sub(r"^https?://", "", get_settings().public_base_url).rstrip("/")

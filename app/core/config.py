@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     meta_reminder_template: str = "bin_reminder"
     meta_change_template: str = "bin_day_changed"
     meta_template_lang: str = "en_GB"
+    # The business WhatsApp number in E.164 (+447...). When set, sign-up ends with the resident
+    # sending us "hi" from their own WhatsApp, which proves the number is theirs and opens the
+    # reply window for the welcome. Empty (local, stub): reminders start straight away.
+    meta_display_number: str = ""
 
     public_base_url: str = "http://localhost:8000"
     # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.

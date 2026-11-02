@@ -511,6 +511,22 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </main>
 </section>
 
+<!-- 6b · Say hi: the resident messages us first, which proves the number is theirs (live only) -->
+<section class="screen" data-screen="hi" data-step="5" hidden>
+<div data-bar></div>
+<main class="flow-main">
+<div class="col">
+<h1 class="h1">Last step:<br>say hi to {{BRAND}}</h1>
+<p class="lede">Tap the button to open WhatsApp with your message ready. Send it, and {{BRAND}} replies straight away to start your reminders.</p>
+<a class="pill go" id="hi-go" href="https://wa.me/" target="_blank" rel="noopener" style="width:100%;min-height:68px;font-size:21px">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"></path></svg>
+Say hi on WhatsApp
+</a>
+<span class="hint" style="text-align:center">{{BRAND}} only messages the number that says hi.</span>
+</div>
+</main>
+</section>
+
 <!-- 7 · Binfluencer -->
 <section class="screen" data-screen="binfluencer" data-step="6" hidden>
 <div data-bar></div>
@@ -661,12 +677,14 @@ Share with your street
   });
 
   // Back
-  var ORDER_SCREENS = ['home', 'postcode', 'parsing', 'confirm', 'phone', 'reminders', 'binfluencer'];
+  var ORDER_SCREENS = ['home', 'postcode', 'parsing', 'confirm', 'phone', 'reminders', 'hi', 'binfluencer'];
   document.addEventListener('click', function (e) {
     if (!e.target.closest('[data-back]')) return;
     if (current === 'confirm' && editing && bins.length) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
     var i = ORDER_SCREENS.indexOf(current);
-    go(ORDER_SCREENS[Math.max(0, i - 1)]);
+    var prev = ORDER_SCREENS[Math.max(0, i - 1)];
+    if (prev === 'hi' && !hiLink) prev = 'reminders';  // the say-hi step only exists when it's live
+    go(prev);
   });
 
   // ---- API layer. Falls back to the built-in demo data when the API isn't reachable.
@@ -1074,10 +1092,16 @@ Share with your street
     var a = e.target.closest('a[href="#binfluencer"]'); if (!a || !API.live || !API.userId) return;
     e.preventDefault(); e.stopImmediatePropagation();
     api('POST', '/users/' + API.userId + '/reminders', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time) })
-      .then(function () { return api('GET', '/users/' + API.userId + '/referral'); })
+      .then(function (res) { hiLink = (res && res.start_link) || ''; return api('GET', '/users/' + API.userId + '/referral'); })
       .then(function (r) { link = r.link.replace(/^https?:\/\//, ''); $('#link').value = link; $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent(r.share_text); })
-      .catch(function () {}).then(function () { go('binfluencer'); });
+      .catch(function () {}).then(function () {
+        // Live with a business number: one more step, saying hi from their own WhatsApp.
+        if (hiLink) { $('#hi-go').href = hiLink; go('hi'); } else go('binfluencer');
+      });
   }, true);
+  // Say hi: WhatsApp opens in a new tab or the app; this page moves on to the invite step.
+  var hiLink = '';
+  $('#hi-go').addEventListener('click', function () { setTimeout(function () { go('binfluencer'); }, 400); });
 
   // Binfluencer
   function renderBadge() {
