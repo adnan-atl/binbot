@@ -174,8 +174,6 @@ button{font:inherit}
 .c-freq{display:none}
 .m-only{display:block}
 .m-freq{font-size:14px;font-weight:500;color:var(--grey);white-space:nowrap;margin-top:2px}
-.sb-seg{white-space:nowrap}
-@media (max-width:420px){.sb-cut{display:none}.sb-next{display:block}}
 .dot{width:12px;height:12px;border-radius:999px;flex:none}
 .daychip{display:inline-flex;align-items:center;justify-content:center;height:32px;min-width:52px;padding:2px 12px 0;box-sizing:border-box;border-radius:999px;background:var(--ink);color:#FFFFFF;font-size:14px;font-weight:700;line-height:1;letter-spacing:0.01em}
 .editcard{background:var(--tile);border-radius:22px;padding:20px 22px 22px;display:flex;flex-direction:column;gap:18px}
@@ -835,14 +833,16 @@ Share with your street
   };
   var find = function (id) { return bins.filter(function (b) { return b.id === id; })[0]; };
   // Grey line under each bin: what goes in it, how often, and the next date it goes out.
-  // Each part stays unbroken; on phones the next date always takes its own line so rows match.
+  // Phones drop how often so the line stays short: just the next date.
+  var narrowMq = null; try { narrowMq = matchMedia('(max-width:420px)'); } catch (e) {}
   var subline = function (b) {
     var nx = b.upcoming && b.upcoming.length ? fmtDate(b.upcoming[0]) : b.next0;
-    var parts = [purposeText(b), freqText(b)].filter(Boolean).map(esc);
-    var html = parts.map(function (t) { return '<span class="sb-seg">' + t + '</span>'; }).join('<span class="sb-dot"> · </span>');
-    if (nx) html += (parts.length ? '<span class="sb-dot sb-cut"> · </span>' : '') + '<span class="sb-seg sb-next">next ' + esc(nx) + '</span>';
-    return html;
+    var narrow = !!(narrowMq && narrowMq.matches);
+    return [purposeText(b), narrow && nx ? '' : freqText(b), nx ? 'next ' + nx : ''].filter(Boolean).join(' · ');
   };
+  // Re-draw the rows when the screen crosses the phone width (rotating a phone, resizing).
+  if (narrowMq) { var onMq = function () { if (current === 'confirm' && !editing) renderConfirm(); };
+    if (narrowMq.addEventListener) narrowMq.addEventListener('change', onMq); else if (narrowMq.addListener) narrowMq.addListener(onMq); }
   var calendarFailed = false;
   function renderConfirm() {
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
@@ -869,7 +869,7 @@ Share with your street
         var chips = b.on === false ? '<span class="daychip" style="background:var(--line);color:var(--grey)">Off</span>' : !chosen.length ? '<span class="hint">Not set</span>' : chosen.length === 7 ? '<span class="daychip">Daily</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
         return '<div class="cols binrow' + (b.on === false ? ' off' : '') + '">' +
           '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span>' +
-          '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : subline(b)) + '</span></span></span>' +
+          '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : esc(subline(b))) + '</span></span></span>' +
           '<span class="c-days">' + chips + '</span>' +
           '<span class="c-freq">' + freqText(b) + '</span>' +
           '</div>';
