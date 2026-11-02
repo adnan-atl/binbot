@@ -3,6 +3,7 @@ import os
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["DEMO_MODE"] = "true"
 os.environ["MESSAGE_PROVIDER"] = "stub"
+os.environ["BRAND_NAME"] = "Binny"  # tests pin a fixed name; the product default lives in config.py
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
