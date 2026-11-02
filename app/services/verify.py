@@ -32,7 +32,7 @@ from app.adapters.base import AdapterError
 from app.adapters.registry import library_version
 from app.core.config import get_settings
 from app.models import ChangeLog, CollectionEvent, CouncilStatus, Property, Snapshot
-from app.services import geo, quorum
+from app.services import geo, quorum, sides
 from app.services import schedule as sched
 from app.services.normalize import categorise
 
@@ -69,6 +69,10 @@ def _neighbours(db: Session, prop: Property) -> list:
     except Exception as e:  # address provider down: only residents to cross-check with
         log.warning("verify: address lookup failed for %s: %s", prop.postcode, e)
         hits = []
+    base = prop.round_key.split("~")[0]
+    if base.startswith("pc:"):  # a split postcode: only this side's homes are on this round
+        hits = [h for h in hits
+                if sides.side_key(db, base, h.house_number, h.uprn, prop.postcode) == prop.round_key]
     for h in [*members, *hits]:
         if not h.house_number or h.house_number in seen or (prop.uprn and h.uprn == prop.uprn):
             continue

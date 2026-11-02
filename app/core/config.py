@@ -27,14 +27,36 @@ class Settings(BaseSettings):
     refresh_interval_days: int = 7
     refresh_window_days_before_holiday: int = 21
     horizon_days: int = 90  # how far ahead we keep events
+    # Splitting a postcode round moves residents and messages them. Until it's been watched
+    # on real councils, only log what it would do ("would_split" in change_log).
+    split_dry_run: bool = True
 
     # Messaging
     message_provider: str = "stub"  # stub | meta
     meta_token: str = ""
     meta_phone_number_id: str = ""
     meta_verify_token: str = ""  # any string you choose; paste the same one in Meta's webhook settings
+    # App secret (Meta app dashboard -> App settings -> Basic). Every webhook POST is checked
+    # against it (X-Hub-Signature-256). Empty skips the check: local testing only.
+    meta_app_secret: str = ""
+    # Approved message templates, for messages sent outside WhatsApp's 24-hour reply window
+    # (reminders, date changes). Empty = send free text instead (fine for stub and testing).
+    meta_reminder_template: str = "bin_reminder"
+    meta_change_template: str = "bin_day_changed"
+    meta_template_lang: str = "en_GB"
+    # The business WhatsApp number in E.164 (+447...). When set, sign-up ends with the resident
+    # sending us "hi" from their own WhatsApp, which proves the number is theirs and opens the
+    # reply window for the welcome. Empty (local, stub): reminders start straight away.
+    meta_display_number: str = ""
 
     public_base_url: str = "http://localhost:8000"
+    # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.
+    brand_name: str = "Binny"
+    # The company behind the product, and the links in the page footer and consent text.
+    parent_name: str = "Alfred"
+    parent_url: str = "https://alfred.co.uk"
+    privacy_url: str = "https://alfred.co.uk/privacy"
+    terms_url: str = "https://alfred.co.uk/legal"
     timezone: str = "Europe/London"
 
 

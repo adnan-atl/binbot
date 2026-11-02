@@ -1,0 +1,88 @@
+# Production: one small server (AWS Lightsail, 2 GB+). See deploy/README.md.
+#   docker compose -f deploy/docker-compose.prod.yml up -d
+# Settings come from deploy/.env.production (copy .env.production.example).
+name: binny
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.production          # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: ..
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      SELENIUM_URL: http://selenium:4444
+    # Migrations run on every start (safe to repeat), then the web server behind Caddy.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
+    depends_on:
+      db: { condition: service_healthy }
+
+  worker:
+    build: ..
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      SELENIUM_URL: http://selenium:4444
+    command: python -m app.workers.main
+    depends_on:
+      db: { condition: service_healthy }
+      api: { condition: service_started }   # api applies the migrations first
+
+  # Some councils' sites only work in a real browser.
+  selenium:
+    image: selenium/standalone-chromium:latest
+    restart: unless-stopped
+    shm_size: 1g
+    environment:
+      SE_NODE_MAX_SESSIONS: 2              # keep equal to BROWSER_SESSIONS in .env.production
+      SE_NODE_OVERRIDE_MAX_SESSIONS: "true"
+
+  # HTTPS for DOMAIN, certificates from Let's Encrypt, renewed automatically.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file: .env.production          # DOMAIN
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+
+  # Daily database backup into the `backups` volume; keeps the last 14 days.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      PGHOST: db
+    volumes:
+      - backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        export PGUSER="$$POSTGRES_USER" PGPASSWORD="$$POSTGRES_PASSWORD" PGDATABASE="$$POSTGRES_DB"
+        until pg_isready -q; do sleep 5; done
+        while true; do
+          f=/backups/binny-$$(date +%Y-%m-%d).sql.gz
+          pg_dump --no-owner | gzip > "$$f.tmp" && mv "$$f.tmp" "$$f" && echo "backup: $$f"
+          find /backups -name 'binny-*.sql.gz' -mtime +14 -delete
+          sleep 86400
+        done
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  backups:
+  caddy_data:
+  caddy_config:

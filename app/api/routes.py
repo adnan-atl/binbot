@@ -26,9 +26,9 @@ from app.models import (
     level_for,
     now,
 )
-from app.services import geo
+from app.services import geo, split
 from app.services.normalize import describe_rule
-from app.services.reminders import handle_inbound, rebuild_reminders
+from app.services.reminders import handle_inbound, rebuild_reminders, start_link, welcome_message
 from app.services.verify import rescue_round, verify_round
 from app.services.schedule import (
     get_or_create_council,
@@ -177,6 +177,7 @@ def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_
                                 "you're still on your street's days.")
     _seed_settings(db, user, prop)
     _log_checks(db, prop)
+    split.own_calendar_vote(db, before[0], prop)
     db.commit()
     return S.StartOut(user_id=user.id, property_id=prop.id, council=prop.council.name,
                       source=source, shared=False, bins=_bins_out(db, user))
@@ -226,17 +227,21 @@ def _bins_out(db: Session, user: User) -> list[S.BinOut]:
             rule = describe_rule(dates)
             rule["days"] = s.override_rule.get("days", rule["days"])
             rule["frequency"] = s.override_rule.get("frequency", rule["frequency"])
+            upcoming = [d.isoformat() for d in dates[:4]]
             colour, manual = None, True
         elif s.bin_type_id in council_bins:
             cb = council_bins[s.bin_type_id]
             rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"],
                     "purpose": cb["purpose"], "frequency_source": cb.get("frequency_source", "")}
+            # The round's real dates (bank holiday moves included), as schedule_for has them
+            upcoming = cb["dates"][:4]
             colour, manual = cb["colour"], False
         else:
             rule, colour, manual = {"days": [], "frequency": "irregular", "next": None}, None, True
+            upcoming = []
         out.append(S.BinOut(setting_id=s.id, bin_type_id=s.bin_type_id, label=s.label,
                             category=s.category.value, colour=colour, enabled=s.enabled,
-                            manual=manual, **rule))
+                            manual=manual, upcoming=upcoming, **rule))
     return out
 
 
@@ -293,7 +298,10 @@ def set_phone(user_id: str, body: S.PhoneIn, db: Session = Depends(get_db)):
     user = _user(db, user_id)
     phone = _e164(body.phone)
     clash = db.scalar(select(User).where(User.phone_e164 == phone, User.id != user.id))
-    if clash:
+    if clash and get_settings().meta_display_number and clash.status == UserStatus.pending:
+        clash.phone_e164 = None  # typed but never proven; whoever says hi from it owns it
+        db.flush()
+    elif clash:
         raise HTTPException(409, "That number already has reminders set up")
     user.phone_e164 = phone
     if body.consent:
@@ -320,30 +328,30 @@ def set_prefs(user_id: str, body: S.PrefsIn, db: Session = Depends(get_db)):
         raise HTTPException(400, "time must be HH:MM")
     user.reminder_time = body.time
     was_active = user.status == UserStatus.active
+    if not was_active and get_settings().meta_display_number:
+        # Don't message a typed number cold: the resident says hi to us from their WhatsApp
+        # first (handle_inbound), which proves the number and starts their reminders.
+        if not user.start_code:
+            user.start_code = _new_start_code(db)
+        db.commit()
+        return {"status": "awaiting_hi", "scheduled": 0, "start_code": user.start_code,
+                "start_link": start_link(user.start_code)}
     user.status = UserStatus.active
     n = rebuild_reminders(db, user)
     if not was_active:
-        send_message(db, user.phone_e164, _welcome(db, user), kind="welcome")
+        send_message(db, user.phone_e164, welcome_message(db, user), kind="welcome")
     db.commit()
     return {"status": "active", "scheduled": n}
 
 
-def _welcome(db: Session, user: User) -> str:
-    """First message, sent the moment reminders go on, so the resident sees BinBot works
-    (and, on WhatsApp, it opens the 24-hour window for free-form replies)."""
-    first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
-                      .order_by(Reminder.send_at))
-    # "night_before" is the day before at any time the resident picks (4pm is an option).
-    when = ("the day before each collection" if user.reminder_mode == ReminderMode.night_before
-            else "on the morning of each collection")
-    hh, mm = (int(x) for x in user.reminder_time.split(":"))
-    clock = f"{hh % 12 or 12}{f':{mm:02d}' if mm else ''}{'pm' if hh >= 12 else 'am'}"
-    msg = f"BinBot here. You're set up: I'll message you {when}, at {clock}."
-    if first:
-        names = [b["label"] for b in first.bins]
-        bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
-        msg += f"\nFirst up: {bins} on {first.collection_date.strftime('%a %-d %b')}."
-    return msg + "\nReply STOP any time to turn reminders off."
+_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O, 1/I/L
+
+
+def _new_start_code(db: Session) -> str:
+    while True:
+        code = "".join(secrets.choice(_CODE_CHARS) for _ in range(6))
+        if not db.scalar(select(User.id).where(User.start_code == code)):
+            return code
 
 
 @router.get("/users/{user_id}/schedule", response_model=list[S.ReminderOut])
@@ -369,7 +377,7 @@ def get_referral(user_id: str, db: Session = Depends(get_db)):
     return S.ReferralOut(
         code=user.referral_code, link=link, referrals=count, level=level, level_name=name,
         next_at=nxt,
-        share_text=f"I use BinBot for bin day reminders on WhatsApp. Sign up with your postcode: {link}",
+        share_text=f"I use {get_settings().brand_name} for bin day reminders on WhatsApp. Sign up with your postcode: {link}",
     )
 
 
