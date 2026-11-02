@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     public_base_url: str = "http://localhost:8000"
     # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.
     brand_name: str = "Binny"
+    # The company behind the product, and the links in the page footer and consent text.
+    parent_name: str = "Alfred"
+    parent_url: str = "https://alfred.co.uk"
+    privacy_url: str = "https://alfred.co.uk/privacy"
+    terms_url: str = "https://alfred.co.uk/legal"
     timezone: str = "Europe/London"
 
 

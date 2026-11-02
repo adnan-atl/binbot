@@ -23,13 +23,19 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 
 
 def render_index() -> str:
-    """The page with the brand filled in. Read on every request, so edits to web/ (mounted
-    into the container) show on refresh. {{BRAND}} is for HTML text and attributes;
-    {{BRAND_JSON}} is a JS string literal, safe inside <script>."""
-    brand = get_settings().brand_name
+    """The page with the brand and links filled in. Read on every request, so edits to web/
+    (mounted into the container) show on refresh. {{BRAND}}, {{PARENT_NAME}}, {{PARENT_URL}},
+    {{PRIVACY_URL}} and {{TERMS_URL}} are for HTML text and attributes; {{BRAND_JSON}} is a JS
+    string literal, safe inside <script>."""
+    s = get_settings()
     page = (WEB / "index.html").read_text(encoding="utf-8")
-    brand_json = json.dumps(brand).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
-    return page.replace("{{BRAND_JSON}}", brand_json).replace("{{BRAND}}", html.escape(brand))
+    brand_json = json.dumps(s.brand_name).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    page = page.replace("{{BRAND_JSON}}", brand_json)
+    for token, value in (("BRAND", s.brand_name), ("PARENT_NAME", s.parent_name),
+                         ("PARENT_URL", s.parent_url), ("PRIVACY_URL", s.privacy_url),
+                         ("TERMS_URL", s.terms_url)):
+        page = page.replace("{{" + token + "}}", html.escape(value))
+    return page
 
 
 if WEB.exists():

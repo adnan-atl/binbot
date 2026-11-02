@@ -41,3 +41,27 @@ def test_brand_name_setting(client, db, brand):
 def test_unknown_number_gets_the_site_not_an_old_domain(client):
     reply = client.post("/api/inbound", json={"phone": "+447700900999", "text": "hi"}).json()["reply"]
     assert reply == "Hi! Sign up at localhost:8000 to get bin reminders."
+
+
+def test_footer_links_and_parent_name(client, monkeypatch):
+    page = client.get("/").text
+    assert 'href="https://alfred.co.uk/privacy" target="_blank" rel="noopener">Privacy<' in page
+    assert 'href="https://alfred.co.uk/legal" target="_blank" rel="noopener">Terms &amp; Conditions<' in page
+    assert ">A product of Alfred</a>" in page and "Don't tell me about other Alfred services." in page
+
+    monkeypatch.setenv("PARENT_NAME", "Fred & Co")
+    monkeypatch.setenv("PARENT_URL", "https://fred.example/")
+    monkeypatch.setenv("PRIVACY_URL", "https://fred.example/p?a=1&b=2")
+    monkeypatch.setenv("TERMS_URL", 'https://fred.example/t"x')
+    get_settings.cache_clear()
+    try:
+        page = client.get("/").text
+    finally:
+        for k in ("PARENT_NAME", "PARENT_URL", "PRIVACY_URL", "TERMS_URL"):
+            monkeypatch.delenv(k)
+        get_settings.cache_clear()
+    assert '<a href="https://fred.example/" target="_blank" rel="noopener">A product of Fred &amp; Co</a>' in page
+    assert page.count('href="https://fred.example/p?a=1&amp;b=2"') == 2  # footer and consent text
+    assert page.count('href="https://fred.example/t&quot;x"') == 2
+    assert "is made by Fred &amp; Co." in page and "{{" not in page
+    assert "alfred.co.uk" not in page and "Alfred" not in page
