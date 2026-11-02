@@ -26,7 +26,7 @@ from app.models import (
     User,
     UserStatus,
 )
-from app.providers.messaging import send_message
+from app.providers.messaging import send_message, send_template_message, uses_template
 from app.services import split
 from app.services.reminders import dispatch_due, rebuild_reminders
 from app.services.verify import verify_round
@@ -103,7 +103,20 @@ def _propagate_change(db: Session, prop: Property, diff: dict) -> int:
                 lines.append(f"{bt.council_label if bt else 'A bin'}: {frm} -> {to}")
             body = "Heads up, your council moved a collection:\n" + "\n".join(lines) + \
                    "\nI've updated your reminders."
-            send_message(db, u.phone_e164, body, kind="change")
+            template = get_settings().meta_change_template
+            if uses_template(template):
+                # One template message per moved bin: "{{1}} now goes out on {{2}} instead of {{3}}."
+                for m, line in zip(moved, lines):
+                    bt = db.get(BinType, m["bin_type_id"])
+                    send_template_message(
+                        db, u.phone_e164, template,
+                        [bt.council_label if bt else "A bin",
+                         date.fromisoformat(m["to"]).strftime("%a %-d %b"),
+                         date.fromisoformat(m["from"]).strftime("%a %-d %b")],
+                        "Heads up, your council moved a collection:\n" + line
+                        + "\nI've updated your reminders.", kind="change")
+            else:
+                send_message(db, u.phone_e164, body, kind="change")
             notified += 1
     log_row = db.scalar(
         select(ChangeLog).where(ChangeLog.scope_id == prop.round_key,

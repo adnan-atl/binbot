@@ -21,7 +21,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.providers.messaging import send_message
+from app.providers.messaging import send_message, send_template_message
 
 _CATEGORY_NAMES = {
     "recycling": "Recycling", "general": "General waste", "food": "Food waste",
@@ -111,7 +111,11 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
         if user.status != UserStatus.active:
             r.status = ReminderStatus.cancelled
             continue
-        row = send_message(db, user.phone_e164, render_reminder(user, r), kind="reminder")
+        when = "tomorrow" if user.reminder_mode == ReminderMode.night_before else "today"
+        row = send_template_message(
+            db, user.phone_e164, get_settings().meta_reminder_template,
+            [_join([b["label"] for b in r.bins]), when, r.collection_date.strftime("%a %-d %b")],
+            render_reminder(user, r), kind="reminder", buttons=True)
         if row.error:
             r.status = ReminderStatus.failed
         else:

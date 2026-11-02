@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     meta_token: str = ""
     meta_phone_number_id: str = ""
     meta_verify_token: str = ""  # any string you choose; paste the same one in Meta's webhook settings
+    # Approved message templates, for messages sent outside WhatsApp's 24-hour reply window
+    # (reminders, date changes). Empty = send free text instead (fine for stub and testing).
+    meta_reminder_template: str = "bin_reminder"
+    meta_change_template: str = "bin_day_changed"
+    meta_template_lang: str = "en_GB"
 
     public_base_url: str = "http://localhost:8000"
     # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.

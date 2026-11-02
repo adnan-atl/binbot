@@ -28,6 +28,22 @@ async def meta(req: Request, db: Session = Depends(get_db)):
     for entry in payload.get("entry", []):
         for ch in entry.get("changes", []):
             for m in ch.get("value", {}).get("messages", []):
-                if m.get("type") == "text":
-                    handle_inbound(db, "+" + m["from"], m["text"]["body"])
+                text = message_text(m)
+                if text:
+                    handle_inbound(db, "+" + m["from"], text)
     return {"ok": True}
+
+
+def message_text(m: dict) -> str | None:
+    """What the resident said: typed text, or the quick-reply button they tapped on a reminder
+    template ("Done", "Snooze", "Wrong day", sent back with our DONE / SNOOZE / WRONG payload)."""
+    kind = m.get("type")
+    if kind == "text":
+        return m.get("text", {}).get("body")
+    if kind == "button":
+        b = m.get("button", {})
+        return b.get("payload") or b.get("text")
+    if kind == "interactive":
+        reply = m.get("interactive", {}).get("button_reply", {})
+        return reply.get("id") or reply.get("title")
+    return None
