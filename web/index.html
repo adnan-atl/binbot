@@ -871,8 +871,8 @@ Share with your street
   // Reminders
   var when = 'night', time = '7:00pm';
   function renderReminders() {
-    var W = [{ id: 'night', label: 'Night before', sub: 'Most people pick this' }, { id: 'morning', label: 'Morning of', sub: 'Before the lorry comes' }];
-    var T = when === 'night' ? ['6:00pm', '7:00pm', '8:00pm', '9:00pm'] : ['6:00am', '6:30am', '7:00am'];
+    var W = [{ id: 'night', label: 'Day before', sub: 'Most people pick this' }, { id: 'morning', label: 'Morning of', sub: 'Before the lorry comes' }];
+    var T = when === 'night' ? ['4:00pm', '6:00pm', '7:00pm', '8:00pm', '9:00pm'] : ['6:00am', '6:30am', '7:00am'];
     $('#whens').innerHTML = W.map(function (w) { return '<button type="button" class="big" data-when="' + w.id + '" aria-pressed="' + (when === w.id) + '"><b>' + w.label + '</b><small>' + w.sub + '</small></button>'; }).join('');
     $('#times').innerHTML = T.map(function (t) { return '<button type="button" class="opt" data-time="' + t + '" aria-pressed="' + (time === t) + '">' + t + '</button>'; }).join('');
   }
@@ -897,7 +897,7 @@ Share with your street
 
   // Binfluencer
   function renderBadge() {
-    $('#b-badge').textContent = 'Reminders on' + (phone ? ' for ' + phone : '') + ' · ' + (when === 'night' ? 'night before, ' : 'morning of, ') + time;
+    $('#b-badge').textContent = 'Reminders on' + (phone ? ' for ' + phone : '') + ' · ' + (when === 'night' ? 'day before, ' : 'morning of, ') + time;
   }
   var link = $('#link').value;
   $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent('I use BinBot for bin day reminders on WhatsApp. Sign up with your postcode: https://' + link);
