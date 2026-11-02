@@ -1,5 +1,5 @@
 """Reminders and date changes go out as approved WhatsApp templates (they're sent outside the
-24-hour reply window); quick-reply taps come back through the webhook as DONE / SNOOZE / WRONG."""
+24-hour reply window); quick-reply taps come back through the webhook as DONE / SNOOZE / menu:settings."""
 from datetime import date, timedelta
 
 import pytest
@@ -66,8 +66,6 @@ def test_reminder_goes_out_as_a_template_with_quick_replies(client, db, sent):
                 {"type": "button", "sub_type": "quick_reply", "index": "1",
                  "parameters": [{"type": "payload", "payload": "SNOOZE"}]},
                 {"type": "button", "sub_type": "quick_reply", "index": "2",
-                 "parameters": [{"type": "payload", "payload": "WRONG"}]},
-                {"type": "button", "sub_type": "quick_reply", "index": "3",
                  "parameters": [{"type": "payload", "payload": "menu:settings"}]},
             ]}}
     # The outbox still records the readable text

@@ -100,9 +100,10 @@ class MetaProvider:
             "action": {"button": button_label[:20], "sections": out}}})
 
 
-# Payloads on the reminder template's quick-reply buttons ("Done", "Snooze", "Wrong day",
-# "Settings"), in button order. Taps come back through the webhook as these words.
-QUICK_REPLIES = ("DONE", "SNOOZE", "WRONG", "menu:settings")
+# Payloads on the reminder template's quick-reply buttons ("Done", "Snooze", "Settings"), in
+# button order. Taps come back through the webhook as these words. "Wrong collection day" lives
+# in the Settings menu.
+QUICK_REPLIES = ("DONE", "SNOOZE", "menu:settings")
 
 
 def readable(body: str, buttons=(), sections=()) -> str:

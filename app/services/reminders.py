@@ -284,8 +284,12 @@ def settings_menu(db: Session, user: User) -> Reply:
             + (" (paused)" if paused else "") + ".\n"
             + f"Bins on: {', '.join(on) if on else 'none'}.\n"
             + "What would you like to change?")
-    last = ("menu:resume", "Turn reminders on") if paused else ("menu:pause", "Pause reminders")
-    return Reply(text, buttons=[("menu:time", "Reminder time"), ("menu:bins", "My bins"), last])
+    last = ("menu:resume", "Turn reminders on", "") if paused else ("menu:pause", "Pause reminders", "")
+    rows = [("menu:time", "Reminder time", "Day before or morning of"),
+            ("menu:bins", "My bins", "Turn bins on or off"),
+            ("menu:wrong", "Wrong collection day", "Tell us your days don't match"),
+            last]
+    return Reply(text, list_button="Settings", sections=[("Settings", rows)])
 
 
 def time_menu(user: User) -> Reply:
@@ -442,7 +446,8 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
     return _bin_phrase(db, user, t)
 
 
-FALLBACK = "Reply DONE, SNOOZE or WRONG to your last reminder, or tap below to change your settings."
+FALLBACK = ("Tap Done or Snooze on your last reminder, or tap Settings to change your bins or time, "
+            "or tell us about a wrong collection day.")
 
 
 def handle_inbound(db: Session, phone: str, text: str) -> str:
@@ -458,6 +463,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     if not user:
         site = re.sub(r"^https?://", "", get_settings().public_base_url).rstrip("/")
         return f"Hi! Sign up at {site} to get bin reminders."
+    if text.strip() == "menu:wrong":  # "Wrong collection day" in the settings menu
+        text = "WRONG"
     words = text.strip().upper().split()
     cmd = words[0] if words else ""
     last = db.scalar(

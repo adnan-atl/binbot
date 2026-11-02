@@ -33,7 +33,7 @@ waiting for approval, but free text only reaches people who messaged in the last
 **Body** (copy exactly):
 
 ```
-Bin reminder: {{1}} out {{2}} ({{3}}). Tap Done when that's sorted, Snooze for a nudge later, or Wrong day if that's not your collection day.
+Bin reminder: {{1}} out {{2}} ({{3}}). Tap Done when that's sorted, Snooze for a nudge later, or Settings to change your bins or time.
 ```
 
 **Sample values** (Meta asks for one per variable):
@@ -45,18 +45,21 @@ Bin reminder: {{1}} out {{2}} ({{3}}). Tap Done when that's sorted, Snooze for a
 | `{{3}}` | the collection date | `Wed 4 Nov` |
 
 Preview: *Bin reminder: Recycling and Food waste out tomorrow (Wed 4 Nov). Tap Done when that's
-sorted, Snooze for a nudge later, or Wrong day if that's not your collection day.*
+sorted, Snooze for a nudge later, or Settings to change your bins or time.*
 
 **Buttons**: add **Quick reply** buttons, in this order (the order matters, the app fills them by
 position):
 
 1. `Done`
 2. `Snooze`
-3. `Wrong day`
-4. `Settings`
+3. `Settings`
 
-Taps come back through the webhook and are handled exactly like typing DONE, SNOOZE or WRONG.
-**Settings** opens the settings menu (reminder time, bins, pause), all by tapping.
+**Message validity period**: custom, **3 hours** (Meta's default is 10 minutes, too short if a
+phone is off for a bit).
+
+Taps come back through the webhook and are handled exactly like typing DONE or SNOOZE.
+**Settings** opens the settings menu (reminder time, bins, wrong collection day, pause), all by
+tapping. Typing WRONG still works too.
 
 ---
 
@@ -70,12 +73,15 @@ Taps come back through the webhook and are handled exactly like typing DONE, SNO
 | Header | none |
 | Footer | none |
 | Buttons | none |
+| Validity period | custom, **3 hours** |
 
 **Body** (copy exactly):
 
 ```
-Change to your collection: {{1}} now goes out on {{2}} instead of {{3}}.
+Change to your collection: {{1}} now goes out on {{2}} instead of {{3}}. Your reminders have moved to match.
 ```
+
+(Meta rejects a body that ends on a variable, hence the second sentence.)
 
 **Sample values**:
 
@@ -92,5 +98,5 @@ One message is sent for each bin that moved.
 ## After approval
 
 Nothing to change in the app if you kept the default names. Check that a test reminder arrives
-with the four buttons, and that tapping **Done** marks it done (it shows in the outbox table as a
+with the three buttons, and that tapping **Done** marks it done (it shows in the outbox table as a
 `reply`).
