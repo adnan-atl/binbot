@@ -7,6 +7,9 @@ from app.core.db import session_factory
 from app.workers import monitor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+# httpx logs full request URLs at INFO, API keys in query strings included: warnings only.
+for _name in ("httpx", "httpcore"):
+    logging.getLogger(_name).setLevel(logging.WARNING)
 log = logging.getLogger("worker")
 
 

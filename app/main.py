@@ -13,6 +13,10 @@ from app.api.webhooks import router as webhook_router
 from app.core.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
+# httpx logs every request URL at INFO, query string included, and some providers take the API
+# key in the URL (OS Places): keep those loggers to warnings and errors.
+for _name in ("httpx", "httpcore"):
+    logging.getLogger(_name).setLevel(logging.WARNING)
 
 app = FastAPI(title=get_settings().brand_name, version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
