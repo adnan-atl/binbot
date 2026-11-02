@@ -174,17 +174,9 @@ button{font:inherit}
 .c-freq{display:none}
 .m-only{display:block}
 .m-freq{font-size:14px;font-weight:500;color:var(--grey);white-space:nowrap;margin-top:2px}
+.sb-seg{white-space:nowrap}
+@media (max-width:420px){.sb-cut{display:none}.sb-next{display:block}}
 .dot{width:12px;height:12px;border-radius:999px;flex:none}
-/* "Your next two collections": shown when bins take turns, so it's clear which go out which week */
-.nextcard{background:var(--tile);border-radius:22px;padding:18px 20px 20px;margin-top:16px;display:flex;flex-direction:column;gap:12px}
-.nextcard h2{margin:0;font-size:17px;font-weight:700;letter-spacing:-0.01em}
-.nx-row{display:flex;align-items:flex-start;gap:12px;padding-top:12px;border-top:1px solid var(--line)}
-.nx-date{flex:none;width:100px;font-size:16px;font-weight:700;line-height:1.3;padding-top:6px}
-.nx-bins{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
-.nx-pill{display:inline-flex;align-items:center;gap:7px;background:#FFFFFF;color:var(--ink);border-radius:999px;padding:6px 12px;font-size:15px;font-weight:600;line-height:1.3}
-.nx-pill i{width:10px;height:10px;border-radius:999px;flex:none}
-.nextcard p{margin:0;font-size:15px;line-height:1.45;color:var(--grey)}
-@media (max-width:420px){.nextcard{padding:16px 16px 18px}.nx-date{width:84px;font-size:15px}.nx-pill{font-size:14px;padding:5px 10px}}
 .daychip{display:inline-flex;align-items:center;justify-content:center;height:32px;min-width:52px;padding:2px 12px 0;box-sizing:border-box;border-radius:999px;background:var(--ink);color:#FFFFFF;font-size:14px;font-weight:700;line-height:1;letter-spacing:0.01em}
 .editcard{background:var(--tile);border-radius:22px;padding:20px 22px 22px;display:flex;flex-direction:column;gap:18px}
 .editcard.off .binic,.editcard.off .name{opacity:.45}
@@ -427,11 +419,6 @@ button{font:inherit}
 </div>
 <div id="c-view">
 <fieldset class="binlist"><legend class="sr">Bins to remind me about</legend><div id="c-rows"></div></fieldset>
-<section class="nextcard" id="c-next" aria-labelledby="c-next-t" hidden>
-<h2 id="c-next-t">Your next two collections</h2>
-<div id="c-next-rows"></div>
-<p>Your bins take turns. {{BRAND}}'s WhatsApp reminder tells you exactly which ones go out, every time.</p>
-</section>
 <div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
 <a class="pill solid" id="c-yes" href="#phone" style="width:100%">Yes, these are right</a>
 <button type="button" class="ghost" id="c-edit">Something's off</button>
@@ -848,36 +835,14 @@ Share with your street
   };
   var find = function (id) { return bins.filter(function (b) { return b.id === id; })[0]; };
   // Grey line under each bin: what goes in it, how often, and the next date it goes out.
+  // Each part stays unbroken; on phones the next date always takes its own line so rows match.
   var subline = function (b) {
     var nx = b.upcoming && b.upcoming.length ? fmtDate(b.upcoming[0]) : b.next0;
-    var narrow = false; try { narrow = matchMedia('(max-width:420px)').matches; } catch (e) {}
-    return [purposeText(b), narrow && nx ? '' : freqText(b), nx ? 'next ' + nx : ''].filter(Boolean).join(' · ');
+    var parts = [purposeText(b), freqText(b)].filter(Boolean).map(esc);
+    var html = parts.map(function (t) { return '<span class="sb-seg">' + t + '</span>'; }).join('<span class="sb-dot"> · </span>');
+    if (nx) html += (parts.length ? '<span class="sb-dot sb-cut"> · </span>' : '') + '<span class="sb-seg sb-next">next ' + esc(nx) + '</span>';
+    return html;
   };
-  // The next two collection dates and which bins go out on each. Only worth showing when bins
-  // take turns (or differ between days); every-week-same-day bins don't need it. Uses the
-  // API's real dates, so the built-in demo (no API) has none and the card stays hidden.
-  function nextTwo() {
-    var on = bins.filter(function (b) { return b.on !== false && b.upcoming && b.upcoming.length; });
-    var dates = [];
-    on.forEach(function (b) { b.upcoming.forEach(function (d) { if (dates.indexOf(d) < 0) dates.push(d); }); });
-    dates = dates.sort().slice(0, 2);
-    if (dates.length < 2) return null;
-    var rows = dates.map(function (d) { return { date: d, bins: on.filter(function (b) { return b.upcoming.indexOf(d) > -1; }) }; });
-    var differ = rows[0].bins.length !== rows[1].bins.length || rows[0].bins.some(function (b) { return rows[1].bins.indexOf(b) < 0; });
-    var rotating = differ || on.some(function (b) { return b.freq !== 'weekly'; });
-    return rotating ? rows : null;
-  }
-  function renderNextTwo() {
-    var rows = editing ? null : nextTwo();
-    $('#c-next').hidden = !rows;
-    if (!rows) return;
-    $('#c-next-rows').innerHTML = rows.map(function (r) {
-      return '<div class="nx-row"><span class="nx-date">' + fmtDate(r.date) + '</span><span class="nx-bins">' +
-        r.bins.map(function (b) { return '<span class="nx-pill"><i style="background:' + b.color + '" aria-hidden="true"></i>' + esc(b.name) + '</span>'; }).join('') +
-        '</span></div>';
-    }).join('');
-  }
-
   var calendarFailed = false;
   function renderConfirm() {
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
@@ -904,7 +869,7 @@ Share with your street
         var chips = b.on === false ? '<span class="daychip" style="background:var(--line);color:var(--grey)">Off</span>' : !chosen.length ? '<span class="hint">Not set</span>' : chosen.length === 7 ? '<span class="daychip">Daily</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
         return '<div class="cols binrow' + (b.on === false ? ' off' : '') + '">' +
           '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span>' +
-          '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : esc(subline(b))) + '</span></span></span>' +
+          '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : subline(b)) + '</span></span></span>' +
           '<span class="c-days">' + chips + '</span>' +
           '<span class="c-freq">' + freqText(b) + '</span>' +
           '</div>';
@@ -923,7 +888,6 @@ Share with your street
       }).join('');
     }
     renderAdder();
-    renderNextTwo();
   }
   $('#c-rows').addEventListener('change', function (e) {
     var id = e.target.dataset.toggle; if (!id) return;

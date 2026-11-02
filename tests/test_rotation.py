@@ -1,5 +1,5 @@
-"""Rotating bins: each bin carries its next real dates, so the confirm screen can show which
-bins go out on which collection day."""
+"""Rotating bins: each bin carries its next real dates, so each confirm-screen row can show
+how often it goes out and its next date."""
 from datetime import date, timedelta
 
 from sqlalchemy import select
@@ -41,7 +41,7 @@ def test_manual_bins_get_upcoming_dates_too(client, db, monkeypatch):
     assert glass["upcoming"] == [(mon + timedelta(weeks=2 * i)).isoformat() for i in range(4)]
 
 
-def test_confirm_screen_has_the_next_collections_card(client):
+def test_confirm_screen_has_no_next_collections_card(client):
     page = client.get("/").text
-    assert 'id="c-next"' in page and "Your next two collections" in page
-    assert "Binny's WhatsApp reminder tells you exactly which ones go out" in page
+    assert 'id="c-next"' not in page and "Your next two collections" not in page
+    assert "Your bins take turns" not in page
