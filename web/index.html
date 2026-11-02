@@ -357,11 +357,11 @@ button{font:inherit}
 <input id="tel" class="field" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="7700 900123" value="7700 900123" aria-describedby="tel-err tel-hint" style="text-transform:none;letter-spacing:0.02em">
 </div>
 <span id="tel-err" class="error" hidden>Enter a UK mobile number, like 7700 900123.</span>
-<span id="tel-hint" class="hint">By continuing, you agree to get bin reminders on WhatsApp. Reply STOP any time.</span>
+<span id="tel-hint" class="hint">BinBot is made by Alfred. By continuing, you agree to Alfred's terms and privacy policy, and to get bin reminders and BinBot updates on WhatsApp. Alfred may also tell you about its other home admin services. Reply STOP any time.</span>
 </div>
-<label hidden style="display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--grey);cursor:pointer">
-<input id="mkt" type="checkbox" style="width:22px;height:22px;margin:0;accent-color:var(--ink);flex:none">
-<span>BinBot is made by Alfred. Tick to hear about other home services from us now and then. Optional.</span>
+<label style="display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--grey);cursor:pointer">
+<input id="no-offers" type="checkbox" style="width:22px;height:22px;margin:0;accent-color:var(--ink);flex:none">
+<span>Don't tell me about other Alfred services.</span>
 </label>
 <div><button type="button" class="pill solid" id="tel-go">Continue</button></div>
 </div>
@@ -650,7 +650,7 @@ Share with your street
     if (!ok) return;
     phone = '+44 ' + d.slice(1, 5) + ' ' + d.slice(5);
     if (!API.live || !API.userId) { go('reminders'); return; }
-    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true, marketing_consent: $('#mkt').checked }).then(function () { go('reminders'); })
+    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true, marketing_consent: !$('#no-offers').checked }).then(function () { go('reminders'); })
       .catch(function (e) { $('#tel-err').textContent = e.message; $('#tel-err').hidden = false; });
   }
   $('#tel-go').addEventListener('click', submitPhone);
