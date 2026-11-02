@@ -130,6 +130,21 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
     return sent
 
 
+UNRECOGNISED_KEEP_DAYS = 90
+
+
+def purge_unrecognised(db: Session, now_utc: datetime | None = None) -> int:
+    """Delete messages the bot couldn't understand once they're UNRECOGNISED_KEEP_DAYS old
+    (they're residents' own words, so we don't keep them longer than we need)."""
+    cutoff = (now_utc or datetime.now(ZoneInfo("UTC"))) - timedelta(days=UNRECOGNISED_KEEP_DAYS)
+    old = db.scalars(select(ChangeLog).where(ChangeLog.kind == "unrecognised",
+                                             ChangeLog.detected_at < cutoff)).all()
+    for row in old:
+        db.delete(row)
+    db.commit()
+    return len(old)
+
+
 def welcome_message(db: Session, user: User) -> str:
     """First message, sent the moment reminders go on, so the resident sees the service works
     (and, on WhatsApp, it opens the 24-hour window for free-form replies)."""
@@ -502,6 +517,10 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         reply = Reply("Thanks, noted. If your home's days are different, tap \"These aren't my "
                       f"days\" in {get_settings().brand_name} to set your own.")
     else:
+        # Kept so we can see what people ask for that we don't handle yet. Deleted after
+        # UNRECOGNISED_KEEP_DAYS by the worker (purge_unrecognised, daily).
+        db.add(ChangeLog(scope="user", scope_id=user.id, kind="unrecognised",
+                         diff={"text": text.strip()[:1000]}))
         reply = Reply(FALLBACK, buttons=[SETTINGS_BUTTON])
     send_reply(db, phone, reply.text, kind="reply", buttons=reply.buttons,
                list_button=reply.list_button, sections=reply.sections)
