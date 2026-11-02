@@ -25,6 +25,16 @@ def fake_adapter(monkeypatch):
     return state
 
 
+@pytest.fixture(autouse=True)
+def pinned_week(monkeypatch):
+    """Verify rotates which neighbours it asks by week; pin it so tests know who's asked."""
+    from app.services import verify
+
+    week = {"n": 0}
+    monkeypatch.setattr(verify, "_week", lambda today: week["n"])
+    return week
+
+
 def _signup_active(client, db):
     uid = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()["user_id"]
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123"})
@@ -314,3 +324,32 @@ def test_rescue_uses_first_neighbour_and_confirms_later(client, db, fake_adapter
     n = len(asked)
     client.post(f"/api/users/{r['user_id']}/verify")
     assert len(asked) == n
+
+
+def test_verify_asks_different_homes_each_week(client, db, fake_adapter, monkeypatch, pinned_week):
+    """Over a few weeks every home on the postcode confirms the round, not the same two."""
+    from app.services import verify
+
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+    fake_adapter["items"] = [RawCollection("Refuse", tue + timedelta(weeks=i)) for i in range(4)] + \
+                            [RawCollection("Recycling", tue + timedelta(weeks=i)) for i in range(4)]
+    start = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    prop = db.get(User, start["user_id"]).property
+    asked = set()
+    for week in range(4):
+        pinned_week["n"] = week
+        asked |= {n.house_number for n in verify._neighbours(db, prop)}
+    assert asked == {"10", "14", "16", "Flat 3, 18"}
+
+
+def test_residents_on_the_round_are_asked_first(client, db, fake_adapter, monkeypatch):
+    """A neighbour who signed up is on the round: their calendar is the one worth confirming."""
+    from app.services import verify
+
+    tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
+    fake_adapter["items"] = [RawCollection("Refuse", tue + timedelta(weeks=i)) for i in range(4)]
+    first = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
+    client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000004",
+                                           "house_number": "16"})
+    prop = db.get(User, first["user_id"]).property
+    assert verify._neighbours(db, prop)[0].house_number == "16"

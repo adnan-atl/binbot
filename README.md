@@ -125,6 +125,7 @@ the Meta app is published.
   `confirmed` once a second address on the postcode returns the same dates
   (`app/services/quorum.py`), and `disputed` when the neighbours contradict it. Disputes and
   outvoted neighbours go to `change_log` (`disputed`, `neighbour_differs`) for ops; residents
-  aren't shown them. Splitting a disputed round in two (odd/even sides) isn't automatic yet.
+  aren't shown them. Who gets asked rotates weekly, residents on the round first, so every
+  home confirms the round over a few weeks, not the same two. Splitting a disputed round in two (odd/even sides) isn't automatic yet.
 - Local fixes for broken upstream scrapers live in `app/adapters/overrides.py`.
 - Bank holiday list in `monitor.py` is static; wire it to gov.uk/bank-holidays.json.
