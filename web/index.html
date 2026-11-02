@@ -16,9 +16,17 @@ button{font:inherit}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* Home */
-#home{background:#000000;color:#FFFFFF;height:100vh;height:100svh;min-height:0;overflow:hidden;position:relative}
-.home-head{width:100%;max-width:1200px;margin:0 auto;padding:24px 32px 0;display:flex;align-items:center;justify-content:space-between;gap:16px}
-.badge{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:10px;background:#FFFFFF;color:#000000;text-decoration:none;font-size:22px;font-weight:700;letter-spacing:-0.02em}
+#home{background:#FFFFFF;color:var(--ink);height:100vh;height:100svh;min-height:0;overflow:hidden}
+/* Brow: white strip with the logo and site nav; the black hero is a card under it */
+.brow{flex:none}
+.brow-in{width:100%;max-width:1200px;margin:0 auto;height:64px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.badge{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:10px;background:#000000;color:#FFFFFF;text-decoration:none;font-size:22px;font-weight:700;letter-spacing:-0.02em}
+.brow-nav{display:flex;gap:20px}
+.brow-nav a{color:var(--ink);font-size:17px;font-weight:500;text-decoration:none;white-space:nowrap;border-radius:4px}
+.brow-nav a:hover,.brow-nav a:focus-visible{text-decoration:underline;text-underline-offset:4px}
+.badge:focus-visible,.brow-nav a:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.hero{flex:1;min-height:0;position:relative;overflow:hidden;display:flex;flex-direction:column;background:#000000;color:#FFFFFF;border-radius:28px 28px 0 0}
+@media (min-width:601px){.brow-in{height:76px;padding:0 32px}.brow-nav{gap:28px}.brow-nav a{font-size:19px}.hero{border-radius:36px 36px 0 0}}
 .home-main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:clamp(28px,5vh,56px) 32px 0;display:flex;flex-direction:column;align-items:stretch;min-height:0}
 .home-copy{flex:none;display:flex;flex-direction:column;gap:clamp(16px,2.4vh,24px);max-width:1040px}
 .home-h{margin:0;font-size:clamp(50px,9.4vw,124px);line-height:.96;font-weight:800;letter-spacing:-0.045em}
@@ -73,21 +81,14 @@ button{font:inherit}
 .home-foot a:hover,.home-foot a:focus-visible{text-decoration:underline;text-underline-offset:3px;color:#FFFFFF}
 .home-foot a:focus-visible{outline:2px solid #FFFFFF;outline-offset:3px}
 .foot-links{display:flex;gap:16px}
-/* "A product of ...": top right of the header on phones and tablets, bottom-left corner on wide screens. Only one is ever displayed. */
-.head-parent{color:#B8B8BD;font-size:15px;font-weight:500;line-height:1.4;text-decoration:none;white-space:nowrap;border-radius:4px}
-.head-parent:hover,.head-parent:focus-visible{text-decoration:underline;text-underline-offset:3px;color:#FFFFFF}
-.head-parent:focus-visible{outline:2px solid #FFFFFF;outline-offset:3px}
-.foot-parent{display:none}
 #home .home-cta{bottom:calc(64px + env(safe-area-inset-bottom))}
-@media (max-width:400px){.home-foot{font-size:13px;column-gap:12px}.foot-links{gap:12px}.head-parent{font-size:14px}}
-/* Same side padding as the home header, which is centred at 1200px max */
+@media (max-width:400px){.home-foot{font-size:13px;column-gap:12px}.foot-links{gap:12px}}
+/* Same side padding as the hero content, which is centred at 1200px max */
 @media (min-width:601px){.home-foot{padding-left:max(32px,calc(50% - 568px));padding-right:max(32px,calc(50% - 568px))}}
 @media (min-width:1100px){
 .home-foot{background:none;padding-top:0;padding-bottom:calc(28px + env(safe-area-inset-bottom));font-size:22px;pointer-events:none}
 .home-foot > *{pointer-events:auto}
 .foot-links{flex-direction:column;gap:0;align-items:flex-start}
-.foot-parent{display:block}
-.head-parent{display:none}
 #home .home-cta{bottom:calc(20px + env(safe-area-inset-bottom))}
 }
 
@@ -117,6 +118,21 @@ button{font:inherit}
 .row-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .lbl{font-size:15px;font-weight:600}
 .hint{font-size:14px;color:var(--grey)}
+
+/* About and FAQs */
+.page-main{flex:1;width:100%;max-width:680px;margin:0 auto;padding:48px 24px 80px;display:flex;flex-direction:column;gap:20px}
+.page-main .h1{margin-bottom:8px}
+.page-cta{align-self:flex-start;margin-top:16px;min-height:60px;padding:15px 32px;font-size:18px}
+.faqs{display:flex;flex-direction:column;gap:10px}
+.faq{background:var(--tile);border-radius:20px}
+.faq summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;font-size:18px;font-weight:600;line-height:1.35;border-radius:20px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";flex:none;width:28px;height:28px;border-radius:999px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;line-height:1}
+.faq[open] summary::after{content:"\2212"}
+.faq summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.faq p{margin:0;padding:0 20px 20px;font-size:17px;line-height:1.5;color:var(--grey)}
+.faq a{color:var(--ink);text-underline-offset:3px}
+@media (max-width:600px){.page-main{padding:32px 20px 64px}.faq summary{font-size:17px;padding:16px 18px}.faq p{font-size:16px;padding:0 18px 18px}}
 
 /* Postcode */
 .field{width:100%;font:inherit;font-size:22px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:18px 20px;border-radius:18px;border:0;background:var(--tile);color:var(--ink);outline:none;min-height:64px}
@@ -234,7 +250,7 @@ button{font:inherit}
 .copy{font-size:15px;font-weight:600;border:0;border-radius:999px;padding:10px 16px;min-height:44px;background:var(--ink);color:#FFFFFF;cursor:pointer;flex:none}
 .levelcard{background:var(--tile);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:12px}
 
-@media (max-width:600px){.home-head{padding:20px 20px 0}.home-main{padding:28px 20px 0}.home-p{max-width:none}.home-members{font-size:14px;line-height:20px}.phone-col{margin-top:calc(clamp(48px,11vh,120px) - 26px)}}
+@media (max-width:600px){.home-main{padding:28px 20px 0}.home-p{max-width:none}.home-members{font-size:14px;line-height:20px}.phone-col{margin-top:calc(clamp(48px,11vh,120px) - 26px)}}
 @media (max-width:400px){.home-members{font-size:13px}}  /* keeps the members line on one line at 375px */
 @media (max-width:760px){
 .h1{font-size:36px}.lede{font-size:17px}
@@ -260,7 +276,8 @@ button{font:inherit}
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="home-head"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a><a class="head-parent" href="{{PARENT_URL}}" target="_blank" rel="noopener">A product of {{PARENT_NAME}}</a></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a><nav class="brow-nav" aria-label="Site"><a href="#about">about 💭</a><a href="#faqs">FAQs 🙋</a></nav></div></header>
+<div class="hero">
 <main class="home-main">
 <div class="home-copy">
 <h1 class="home-h">Miss your bin collection dates?</h1>
@@ -299,9 +316,42 @@ button{font:inherit}
 </div>
 </main>
 <footer class="home-foot">
-<div><p>Born in London 🇬🇧</p><p class="foot-parent"><a href="{{PARENT_URL}}" target="_blank" rel="noopener">A product of {{PARENT_NAME}}</a></p></div>
+<a href="{{PARENT_URL}}" target="_blank" rel="noopener">A product of {{PARENT_NAME}}</a>
 <nav class="foot-links" aria-label="Legal"><a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">Privacy</a><a href="{{TERMS_URL}}" target="_blank" rel="noopener">Terms &amp; Conditions</a></nav>
 </footer>
+</div>
+</section>
+
+<!-- About (from the brow). Plain copy: edit it here. -->
+<section class="screen" data-screen="about" hidden>
+<div data-bar></div>
+<main class="page-main">
+<h1 class="h1">About {{BRAND}}</h1>
+<p class="lede">{{BRAND}} is a WhatsApp bot that tells you which bins go out, the day before collection or on the morning.</p>
+<p class="lede">It reads your council's own collection calendar. It keeps checking it for changes, like bank holidays, and messages you if your dates move.</p>
+<p class="lede">{{BRAND}} is made by {{PARENT_NAME}}, the household bills membership. It's free for everyone and included with {{PARENT_NAME}} membership.</p>
+<a class="pill go page-cta" href="#postcode">Add to WhatsApp</a>
+</main>
+</section>
+
+<!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
+<section class="screen" data-screen="faqs" hidden>
+<div data-bar></div>
+<main class="page-main">
+<h1 class="h1">FAQs</h1>
+<div class="faqs">
+<details class="faq"><summary>How does {{BRAND}} know my bin days?</summary><p>It reads your council's own website, using your postcode or address. It checks it again every week, and more often before bank holidays.</p></details>
+<details class="faq"><summary>Does it work for my council?</summary><p>It covers most councils in the UK. If yours isn't covered, you can add your bin days yourself and still get reminders.</p></details>
+<details class="faq"><summary>How much does it cost?</summary><p>Nothing. {{BRAND}} is free for everyone, and included with {{PARENT_NAME}} membership.</p></details>
+<details class="faq"><summary>What if my collection day changes?</summary><p>{{BRAND}} spots changes on your council's calendar, such as bank holiday moves, and messages you with the new date.</p></details>
+<details class="faq"><summary>The days look wrong for my home.</summary><p>Reply WRONG to a reminder, or tap "These aren't my days" when you check your bins. {{BRAND}} then looks up your home on its own.</p></details>
+<details class="faq"><summary>Can I change my reminder time or bins?</summary><p>Yes. You pick your bins and reminder time when you set up, and more options are coming.</p></details>
+<details class="faq"><summary>How do I stop the messages?</summary><p>Reply STOP. Reply START to turn them back on.</p></details>
+<details class="faq"><summary>What do you do with my data?</summary><p>We use your address and WhatsApp number to send your reminders. See our <a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">privacy policy</a>.</p></details>
+<details class="faq"><summary>Who makes {{BRAND}}?</summary><p><a href="{{PARENT_URL}}" target="_blank" rel="noopener">{{PARENT_NAME}}</a>.</p></details>
+</div>
+<a class="pill go page-cta" href="#postcode">Add to WhatsApp</a>
+</main>
 </section>
 
 <!-- 2 · Postcode -->
@@ -487,8 +537,11 @@ Share with your street
 
   // Shared header + progress on each flow step
   document.querySelectorAll('[data-bar]').forEach(function (slot) {
-    var step = +slot.closest('[data-step]').dataset.step;
+    var host = slot.closest('[data-step]');
     slot.appendChild($('#bar-tpl').content.cloneNode(true));
+    // About and FAQs aren't sign-up steps: header with back and logo only.
+    if (!host) { slot.querySelector('.step-of').remove(); slot.querySelector('.progress').remove(); return; }
+    var step = +host.dataset.step;
     slot.querySelector('.step-of').textContent = 'Step ' + step + ' of 6';
     slot.querySelectorAll('.progress .seg').forEach(function (s, i) { if (i < step) s.classList.add('on'); });
   });
@@ -499,7 +552,7 @@ Share with your street
     var id = current;
     var target = document.querySelector('[data-screen="' + id + '"]') ? id : 'home';
     document.querySelectorAll('[data-screen]').forEach(function (s) { s.hidden = s.dataset.screen !== target; });
-    document.body.style.background = target === 'home' ? '#000000' : '#FFFFFF';
+    document.body.style.background = '#FFFFFF';
     window.scrollTo(0, 0);
     clearInterval(timer);
     if (target === 'parsing') runParsing();

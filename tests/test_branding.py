@@ -48,9 +48,10 @@ def test_footer_links_and_parent_name(client, monkeypatch):
     assert 'href="https://alfred.co.uk/privacy" target="_blank" rel="noopener">Privacy<' in page
     assert 'href="https://alfred.co.uk/legal" target="_blank" rel="noopener">Terms &amp; Conditions<' in page
     assert ">A product of Alfred</a>" in page and "Don't tell me about other Alfred services." in page
-    # header copy (phones) and footer copy (wide screens); CSS shows only one
-    assert page.count('class="head-parent"') == 1 and page.count('class="foot-parent"') == 1
+    assert page.count(">A product of Alfred</a>") == 1 and "Born in London" not in page
     assert "Free for everyone. Included with Alfred membership." in page
+    assert 'data-screen="about"' in page and 'data-screen="faqs"' in page
+    assert '<a href="#about">' in page and '<a href="#faqs">' in page
 
     monkeypatch.setenv("PARENT_NAME", "Fred & Co")
     monkeypatch.setenv("PARENT_URL", "https://fred.example/")
@@ -64,9 +65,9 @@ def test_footer_links_and_parent_name(client, monkeypatch):
             monkeypatch.delenv(k)
         get_settings.cache_clear()
     assert page.count('<a href="https://fred.example/" target="_blank" rel="noopener">A product of Fred &amp; Co</a>') == 1
-    assert page.count('href="https://fred.example/" target="_blank" rel="noopener">A product of Fred &amp; Co</a>') == 2
-    assert "Included with Fred &amp; Co membership." in page
-    assert page.count('href="https://fred.example/p?a=1&amp;b=2"') == 2  # footer and consent text
+    assert page.count('href="https://fred.example/"') == 2  # footer and the FAQ "Who makes" answer
+    assert "Included with Fred &amp; Co membership." in page and "made by Fred &amp; Co, the" in page
+    assert page.count('href="https://fred.example/p?a=1&amp;b=2"') == 3  # footer, consent text, FAQ
     assert page.count('href="https://fred.example/t&quot;x"') == 2
     assert "is made by Fred &amp; Co." in page and "{{" not in page
     assert "alfred.co.uk" not in page and "Alfred" not in page
