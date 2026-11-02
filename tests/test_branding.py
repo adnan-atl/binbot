@@ -1,0 +1,43 @@
+"""The product name comes from one setting (BRAND_NAME): page and WhatsApp messages follow it."""
+import pytest
+from sqlalchemy import select
+
+from app.core.config import get_settings
+from app.models import Outbox
+
+
+@pytest.fixture
+def brand(monkeypatch):
+    monkeypatch.setenv("BRAND_NAME", 'Bin & "Co"')
+    get_settings.cache_clear()
+    yield 'Bin & "Co"'
+    monkeypatch.delenv("BRAND_NAME")
+    get_settings.cache_clear()
+
+
+def test_default_brand(client):
+    page = client.get("/").text
+    assert "<title>Binny " in page and "{{" not in page
+
+
+def test_brand_name_setting(client, db, brand):
+    uid = client.post("/api/signup/start", json={"postcode": "e83pb", "uprn": "10000002",
+                                                 "house_number": "12"}).json()["user_id"]
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123"})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    welcome = db.scalar(select(Outbox).where(Outbox.kind == "welcome"))
+    assert welcome.body.startswith(f"{brand} here.")
+    assert brand in client.get(f"/api/users/{uid}/referral").json()["share_text"]
+
+    r = client.get("/")
+    assert r.headers["content-type"].startswith("text/html")
+    page = r.text
+    assert "<title>Bin &amp; &quot;Co&quot; –" in page  # escaped in HTML
+    assert 'var BRAND = "Bin \\u0026 \\"Co\\"";' in page  # a safe JS string literal
+    assert "{{" not in page and "Binny" not in page and "binbot.app" not in page
+    assert client.get("/static/index.html").text == page
+
+
+def test_unknown_number_gets_the_site_not_an_old_domain(client):
+    reply = client.post("/api/inbound", json={"phone": "+447700900999", "text": "hi"}).json()["reply"]
+    assert reply == "Hi! Sign up at localhost:8000 to get bin reminders."

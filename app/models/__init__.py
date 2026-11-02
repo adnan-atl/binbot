@@ -1,5 +1,5 @@
 """
-Binny data model.
+Data model.
 
 Layers, in order of trust:
   1. Council data (Snapshot -> CollectionEvent): the source of truth for dates.
