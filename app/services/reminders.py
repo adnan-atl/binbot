@@ -3,6 +3,7 @@ Layer 3: reminders = council events + user overrides + user preferences.
 Rebuilt from scratch for a user whenever any input changes (idempotent).
 """
 import re
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -22,7 +23,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.providers.messaging import send_message, send_template_message
+from app.providers.messaging import send_reply, send_template_message
 
 _CATEGORY_NAMES = {
     "recycling": "Recycling", "general": "General waste", "food": "Food waste",
@@ -167,7 +168,7 @@ def _handle_hi(db: Session, phone: str, text: str) -> tuple[str, str] | None:
     if not user:
         sender = db.scalar(select(User).where(User.phone_e164 == phone))
         if sender and sender.status == UserStatus.active:
-            return "Your reminders are already on. Send SETTINGS to change them.", "reply"
+            return 'Your reminders are already on. Message "settings" to change them.', "reply"
         return None
     holder = db.scalar(select(User).where(User.phone_e164 == phone, User.id != user.id))
     if holder:  # an older sign-up on this number: the person holding the phone moves over
@@ -218,19 +219,31 @@ def parse_time(raw: str, mode: ReminderMode) -> str | None:
 
 
 def _when(user: User) -> str:
-    return ("the day before each collection" if user.reminder_mode == ReminderMode.night_before
-            else "on the morning of each collection")
+    return ("the day before" if user.reminder_mode == ReminderMode.night_before
+            else "on the morning of collection")
+
+
+@dataclass
+class Reply:
+    """A reply to the resident: text, optionally with reply buttons (id, title) or a list menu
+    (button label + sections of (id, title, description) rows)."""
+    text: str
+    buttons: list = field(default_factory=list)
+    list_button: str = ""
+    sections: list = field(default_factory=list)
+
+
+SETTINGS_BUTTON = ("menu:settings", "Settings")
+# The times offered in the menu: (id, title). Typed TIME 5:45pm still works for anything else.
+DAY_BEFORE_TIMES = [("16:00", "4pm"), ("18:00", "6pm"), ("19:00", "7pm"), ("20:00", "8pm"), ("21:00", "9pm")]
+MORNING_TIMES = [("06:00", "6am"), ("06:30", "6:30am"), ("07:00", "7am")]
 
 
 def _user_bins(db: Session, user: User) -> list[UserBinSetting]:
-    """The resident's bins in a fixed order, so BINS and OFF 2 always mean the same bin."""
+    """The resident's bins in a fixed order."""
     rows = db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id)).all()
     rank = {c: i for i, c in enumerate(_CATEGORY_ORDER)}
     return sorted(rows, key=lambda s: (rank.get(s.category.value, 99), s.label.lower(), s.id))
-
-
-def _bin_list(bins: list[UserBinSetting]) -> str:
-    return "\n".join(f"{i}. {b.label} ({'on' if b.enabled else 'off'})" for i, b in enumerate(bins, 1))
 
 
 def _join(names: list[str]) -> str:
@@ -248,30 +261,76 @@ def _next_reminder(db: Session, user: User, label: str | None = None) -> str:
     return ""
 
 
-_OFF_NOTE = " Reminders are off at the moment. Reply START to turn them back on."
+_OFF_NOTE = " Reminders are paused at the moment. Reply START to turn them back on."
 
 
-def _set_time(db: Session, user: User, mode: ReminderMode, hhmm: str) -> str:
+# ---- menus -------------------------------------------------------------------------------------
+
+def settings_menu(db: Session, user: User) -> Reply:
+    on = [b.label for b in _user_bins(db, user) if b.enabled]
+    paused = user.status != UserStatus.active
+    text = (f"Your reminders: {_when(user)} at {_clock(user.reminder_time)}"
+            + (" (paused)" if paused else "") + ".\n"
+            + f"Bins on: {', '.join(on) if on else 'none'}.\n"
+            + "What would you like to change?")
+    last = ("menu:resume", "Turn reminders on") if paused else ("menu:pause", "Pause reminders")
+    return Reply(text, buttons=[("menu:time", "Reminder time"), ("menu:bins", "My bins"), last])
+
+
+def time_menu(user: User) -> Reply:
+    def rows(times, prefix, mode):
+        return [(f"{prefix}:{hhmm}", title,
+                 "Current" if user.reminder_mode == mode and user.reminder_time == hhmm else "")
+                for hhmm, title in times]
+    return Reply("Pick a time for your reminders.", list_button="Pick a time", sections=[
+        ("Day before", rows(DAY_BEFORE_TIMES, "time", ReminderMode.night_before)),
+        ("Morning of", rows(MORNING_TIMES, "time_m", ReminderMode.morning_of))])
+
+
+def bins_menu(db: Session, user: User) -> Reply:
+    bins = _user_bins(db, user)
+    if not bins:
+        return Reply("You don't have any bins set up yet.", buttons=[SETTINGS_BUTTON])
+    rows = [(f"bin:{b.id}", b.label[:24], "On, tap to turn off" if b.enabled else "Off, tap to turn on")
+            for b in bins[:10]]
+    return Reply("Tap a bin to turn its reminders on or off.", list_button="Your bins",
+                 sections=[("Your bins", rows)])
+
+
+def _set_time(db: Session, user: User, mode: ReminderMode, hhmm: str) -> Reply:
     user.reminder_mode, user.reminder_time = mode, hhmm
     rebuild_reminders(db, user)
     tail = _next_reminder(db, user) if user.status == UserStatus.active else _OFF_NOTE
-    return f"Done. I'll message you {_when(user)} at {_clock(hhmm)}.{tail}"
+    return Reply(f"Done. I'll remind you {_when(user)} at {_clock(hhmm)}.{tail}")
 
 
-def _settings_reply(db: Session, user: User) -> str:
-    when = ("the day before" if user.reminder_mode == ReminderMode.night_before
-            else "the morning of collection")
-    lines = [f"Your {get_settings().brand_name} settings",
-             f"Reminders: {when} at {_clock(user.reminder_time)}"
-             + (" (off, reply START to turn them on)" if user.status != UserStatus.active else "")]
-    bins = _user_bins(db, user)
-    if bins:
-        lines += ["", "Bins:", _bin_list(bins)]
-    lines += ["", "To change them, send:",
-              "TIME 6pm for a new time",
-              "MORNING or DAY BEFORE to switch day",
-              "OFF 2 or ON 2 to turn a bin off or on"]
-    return "\n".join(lines)
+def _set_bin(db: Session, user: User, b: UserBinSetting, on: bool) -> Reply:
+    after = [("menu:bins", "My bins"), ("menu:done", "Done")]
+    if b.enabled == on:
+        return Reply(f"{b.label} is already {'on' if on else 'off'}.", buttons=after)
+    b.enabled = on
+    db.flush()
+    rebuild_reminders(db, user)
+    if on:
+        tail = _next_reminder(db, user, b.label) if user.status == UserStatus.active else _OFF_NOTE
+        return Reply(f"{b.label} is back on.{tail}", buttons=after)
+    if not any(x.enabled for x in _user_bins(db, user)):
+        return Reply(f"{b.label} is off. That was your last bin, so you'll get no reminders until "
+                     "you turn one back on.", buttons=after)
+    return Reply(f"{b.label} is off. I won't remind you about it.", buttons=after)
+
+
+def _pause(db: Session, user: User) -> Reply:
+    user.status = UserStatus.stopped
+    rebuild_reminders(db, user)
+    return Reply("Reminders are off. Reply START or tap Turn reminders on when you want them back.",
+                 buttons=[("menu:resume", "Turn reminders on")])
+
+
+def _resume(db: Session, user: User) -> Reply:
+    user.status = UserStatus.active
+    rebuild_reminders(db, user)
+    return Reply(f"Reminders are back on.{_next_reminder(db, user)}")
 
 
 def _find_bin(bins: list[UserBinSetting], ref: str) -> list[UserBinSetting]:
@@ -288,53 +347,78 @@ def _find_bin(bins: list[UserBinSetting], ref: str) -> list[UserBinSetting]:
     return []
 
 
-def _toggle_bin(db: Session, user: User, on: bool, ref: str) -> str:
-    word = "ON" if on else "OFF"
-    bins = _user_bins(db, user)
-    if not bins:
-        return "You don't have any bins set up yet. Send SETTINGS to see your options."
-    if not ref:
-        return f"Send {word} with a bin number, like {word} 2. Send BINS to see the list."
-    hits = _find_bin(bins, ref)
-    if not hits:
-        return "I couldn't find that bin. Send BINS to see the list."
-    if len(hits) > 1:
-        return f"Which one? Send {word} with its number:\n{_bin_list(bins)}"
-    b = hits[0]
-    n = bins.index(b) + 1
-    if b.enabled == on:
-        return f"{b.label} is already {'on' if on else 'off'}."
-    b.enabled = on
-    db.flush()
-    rebuild_reminders(db, user)
-    if on:
-        tail = _next_reminder(db, user, b.label) if user.status == UserStatus.active else _OFF_NOTE
-        return f"Done. {b.label} is back on.{tail}"
-    if not any(x.enabled for x in bins):
-        return (f"Done. {b.label} is off. That was your last bin, so you'll get no reminders "
-                f"until you turn one on (ON {n}).")
-    return f"Done. {b.label} is off, so I won't remind you about it. Send ON {n} to turn it back on."
+def _tap(db: Session, user: User, tap: str) -> Reply | None:
+    """A tapped button or list row: stable ids, never trusted blindly (bins must be the sender's)."""
+    kind, _, arg = tap.partition(":")
+    if kind == "menu":
+        return {"settings": lambda: settings_menu(db, user), "time": lambda: time_menu(user),
+                "bins": lambda: bins_menu(db, user), "pause": lambda: _pause(db, user),
+                "resume": lambda: _resume(db, user),
+                "done": lambda: Reply("All set.")}.get(arg, lambda: settings_menu(db, user))()
+    if kind in ("time", "time_m"):
+        mode = ReminderMode.night_before if kind == "time" else ReminderMode.morning_of
+        offered = DAY_BEFORE_TIMES if kind == "time" else MORNING_TIMES
+        if arg not in dict(offered):
+            return time_menu(user)
+        return _set_time(db, user, mode, arg)
+    if kind == "bin":
+        b = db.get(UserBinSetting, arg)
+        if b is None or b.user_id != user.id:
+            return bins_menu(db, user)
+        return _set_bin(db, user, b, not b.enabled)
+    return None
 
 
-def _command(db: Session, user: User, text: str) -> str | None:
-    """Settings commands. Returns the reply, or None if the message isn't one of them."""
-    words = text.strip().upper().split()
+_TAP_RE = re.compile(r"^(menu|time|time_m|bin):[A-Za-z0-9:_]+$")
+# "turn off garden", "switch the garden bin off", "no garden", "stop garden", "turn on garden"
+_PHRASE_RES = [
+    (re.compile(r"^(?:turn|switch)\s+(off|on)\s+(?:the\s+|my\s+)?(.+)$", re.IGNORECASE), None),
+    (re.compile(r"^(?:turn|switch)\s+(?:the\s+|my\s+)?(.+?)\s+(off|on)$", re.IGNORECASE), "swap"),
+    (re.compile(r"^(no|stop|off|on)\s+(?:the\s+|my\s+)?(.+)$", re.IGNORECASE), None),
+]
+
+
+def _bin_phrase(db: Session, user: User, text: str) -> Reply | None:
+    t = re.sub(r"[.!?]+$", "", text.strip())
+    for rx, order in _PHRASE_RES:
+        m = rx.match(t)
+        if not m:
+            continue
+        word, ref = (m.group(2), m.group(1)) if order == "swap" else (m.group(1), m.group(2))
+        on = word.lower() == "on"
+        ref = re.sub(r"\s+(bin|bins|caddy|box)$", "", ref.strip(), flags=re.IGNORECASE)
+        bins = _user_bins(db, user)
+        hits = _find_bin(bins, ref) if bins else []
+        if len(hits) == 1:
+            return _set_bin(db, user, hits[0], on)
+        if order is None and rx is _PHRASE_RES[2][0] and not hits:
+            return None  # "no thanks", "stop please": not about a bin (STOP still works)
+        return bins_menu(db, user)
+    return None
+
+
+def _command(db: Session, user: User, text: str) -> Reply | None:
+    """Typed shortcuts and taps. Returns the reply, or None if the message isn't one of them."""
+    t = text.strip()
+    if _TAP_RE.match(t):
+        return _tap(db, user, t)
+    words = t.upper().split()
     if not words:
         return None
     head, rest = words[0], " ".join(words[1:])
-    if head in ("SETTINGS", "MENU", "HELP", "CHANGE"):
-        return _settings_reply(db, user)
-    if head == "BINS":
+    if head in ("SETTINGS", "MENU", "HELP", "CHANGE") and len(words) == 1:
+        return settings_menu(db, user)
+    if head == "BINS" and len(words) == 1:  # hidden alias
+        return bins_menu(db, user)
+    if head in ("OFF", "ON") and rest:  # hidden aliases: OFF 2, ON garden
         bins = _user_bins(db, user)
-        if not bins:
-            return "You don't have any bins set up yet."
-        return f"Your bins:\n{_bin_list(bins)}\nSend OFF 2 or ON 2 to change one."
-    if head in ("OFF", "ON"):
-        return _toggle_bin(db, user, head == "ON", rest)
+        hits = _find_bin(bins, rest)
+        return _set_bin(db, user, hits[0], head == "ON") if len(hits) == 1 else bins_menu(db, user)
     if head == "TIME":
         hhmm = parse_time(rest, user.reminder_mode) if rest else None
         if not hhmm:
-            return "I didn't catch that time. Try TIME 7pm or TIME 18:30."
+            return Reply("I didn't catch that time. Try TIME 7pm or TIME 18:30, or pick one below.",
+                         list_button="Pick a time", sections=time_menu(user).sections)
         return _set_time(db, user, user.reminder_mode, hhmm)
     if head == "MORNING" or head in ("EVENING", "NIGHT") or words[:2] == ["DAY", "BEFORE"]:
         mode = ReminderMode.morning_of if head == "MORNING" else ReminderMode.night_before
@@ -342,50 +426,52 @@ def _command(db: Session, user: User, text: str) -> str | None:
         hhmm = parse_time(arg, mode) if arg else _DEFAULT_TIME[mode]
         if not hhmm:
             example = "MORNING 6:30am" if mode == ReminderMode.morning_of else "DAY BEFORE 7pm"
-            return f"I didn't catch that time. Try {example}."
+            return Reply(f"I didn't catch that time. Try {example}.")
         return _set_time(db, user, mode, hhmm)
-    return None
+    return _bin_phrase(db, user, t)
+
+
+FALLBACK = "Reply DONE, SNOOZE or WRONG to your last reminder, or tap below to change your settings."
 
 
 def handle_inbound(db: Session, phone: str, text: str) -> str:
-    """Replies to a user's message: the sign-up hi ("start my reminders <code>"), DONE / SNOOZE /
-    WRONG / STOP / START, and the settings commands (SETTINGS, TIME, MORNING, DAY BEFORE, BINS,
-    ON, OFF). Returns what we answered."""
+    """Replies to a user's message or tap: the sign-up hi ("start my reminders <code>"), DONE /
+    SNOOZE / WRONG / STOP / START, the settings menus (taps, or "settings"), and typed shortcuts
+    (TIME 4pm, MORNING, DAY BEFORE, "turn off garden"). Returns the reply text."""
     hi = _handle_hi(db, phone, text)
     if hi:
-        send_message(db, phone, hi[0], kind=hi[1])
+        send_reply(db, phone, hi[0], kind=hi[1])
         db.commit()
         return hi[0]
     user = db.scalar(select(User).where(User.phone_e164 == phone))
     if not user:
         site = re.sub(r"^https?://", "", get_settings().public_base_url).rstrip("/")
         return f"Hi! Sign up at {site} to get bin reminders."
-    cmd = text.strip().upper().split()[0] if text.strip() else ""
+    words = text.strip().upper().split()
+    cmd = words[0] if words else ""
     last = db.scalar(
         select(Reminder).where(Reminder.user_id == user.id, Reminder.status == ReminderStatus.sent)
         .order_by(Reminder.sent_at.desc())
     )
-    settings_reply = None if cmd in ("STOP", "START", "DONE", "SNOOZE", "WRONG") else _command(db, user, text)
-    if settings_reply is not None:
-        reply = settings_reply
+    reply = None
+    if cmd not in ("STOP", "START", "DONE", "SNOOZE", "WRONG") or len(words) > 1:
+        reply = _command(db, user, text)
+    if reply is not None:
+        pass
     elif cmd == "STOP":
-        user.status = UserStatus.stopped
-        rebuild_reminders(db, user)
-        reply = "Reminders are off. Reply START to turn them back on."
+        reply = _pause(db, user)
     elif cmd == "START":
-        user.status = UserStatus.active
-        rebuild_reminders(db, user)
-        reply = "Reminders are back on."
+        reply = _resume(db, user)
     elif cmd == "DONE" and last:
         last.status = ReminderStatus.done
         last.reply = "done"
-        reply = "Nice one. I'll be in touch before the next one."
+        reply = Reply("Nice one. I'll be in touch before the next one.")
     elif cmd == "SNOOZE" and last:
         last.status = ReminderStatus.snoozed
         last.reply = "snooze"
         db.add(Reminder(user_id=user.id, collection_date=last.collection_date, bins=last.bins,
                         send_at=datetime.now(ZoneInfo("UTC")) + timedelta(hours=2)))
-        reply = "No problem, I'll nudge you again in 2 hours."
+        reply = Reply("No problem, I'll nudge you again in 2 hours.")
     elif cmd == "WRONG" and last:
         # A vote against the round's calendar: the monitor's dispute job (split.py) asks the
         # council about more homes on the street and splits the round if it's really two.
@@ -395,10 +481,11 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
                              diff={"user_id": user.id,
                                    "collection_date": last.collection_date.isoformat()}))
         # No promise to get back to them: nothing is sent unless their round actually changes.
-        reply = ("Thanks, noted. If your home's days are different, tap \"These aren't my "
-                 f"days\" in {get_settings().brand_name} to set your own.")
+        reply = Reply("Thanks, noted. If your home's days are different, tap \"These aren't my "
+                      f"days\" in {get_settings().brand_name} to set your own.")
     else:
-        reply = "Reply DONE, SNOOZE, WRONG or STOP. Send SETTINGS to change your reminder time or bins."
-    send_message(db, phone, reply, kind="reply")
+        reply = Reply(FALLBACK, buttons=[SETTINGS_BUTTON])
+    send_reply(db, phone, reply.text, kind="reply", buttons=reply.buttons,
+               list_button=reply.list_button, sections=reply.sections)
     db.commit()
-    return reply
+    return reply.text

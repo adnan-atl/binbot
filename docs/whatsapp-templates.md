@@ -53,8 +53,10 @@ position):
 1. `Done`
 2. `Snooze`
 3. `Wrong day`
+4. `Settings`
 
 Taps come back through the webhook and are handled exactly like typing DONE, SNOOZE or WRONG.
+**Settings** opens the settings menu (reminder time, bins, pause), all by tapping.
 
 ---
 
@@ -90,5 +92,5 @@ One message is sent for each bin that moved.
 ## After approval
 
 Nothing to change in the app if you kept the default names. Check that a test reminder arrives
-with the three buttons, and that tapping **Done** marks it done (it shows in the outbox table as a
+with the four buttons, and that tapping **Done** marks it done (it shows in the outbox table as a
 `reply`).

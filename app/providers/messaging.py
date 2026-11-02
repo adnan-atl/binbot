@@ -35,6 +35,13 @@ class StubProvider:
         log.info("[stub whatsapp] -> %s: %s", to_phone, body)
         return SendResult(ok=True, message_id="stub")
 
+    def send_buttons(self, to_phone: str, body: str, buttons: list[tuple[str, str]]) -> SendResult:
+        return self.send(to_phone, readable(body, buttons=buttons))
+
+    def send_list(self, to_phone: str, body: str, button_label: str,
+                  sections: list[tuple[str, list[tuple[str, str, str]]]]) -> SendResult:
+        return self.send(to_phone, readable(body, sections=sections))
+
 
 class MetaProvider:
     name = "meta"
@@ -58,7 +65,7 @@ class MetaProvider:
     def send_template(self, to_phone: str, name: str, lang: str, body_params: list[str],
                       buttons: bool = False) -> SendResult:
         """An approved template ({{1}}, {{2}}... filled from body_params), deliverable any time.
-        With buttons, the template's three quick replies carry DONE / SNOOZE / WRONG payloads."""
+        With buttons, the template's quick replies carry the QUICK_REPLIES payloads, in order."""
         components = [{"type": "body",
                        "parameters": [{"type": "text", "text": p} for p in body_params]}]
         if buttons:
@@ -69,10 +76,44 @@ class MetaProvider:
                            "template": {"name": name, "language": {"code": lang},
                                         "components": components}})
 
+    def send_buttons(self, to_phone: str, body: str, buttons: list[tuple[str, str]]) -> SendResult:
+        """Up to 3 reply buttons (id, title <= 20 chars). Free-form: only inside the 24-hour
+        window, which is open whenever the resident has just messaged or tapped."""
+        return self._post({"to": to_phone.lstrip("+"), "type": "interactive", "interactive": {
+            "type": "button", "body": {"text": body},
+            "action": {"buttons": [{"type": "reply", "reply": {"id": i, "title": t[:20]}}
+                                   for i, t in buttons[:3]]}}})
 
-# Payloads on the reminder template's quick-reply buttons ("Done", "Snooze", "Wrong day"),
-# in button order. Replies come back through the webhook as these words.
-QUICK_REPLIES = ("DONE", "SNOOZE", "WRONG")
+    def send_list(self, to_phone: str, body: str, button_label: str,
+                  sections: list[tuple[str, list[tuple[str, str, str]]]]) -> SendResult:
+        """A list menu: up to 10 rows in all (id, title <= 24, description <= 72)."""
+        out, left = [], 10
+        for title, rows in sections:
+            rows = rows[:left]
+            left -= len(rows)
+            if rows:
+                out.append({"title": title[:24], "rows": [
+                    {"id": i, "title": t[:24], **({"description": d[:72]} if d else {})}
+                    for i, t, d in rows]})
+        return self._post({"to": to_phone.lstrip("+"), "type": "interactive", "interactive": {
+            "type": "list", "body": {"text": body},
+            "action": {"button": button_label[:20], "sections": out}}})
+
+
+# Payloads on the reminder template's quick-reply buttons ("Done", "Snooze", "Wrong day",
+# "Settings"), in button order. Taps come back through the webhook as these words.
+QUICK_REPLIES = ("DONE", "SNOOZE", "WRONG", "menu:settings")
+
+
+def readable(body: str, buttons=(), sections=()) -> str:
+    """What a menu message looks like as plain text: for the outbox, logs and tests."""
+    lines = [body]
+    if buttons:
+        lines.append(" ".join(f"[{t}]" for _, t in buttons))
+    for title, rows in sections:
+        lines.append(f"{title}:")
+        lines += [f"- {t}" + (f" ({d})" if d else "") for _, t, d in rows]
+    return "\n".join(lines)
 
 
 def get_provider() -> MessageProvider:
@@ -107,6 +148,24 @@ def send_template_message(db: Session, to_phone: str, template: str, params: lis
         res = p.send(to_phone, body)
     row = Outbox(to_phone=to_phone, body=body, kind=kind, provider=p.name,
                  provider_message_id=res.message_id, error=res.error)
+    db.add(row)
+    db.flush()
+    return row
+
+
+def send_reply(db: Session, to_phone: str, text: str, kind: str, buttons=(), list_button: str = "",
+               sections=()) -> Outbox:
+    """Send a reply that may carry tap options: a list menu, reply buttons, or plain text.
+    The outbox records the readable version (body plus options)."""
+    p = get_provider()
+    if sections:
+        res = p.send_list(to_phone, text, list_button, list(sections))
+    elif buttons:
+        res = p.send_buttons(to_phone, text, list(buttons))
+    else:
+        res = p.send(to_phone, text)
+    row = Outbox(to_phone=to_phone, body=readable(text, buttons, sections), kind=kind,
+                 provider=p.name, provider_message_id=res.message_id, error=res.error)
     db.add(row)
     db.flush()
     return row

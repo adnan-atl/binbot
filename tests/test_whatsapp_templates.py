@@ -67,6 +67,8 @@ def test_reminder_goes_out_as_a_template_with_quick_replies(client, db, sent):
                  "parameters": [{"type": "payload", "payload": "SNOOZE"}]},
                 {"type": "button", "sub_type": "quick_reply", "index": "2",
                  "parameters": [{"type": "payload", "payload": "WRONG"}]},
+                {"type": "button", "sub_type": "quick_reply", "index": "3",
+                 "parameters": [{"type": "payload", "payload": "menu:settings"}]},
             ]}}
     # The outbox still records the readable text
     row = db.scalar(select(Outbox).where(Outbox.kind == "reminder"))

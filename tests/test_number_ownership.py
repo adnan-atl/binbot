@@ -66,7 +66,7 @@ def test_hi_from_the_typed_number_starts_reminders_and_sends_the_welcome(client,
     assert welcome.to_phone == "+447700900123" and welcome.body == reply
     # A second tap just says it's already on
     assert _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}") == \
-        "Your reminders are already on. Send SETTINGS to change them."
+        'Your reminders are already on. Message "settings" to change them.'
 
 
 def test_code_is_case_insensitive_and_wording_tolerant(client, db, live):

@@ -53,8 +53,9 @@ async def meta(req: Request, db: Session = Depends(get_db)):
 
 
 def message_text(m: dict) -> str | None:
-    """What the resident said: typed text, or the quick-reply button they tapped on a reminder
-    template ("Done", "Snooze", "Wrong day", sent back with our DONE / SNOOZE / WRONG payload)."""
+    """What the resident said: typed text, a quick-reply tap on a reminder template (our DONE /
+    SNOOZE / WRONG / menu:settings payload), or a tap on a menu button or list row (its id, like
+    "menu:time" or "bin:<id>"; reminders.handle_inbound routes those)."""
     kind = m.get("type")
     if kind == "text":
         return m.get("text", {}).get("body")
@@ -62,6 +63,7 @@ def message_text(m: dict) -> str | None:
         b = m.get("button", {})
         return b.get("payload") or b.get("text")
     if kind == "interactive":
-        reply = m.get("interactive", {}).get("button_reply", {})
+        i = m.get("interactive", {})
+        reply = i.get("button_reply") or i.get("list_reply") or {}
         return reply.get("id") or reply.get("title")
     return None
