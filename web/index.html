@@ -30,17 +30,20 @@ button{font:inherit}
 @media (min-width:601px){.brow-in{height:76px;padding:0 32px}.brow-nav{gap:28px}.brow-nav a{font-size:19px}.hero{border-radius:36px 36px 0 0}}
 .home-main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:clamp(28px,5vh,56px) 32px 0;display:flex;flex-direction:column;align-items:stretch;min-height:0}
 .home-copy{flex:none;display:flex;flex-direction:column;gap:clamp(16px,2.4vh,24px);max-width:1040px}
-.home-h{margin:0;font-size:clamp(50px,9.4vw,124px);line-height:.96;font-weight:800;letter-spacing:-0.045em}
+/* About 40px at 375, 64px at 768, 92px at 1280, never above 100px: the headline leads, the mockup supports it */
+.home-h{margin:0;font-size:clamp(38px,calc(5.75vw + 18.5px),100px);line-height:.96;font-weight:800;letter-spacing:-0.045em;text-wrap:balance}
 .home-p{margin:0;max-width:640px;font-size:clamp(19px,2.1vw,26px);line-height:1.35;font-weight:500;color:#9A9A9E}
 .home-p svg{vertical-align:-3px}
-.phone-col{display:flex;justify-content:center;flex:none;margin-top:clamp(48px,11vh,120px)}
+/* A touch more air above the mockup now the headline is smaller, so less of the phone shows */
+.phone-col{display:flex;justify-content:center;flex:none;margin-top:clamp(64px,13vh,136px)}
 .home-cta{position:fixed;left:50%;transform:translateX(-50%);width:min(520px,calc(100% - 32px));bottom:calc(20px + env(safe-area-inset-bottom));margin:0 !important;z-index:10}
 .home-cta .cta{width:100%;min-height:68px;border-radius:999px;font-size:21px;color:#0B0B0B;box-shadow:0 12px 34px rgba(0,0,0,.5)}
 .cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 32px;border-radius:14px;text-decoration:none;font-size:19px;font-weight:600;color:#FFFFFF;background:var(--green);transition:filter .15s ease}
 .cta:hover{filter:brightness(1.06)}
-.phone-outline{position:relative;width:320px;height:650px;border-radius:52px;border:2.5px solid #E5E5EA;background:#000000;flex:none;box-shadow:0 0 0 7px #121214,0 -10px 80px rgba(255,255,255,.07)}
-.phone-outline i{position:absolute;display:block;border-radius:2px;background:#E5E5EA;width:3px}
-.island{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:96px;height:28px;border-radius:999px;background:#1C1C1E;z-index:5}
+/* Quiet frame and island so the mockup doesn't compete with the headline */
+.phone-outline{position:relative;width:320px;height:650px;border-radius:52px;border:1.5px solid #3A3A3C;background:#000000;flex:none;box-shadow:0 0 0 7px #121214,0 -10px 80px rgba(255,255,255,.035)}
+.phone-outline i{position:absolute;display:block;border-radius:2px;background:#3A3A3C;width:3px}
+.island{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:72px;height:22px;border-radius:999px;background:#000000;z-index:5}
 .pscreen{position:absolute;inset:8px;border-radius:42px;overflow:hidden;background:#0D0D0F;color:#FFFFFF}
 .layer{position:absolute;inset:0;transition:opacity .5s ease}
 .lock{display:flex;flex-direction:column;align-items:center;padding-top:58px}
