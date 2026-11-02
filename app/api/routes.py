@@ -309,10 +309,12 @@ def _welcome(db: Session, user: User) -> str:
     (and, on WhatsApp, it opens the 24-hour window for free-form replies)."""
     first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
                       .order_by(Reminder.send_at))
-    when = "the night before" if user.reminder_mode == ReminderMode.night_before else "on the morning"
+    # "night_before" is the day before at any time the resident picks (4pm is an option).
+    when = ("the day before each collection" if user.reminder_mode == ReminderMode.night_before
+            else "on the morning of each collection")
     hh, mm = (int(x) for x in user.reminder_time.split(":"))
     clock = f"{hh % 12 or 12}{f':{mm:02d}' if mm else ''}{'pm' if hh >= 12 else 'am'}"
-    msg = f"BinBot here. You're set up: I'll message you {when} of each collection, at {clock}."
+    msg = f"BinBot here. You're set up: I'll message you {when}, at {clock}."
     if first:
         names = [b["label"] for b in first.bins]
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
@@ -352,7 +354,7 @@ def get_referral(user_id: str, db: Session = Depends(get_db)):
 
 @router.post("/inbound")
 def inbound(body: S.InboundIn, db: Session = Depends(get_db)):
-    """Generic inbound. Twilio/Meta webhooks map into this shape in app/api/webhooks.py."""
+    """Generic inbound. The Meta webhook maps into this shape in app/api/webhooks.py."""
     return {"reply": handle_inbound(db, _e164(body.phone), body.text)}
 
 
