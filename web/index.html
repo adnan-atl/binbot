@@ -347,13 +347,24 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .editcard{padding:18px 16px 18px}
 .stack-sm .pill{width:100%}
 }
+/* Silly lander layout: rounder card corners, About centred in the brow, more breathing room for the headline */
+.brow-in{position:relative}
+.brow-nav a:first-child{position:absolute;left:50%;transform:translateX(-50%)}
+.hero,.page-card{border-radius:48px 48px 0 0}
+.home-main{padding:clamp(40px,7vh,80px) 28px 0}
+.home-copy{gap:clamp(18px,2.8vh,28px)}
+@media (min-width:601px){.hero,.page-card{border-radius:72px 72px 0 0}.home-main{padding:clamp(56px,9vh,104px) 64px 0}}
+/* Logo, headline and footer share one inset so the edges line up */
+.brow-in{padding:0 28px}
+.home-foot{padding-left:28px;padding-right:28px}
+@media (min-width:601px){.brow-in{padding:0 64px}.home-foot{padding-left:max(64px,calc(50% - 536px));padding-right:max(64px,calc(50% - 536px))}}
 </style>
 </head>
 <body>
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">about</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="hero">
 <main class="home-main">
 <div class="home-copy">
@@ -403,7 +414,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 
 <!-- About (from the brow). Plain copy: edit it here. -->
 <section class="screen" data-screen="about" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">about</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
@@ -417,7 +428,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 
 <!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
 <section class="screen" data-screen="faqs" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">about</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">FAQs</h1>
