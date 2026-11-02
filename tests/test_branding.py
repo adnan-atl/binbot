@@ -74,3 +74,12 @@ def test_footer_links_and_parent_name(client, monkeypatch):
     assert page.count('href="https://fred.example/t&quot;x"') == 2
     assert "is made by Fred &amp; Co." in page and "{{" not in page
     assert "alfred.co.uk" not in page and "Alfred" not in page
+
+
+def test_faqs_keep_details_semantics_and_animate(client):
+    page = client.get("/").text
+    # Every question is still a <details>/<summary>, with the answer in the animated wrapper
+    assert page.count('<details class="faq"><summary>') == 9
+    assert page.count('<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>') == 9
+    # Page changes use View Transitions where supported, and reduced motion is respected
+    assert "document.startViewTransition" in page and "prefers-reduced-motion: reduce" in page
