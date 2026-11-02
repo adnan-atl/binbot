@@ -49,7 +49,7 @@ def test_footer_links_and_parent_name(client, monkeypatch):
     assert 'href="https://alfred.co.uk/legal" target="_blank" rel="noopener">Terms &amp; Conditions<' in page
     assert ">A product of Alfred</a>" in page and "Don't tell me about other Alfred services." in page
     assert page.count(">A product of Alfred</a>") == 1 and "Born in London" not in page
-    assert "Free for everyone. Included with Alfred membership." in page
+    assert "home-members" not in page and "Free for everyone. Included" not in page
     assert 'data-screen="about"' in page and 'data-screen="faqs"' in page
     assert '<a href="#about">' in page and '<a href="#faqs">' in page
 
@@ -66,7 +66,7 @@ def test_footer_links_and_parent_name(client, monkeypatch):
         get_settings.cache_clear()
     assert page.count('<a href="https://fred.example/" target="_blank" rel="noopener">A product of Fred &amp; Co</a>') == 1
     assert page.count('href="https://fred.example/"') == 2  # footer and the FAQ "Who makes" answer
-    assert "Included with Fred &amp; Co membership." in page and "made by Fred &amp; Co, the" in page
+    assert "included with Fred &amp; Co membership." in page and "made by Fred &amp; Co, the" in page
     assert page.count('href="https://fred.example/p?a=1&amp;b=2"') == 3  # footer, consent text, FAQ
     assert page.count('href="https://fred.example/t&quot;x"') == 2
     assert "is made by Fred &amp; Co." in page and "{{" not in page
