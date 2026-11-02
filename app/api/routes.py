@@ -227,17 +227,21 @@ def _bins_out(db: Session, user: User) -> list[S.BinOut]:
             rule = describe_rule(dates)
             rule["days"] = s.override_rule.get("days", rule["days"])
             rule["frequency"] = s.override_rule.get("frequency", rule["frequency"])
+            upcoming = [d.isoformat() for d in dates[:4]]
             colour, manual = None, True
         elif s.bin_type_id in council_bins:
             cb = council_bins[s.bin_type_id]
             rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"],
                     "purpose": cb["purpose"], "frequency_source": cb.get("frequency_source", "")}
+            # The round's real dates (bank holiday moves included), as schedule_for has them
+            upcoming = cb["dates"][:4]
             colour, manual = cb["colour"], False
         else:
             rule, colour, manual = {"days": [], "frequency": "irregular", "next": None}, None, True
+            upcoming = []
         out.append(S.BinOut(setting_id=s.id, bin_type_id=s.bin_type_id, label=s.label,
                             category=s.category.value, colour=colour, enabled=s.enabled,
-                            manual=manual, **rule))
+                            manual=manual, upcoming=upcoming, **rule))
     return out
 
 
