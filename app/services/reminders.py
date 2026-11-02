@@ -144,7 +144,11 @@ def welcome_message(db: Session, user: User) -> str:
         names = [b["label"] for b in first.bins]
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
         msg += f"\nFirst up: {bins} on {first.collection_date.strftime('%a %-d %b')}."
-    return msg + "\nReply STOP any time to turn reminders off."
+    msg += "\nReply STOP any time to turn reminders off."
+    # Invite link, same format as the referral API: people forward it to neighbours.
+    link = f"{get_settings().public_base_url}/?ref={user.referral_code}"
+    msg += f"\n\nKnow a neighbour who forgets bin day? Send them your link: {link}"
+    return msg[:4096]  # WhatsApp's text limit; the welcome is far shorter in practice
 
 
 def start_link(code: str) -> str:

@@ -120,3 +120,11 @@ def test_page_has_the_say_hi_step(client):
     page = client.get("/").text
     assert 'data-screen="hi"' in page and "Last step:<br>say hi to Binny" in page
     assert 'id="hi-go"' in page and "Say hi on WhatsApp" in page
+
+
+def test_welcome_ends_with_the_invite_link(client, db, live):
+    uid, res = _turn_on(client)
+    reply = _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}")
+    ref = client.get(f"/api/users/{uid}/referral").json()
+    assert reply.endswith(f"\n\nKnow a neighbour who forgets bin day? Send them your link: {ref['link']}")
+    assert len(reply) <= 4096
