@@ -37,6 +37,8 @@ class BinOut(BaseModel):
     frequency: str
     frequency_source: str = ""  # calendar | policy | unknown | "" (resident's own rule)
     next: str | None
+    # The next few actual collection dates (ISO), so rotating bins can show which week is which
+    upcoming: list[str] = Field(default_factory=list)
     enabled: bool = True
     manual: bool = False
 

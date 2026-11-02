@@ -1,0 +1,10 @@
+# Keep secrets and local clutter out of the image
+.env
+deploy/.env.production
+.git
+.venv
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.db

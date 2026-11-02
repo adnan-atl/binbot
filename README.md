@@ -1,6 +1,6 @@
-# BinBot
+# Binny
 
-Bin collection reminders on WhatsApp. Enter a postcode, BinBot finds your council's
+Bin collection reminders on WhatsApp. Enter a postcode, Binny finds your council's
 collection calendar, you confirm the bins, and it messages you the night before.
 
 ## Run it
@@ -11,6 +11,10 @@ docker compose up --build     # API on http://localhost:8000, worker alongside
 ```
 
 Open http://localhost:8000 for the sign-up flow, http://localhost:8000/docs for the API.
+
+**Branding:** the product name lives in one setting. Set `BRAND_NAME` in `.env`, then
+`docker compose up -d --force-recreate api worker` (no rebuild; it's read at startup).
+If you've changed Python files too, add `--build`.
 
 Councils that need a real browser (~86 of 345) use the `selenium` service, which starts with everything else.
 
@@ -104,7 +108,7 @@ POST /api/users/{id}/phone              WhatsApp number + consent
 POST /api/users/{id}/reminders          mode + time; turns reminders on
 GET  /api/users/{id}/schedule
 GET  /api/users/{id}/referral           code, link, level
-POST /api/inbound                       DONE / SNOOZE / STOP (WhatsApp webhook: /webhooks/meta)
+POST /api/inbound                       DONE / SNOOZE / WRONG / STOP (WhatsApp webhook: /webhooks/meta)
 GET  /api/health                        adapter coverage
 ```
 
@@ -128,7 +132,8 @@ the Meta app is published.
   (`app/services/quorum.py`), and `disputed` when the neighbours contradict it. Disputes and
   outvoted neighbours go to `change_log` (`disputed`, `neighbour_differs`) for ops; residents
   aren't shown them. Who gets asked rotates weekly, residents on the round first, so every
-  home confirms the round over a few weeks, not the same two. A daily job probes disputed
+  home confirms the round over a few weeks, not the same two. Residents vote too: "These aren't my days" (when the
+  council backs them up) and a WRONG reply to a reminder. A daily job probes disputed
   rounds (`app/services/split.py`): when exactly two calendars show up, each backed by two
   or more homes, and parity or one cut along the street explains them, the postcode is split
   (`round_splits`), residents on the other side are moved and told, and new sign-ups land
