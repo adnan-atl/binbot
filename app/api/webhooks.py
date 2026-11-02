@@ -1,4 +1,8 @@
 """The WhatsApp Cloud API webhook, normalised into handle_inbound()."""
+import hashlib
+import hmac
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 
@@ -22,9 +26,23 @@ def meta_verify(req: Request):
     raise HTTPException(403, "verify token mismatch")
 
 
+def signature_ok(raw: bytes, header: str | None, secret: str) -> bool:
+    """Meta signs each POST: X-Hub-Signature-256: sha256=<HMAC-SHA256 of the raw body, keyed
+    with the app secret>."""
+    expected = "sha256=" + hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
+    return bool(header) and hmac.compare_digest(expected, header)
+
+
 @router.post("/meta")
 async def meta(req: Request, db: Session = Depends(get_db)):
-    payload = await req.json()
+    raw = await req.body()
+    secret = get_settings().meta_app_secret
+    if secret and not signature_ok(raw, req.headers.get("X-Hub-Signature-256"), secret):
+        raise HTTPException(403, "bad signature")
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        raise HTTPException(400, "body is not JSON")
     for entry in payload.get("entry", []):
         for ch in entry.get("changes", []):
             for m in ch.get("value", {}).get("messages", []):

@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     meta_token: str = ""
     meta_phone_number_id: str = ""
     meta_verify_token: str = ""  # any string you choose; paste the same one in Meta's webhook settings
+    # App secret (Meta app dashboard -> App settings -> Basic). Every webhook POST is checked
+    # against it (X-Hub-Signature-256). Empty skips the check: local testing only.
+    meta_app_secret: str = ""
     # Approved message templates, for messages sent outside WhatsApp's 24-hour reply window
     # (reminders, date changes). Empty = send free text instead (fine for stub and testing).
     meta_reminder_template: str = "bin_reminder"
