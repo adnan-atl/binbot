@@ -24,7 +24,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.providers.messaging import send_reply, send_template_message
+from app.providers.messaging import send_reply, send_template_batch
 
 _CATEGORY_NAMES = {
     "recycling": "Recycling", "general": "General waste", "food": "Food waste",
@@ -102,23 +102,29 @@ def render_reminder(user: User, r: Reminder) -> str:
 
 
 def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
-    """Send every reminder whose time has come. Run every minute by the worker."""
+    """Send every reminder whose time has come. Run every minute by the worker. The sends go out
+    in parallel (send_template_batch), so a few thousand people on the same time all get theirs
+    within a minute or two."""
     now_utc = now_utc or datetime.now(ZoneInfo("UTC"))
     due = db.scalars(
         select(Reminder).where(Reminder.status == ReminderStatus.scheduled,
                                Reminder.send_at <= now_utc)
     ).all()
-    sent = 0
+    batch, jobs = [], []
     for r in due:
         user = db.get(User, r.user_id)
         if user.status != UserStatus.active:
             r.status = ReminderStatus.cancelled
             continue
         when = "tomorrow" if user.reminder_mode == ReminderMode.night_before else "today"
-        row = send_template_message(
-            db, user.phone_e164, get_settings().meta_reminder_template,
-            [_join([b["label"] for b in r.bins]), when, r.collection_date.strftime("%a %-d %b")],
-            render_reminder(user, r), kind="reminder", buttons=True)
+        batch.append(r)
+        jobs.append((user.phone_e164,
+                     [_join([b["label"] for b in r.bins]), when, r.collection_date.strftime("%a %-d %b")],
+                     render_reminder(user, r)))
+    rows = send_template_batch(db, get_settings().meta_reminder_template, jobs,
+                               kind="reminder", buttons=True)
+    sent = 0
+    for r, row in zip(batch, rows):
         if row.error:
             r.status = ReminderStatus.failed
         else:

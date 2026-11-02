@@ -6,6 +6,7 @@ Outbound WhatsApp. One interface, two providers:
            (docs/whatsapp-templates.md).
 """
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Protocol
 
 import httpx
@@ -138,20 +139,50 @@ def uses_template(template: str) -> bool:
     return bool(template) and hasattr(get_provider(), "send_template")
 
 
-def send_template_message(db: Session, to_phone: str, template: str, params: list[str],
-                          body: str, kind: str, buttons: bool = False) -> Outbox:
-    """Send an approved template when one is configured and the provider supports templates;
-    otherwise send `body` as free text. `body` is what's recorded in the outbox either way."""
-    p = get_provider()
-    if uses_template(template):
-        res = p.send_template(to_phone, template, get_settings().meta_template_lang, params, buttons)
-    else:
-        res = p.send(to_phone, body)
+def _deliver_template(p, to_phone: str, template: str, params: list[str], body: str,
+                      buttons: bool) -> SendResult:
+    """The network part only (no database), so it can run on a worker thread."""
+    try:
+        if uses_template(template):
+            return p.send_template(to_phone, template, get_settings().meta_template_lang, params, buttons)
+        return p.send(to_phone, body)
+    except Exception as e:  # a timeout or dropped connection fails this message, not the batch
+        log.warning("send to %s failed: %s", to_phone[-4:], e)
+        return SendResult(ok=False, error=str(e)[:300])
+
+
+def _record(db: Session, p, to_phone: str, body: str, kind: str, res: SendResult) -> Outbox:
     row = Outbox(to_phone=to_phone, body=body, kind=kind, provider=p.name,
                  provider_message_id=res.message_id, error=res.error)
     db.add(row)
     db.flush()
     return row
+
+
+def send_template_message(db: Session, to_phone: str, template: str, params: list[str],
+                          body: str, kind: str, buttons: bool = False) -> Outbox:
+    """Send an approved template when one is configured and the provider supports templates;
+    otherwise send `body` as free text. `body` is what's recorded in the outbox either way."""
+    p = get_provider()
+    return _record(db, p, to_phone, body, kind, _deliver_template(p, to_phone, template, params,
+                                                                   body, buttons))
+
+
+# Messages sent at once by send_template_batch. Each send is a ~0.2s HTTP call, so 10 at once is
+# about 50 a second (3,000 a minute), under Meta's default limit of 80 a second per number.
+SEND_CONCURRENCY = 10
+
+
+def send_template_batch(db: Session, template: str, jobs: list[tuple[str, list[str], str]],
+                        kind: str, buttons: bool = False) -> list[Outbox]:
+    """send_template_message for many people at once: jobs are (phone, params, body). The HTTP
+    calls run SEND_CONCURRENCY at a time; the outbox rows are written here, on the caller's
+    thread, in the same order as jobs."""
+    p = get_provider()
+    with ThreadPoolExecutor(max_workers=SEND_CONCURRENCY) as pool:
+        results = list(pool.map(lambda j: _deliver_template(p, j[0], template, j[1], j[2], buttons),
+                                jobs))
+    return [_record(db, p, phone, body, kind, res) for (phone, _, body), res in zip(jobs, results)]
 
 
 def send_reply(db: Session, to_phone: str, text: str, kind: str, buttons=(), list_button: str = "",
