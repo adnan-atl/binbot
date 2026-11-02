@@ -1,7 +1,7 @@
 [project]
 name = "binbot"
 version = "0.1.0"
-description = "BinBot: UK bin collection reminders on WhatsApp"
+description = "Binny: UK bin collection reminders on WhatsApp"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",

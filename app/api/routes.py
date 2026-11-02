@@ -330,7 +330,7 @@ def set_prefs(user_id: str, body: S.PrefsIn, db: Session = Depends(get_db)):
 
 
 def _welcome(db: Session, user: User) -> str:
-    """First message, sent the moment reminders go on, so the resident sees BinBot works
+    """First message, sent the moment reminders go on, so the resident sees Binny works
     (and, on WhatsApp, it opens the 24-hour window for free-form replies)."""
     first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
                       .order_by(Reminder.send_at))
@@ -339,7 +339,7 @@ def _welcome(db: Session, user: User) -> str:
             else "on the morning of each collection")
     hh, mm = (int(x) for x in user.reminder_time.split(":"))
     clock = f"{hh % 12 or 12}{f':{mm:02d}' if mm else ''}{'pm' if hh >= 12 else 'am'}"
-    msg = f"BinBot here. You're set up: I'll message you {when}, at {clock}."
+    msg = f"Binny here. You're set up: I'll message you {when}, at {clock}."
     if first:
         names = [b["label"] for b in first.bins]
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
@@ -370,7 +370,7 @@ def get_referral(user_id: str, db: Session = Depends(get_db)):
     return S.ReferralOut(
         code=user.referral_code, link=link, referrals=count, level=level, level_name=name,
         next_at=nxt,
-        share_text=f"I use BinBot for bin day reminders on WhatsApp. Sign up with your postcode: {link}",
+        share_text=f"I use Binny for bin day reminders on WhatsApp. Sign up with your postcode: {link}",
     )
 
 

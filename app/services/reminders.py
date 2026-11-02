@@ -160,7 +160,7 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
                                    "collection_date": last.collection_date.isoformat()}))
         # No promise to get back to them: nothing is sent unless their round actually changes.
         reply = ("Thanks, noted. If your home's days are different, tap \"These aren't my "
-                 "days\" in BinBot to set your own.")
+                 "days\" in Binny to set your own.")
     else:
         reply = "Reply DONE, SNOOZE, WRONG or STOP."
     send_message(db, phone, reply, kind="reply")

@@ -1,6 +1,6 @@
-# BinBot
+# Binny
 
-Bin collection reminders on WhatsApp. Enter a postcode, BinBot finds your council's
+Bin collection reminders on WhatsApp. Enter a postcode, Binny finds your council's
 collection calendar, you confirm the bins, and it messages you the night before.
 
 ## Run it

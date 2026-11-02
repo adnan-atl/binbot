@@ -11,7 +11,7 @@ from app.api.webhooks import router as webhook_router
 
 logging.basicConfig(level=logging.INFO)
 
-app = FastAPI(title="BinBot", version="0.1.0")
+app = FastAPI(title="Binny", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(api_router)
 app.include_router(webhook_router)

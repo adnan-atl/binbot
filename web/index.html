@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>BinBot – bin day reminders on WhatsApp</title>
+<title>Binny – bin day reminders on WhatsApp</title>
 <style>
 :root{--ink:#1A1A1A;--grey:#6E6E73;--soft:#8A8A8E;--tile:#F4F4F5;--line:#E5E5EA;--green:#45C654}
 *{box-sizing:border-box}
@@ -233,7 +233,7 @@ button{font:inherit}
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="home-head"><a class="badge" href="#home" aria-label="BinBot home">BinBot</a></header>
+<header class="home-head"><a class="badge" href="#home" aria-label="Binny home">Binny</a></header>
 <main class="home-main">
 <div class="home-copy">
 <h1 class="home-h">Miss your bin collection dates?</h1>
@@ -249,11 +249,11 @@ button{font:inherit}
 <div class="lock-date">Monday 2 November</div>
 <div class="notif">
 <div class="notif-ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"></path></svg></div>
-<div style="flex:1;min-width:0"><div class="notif-top"><span>WhatsApp</span><span>now</span></div><b>BinBot</b><p>Recycling goes out tomorrow. Blue bin, kerbside by 7am.</p></div>
+<div style="flex:1;min-width:0"><div class="notif-top"><span>WhatsApp</span><span>now</span></div><b>Binny</b><p>Recycling goes out tomorrow. Blue bin, kerbside by 7am.</p></div>
 </div>
 </div>
 <div class="layer chat">
-<div class="chat-top"><div class="chat-av"><svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle></svg></div><div><div style="font-size:15px;font-weight:700">BinBot</div><div style="font-size:11px;color:#8E8E93">online</div></div></div>
+<div class="chat-top"><div class="chat-av"><svg viewBox="0 0 40 40" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle></svg></div><div><div style="font-size:15px;font-weight:700">Binny</div><div style="font-size:11px;color:#8E8E93">online</div></div></div>
 <div class="chat-body">
 <div class="bub in">Evening! Recycling goes out tomorrow, Tue 3 Nov.<br>Blue bin, kerbside by 7am.<small>19:00</small></div>
 <div class="qr"><span>Done, it's out</span><span>Remind me at 9pm</span></div>
@@ -278,7 +278,7 @@ button{font:inherit}
 <main class="flow-main">
 <div class="col">
 <h1 class="h1">What's your postcode?</h1>
-<p class="lede">BinBot looks up your council and your road. You'll check the dates next, then choose where reminders go.</p>
+<p class="lede">Binny looks up your council and your road. You'll check the dates next, then choose where reminders go.</p>
 <div id="pc-form" style="display:flex;flex-direction:column;gap:24px">
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="pc" class="lbl">Postcode</label>
@@ -305,7 +305,7 @@ button{font:inherit}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">BinBot's on it<br><span id="p-title">Reading your council's calendar</span></h1>
+<h1 class="h1">Binny's on it<br><span id="p-title">Reading your council's calendar</span></h1>
 <div id="psteps" aria-live="polite"></div>
 <div class="row-actions">
 <a class="pill solid" id="p-next" href="#confirm">See my dates</a>
@@ -337,7 +337,7 @@ button{font:inherit}
 <div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
 <button type="button" class="pill solid" id="c-save" style="width:100%">Save changes</button>
 <button type="button" class="ghost" id="c-own" hidden>These aren't my days. Look up my address</button>
-<span class="hint" style="text-align:center">Or tell BinBot in the chat, in your own words.</span>
+<span class="hint" style="text-align:center">Or tell Binny in the chat, in your own words.</span>
 </div>
 </div>
 </main>
@@ -348,8 +348,8 @@ button{font:inherit}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">Where should BinBot<br>message you?</h1>
-<p class="lede">Your WhatsApp number. BinBot only uses it to send your bin reminders.</p>
+<h1 class="h1">Where should Binny<br>message you?</h1>
+<p class="lede">Your WhatsApp number. Binny only uses it to send your bin reminders.</p>
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="tel" class="lbl">WhatsApp number</label>
 <div style="display:flex;gap:8px">
@@ -357,7 +357,7 @@ button{font:inherit}
 <input id="tel" class="field" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="7700 900123" value="7700 900123" aria-describedby="tel-err tel-hint" style="text-transform:none;letter-spacing:0.02em">
 </div>
 <span id="tel-err" class="error" hidden>Enter a UK mobile number, like 7700 900123.</span>
-<span id="tel-hint" class="hint">BinBot is made by Alfred. By continuing, you agree to Alfred's terms and privacy policy, and to get bin reminders and BinBot updates on WhatsApp. Alfred may also tell you about its other home admin services. Reply STOP any time.</span>
+<span id="tel-hint" class="hint">Binny is made by Alfred. By continuing, you agree to Alfred's terms and privacy policy, and to get bin reminders and Binny updates on WhatsApp. Alfred may also tell you about its other home admin services. Reply STOP any time.</span>
 </div>
 <label style="display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--grey);cursor:pointer">
 <input id="no-offers" type="checkbox" style="width:22px;height:22px;margin:0;accent-color:var(--ink);flex:none">
@@ -373,7 +373,7 @@ button{font:inherit}
 <div data-bar></div>
 <main class="flow-main" style="padding-top:56px">
 <div class="col" style="gap:44px">
-<h1 class="h1">When should<br>BinBot nudge you?</h1>
+<h1 class="h1">When should<br>Binny nudge you?</h1>
 <div style="display:flex;flex-direction:column;gap:10px">
 <span class="lbl" id="when-l">Day</span>
 <div role="group" aria-labelledby="when-l" id="whens" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px"></div>
@@ -437,9 +437,9 @@ Share with your street
 <header class="bar">
 <div style="display:flex;align-items:center;gap:6px">
 <button type="button" class="back" data-back aria-label="Back"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
-<a class="logo" href="#home" aria-label="BinBot home">
+<a class="logo" href="#home" aria-label="Binny home">
 <span class="logo-mark"><svg viewBox="0 0 40 40" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><path d="M17 26c1.8 1.4 4.2 1.4 6 0"></path></svg></span>
-<b>BinBot</b>
+<b>Binny</b>
 </a>
 </div>
 <span class="step-of"></span>
@@ -589,7 +589,7 @@ Share with your street
     ownLookup = null;
     // Show progress while the council answers (seconds for some sites), instead of a frozen
     // button followed by a replayed animation.
-    // Steps say what's really happening for this sign-up: which home BinBot is asking about,
+    // Steps say what's really happening for this sign-up: which home Binny is asking about,
     // then the council's calendar, then the cross-check with the street.
     fetching = true; parseAt = 0; hold = 2;
     var home = addr ? addr.line.replace(/,\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, '') : typed ? typed + ', ' + v : '';
@@ -609,7 +609,7 @@ Share with your street
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
       if (!bins.length) return j;
-      // Calendar in hand: keep the loader on while BinBot double-checks it against the
+      // Calendar in hand: keep the loader on while Binny double-checks it against the
       // street (fills anything this address's calendar left out) before showing anything.
       if (shared) PSTEPS[2].subDone = 'Same round as your neighbours on ' + postcode;
       hold = 3; drawParsing(parseAt = 3);
@@ -735,7 +735,7 @@ Share with your street
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
       : editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
     $('#c-lede').textContent = empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
-      : editing ? 'Change the day, how often, or the name. Add any bin BinBot missed.'
+      : editing ? 'Change the day, how often, or the name. Add any bin Binny missed.'
       : note ? note : shared ? 'Your neighbours on ' + postcode + ' get these days. Same lorry, same street.' : '';
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
@@ -900,7 +900,7 @@ Share with your street
     $('#b-badge').textContent = 'Reminders on' + (phone ? ' for ' + phone : '') + ' · ' + (when === 'night' ? 'day before, ' : 'morning of, ') + time;
   }
   var link = $('#link').value;
-  $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent('I use BinBot for bin day reminders on WhatsApp. Sign up with your postcode: https://' + link);
+  $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent('I use Binny for bin day reminders on WhatsApp. Sign up with your postcode: https://' + link);
   $('#copy').addEventListener('click', function () {
     var btn = this;
     try { navigator.clipboard.writeText('https://' + link); } catch (err) { $('#link').select(); }
