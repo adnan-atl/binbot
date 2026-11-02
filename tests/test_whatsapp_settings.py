@@ -75,6 +75,10 @@ def test_parse_time_rejects_nonsense(raw):
     assert parse_time(raw, ReminderMode.night_before) is None
 
 
+MENU = ("\nSettings:\n- Reminder time (Day before or morning of)\n- My bins (Turn bins on or off)\n"
+        "- Wrong collection day (Tell us your days don't match)\n- {}")
+
+
 # ---- settings menu ------------------------------------------------------------------------------
 
 def test_settings_menu_from_a_word_or_the_reminder_button(client, db, uid):
@@ -82,13 +86,13 @@ def test_settings_menu_from_a_word_or_the_reminder_button(client, db, uid):
         reply = say(client, word)
         assert reply == ("Your reminders: the day before at 7pm.\n"
                          f"Bins on: {', '.join(BINS)}.\nWhat would you like to change?")
-        assert last_sent(db).endswith("\n[Reminder time] [My bins] [Pause reminders]")
+        assert last_sent(db).endswith(MENU.format("Pause reminders"))
 
 
 def test_menu_shows_turn_on_when_paused(client, db, uid):
     say(client, "STOP")
     assert say(client, "settings").startswith("Your reminders: the day before at 7pm (paused).")
-    assert last_sent(db).endswith("[Reminder time] [My bins] [Turn reminders on]")
+    assert last_sent(db).endswith(MENU.format("Turn reminders on"))
 
 
 # ---- reminder time ------------------------------------------------------------------------------
@@ -194,7 +198,7 @@ def test_phrase_matching_several_bins_shows_the_list(client, db, uid):
 
 
 def test_other_no_or_stop_phrases_are_not_about_bins(client, db, uid):
-    assert say(client, "no thanks").startswith("Reply DONE, SNOOZE or WRONG")
+    assert say(client, "no thanks").startswith("Tap Done or Snooze")
     assert say(client, "stop please").startswith("Reminders are off.")
 
 
@@ -214,10 +218,10 @@ def test_pause_and_resume_by_tapping(client, db, uid):
 # ---- fallback, copy -----------------------------------------------------------------------------
 
 def test_fallback_offers_the_settings_button(client, db, uid):
-    assert say(client, "hello") == ("Reply DONE, SNOOZE or WRONG to your last reminder, or tap below "
-                                    "to change your settings.")
+    assert say(client, "hello") == ("Tap Done or Snooze on your last reminder, or tap Settings to "
+                                    "change your bins or time, or tell us about a wrong collection day.")
     assert last_sent(db).endswith("\n[Settings]")
-    assert say(client, "done").startswith("Reply DONE, SNOOZE or WRONG")  # nothing sent yet
+    assert say(client, "done").startswith("Tap Done or Snooze")  # nothing sent yet
 
 
 def test_no_old_off_on_copy_anywhere(client, db, uid):
@@ -252,14 +256,21 @@ def meta(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_menu_goes_out_as_interactive_buttons(client, db, uid, meta):
+def test_menu_goes_out_as_an_interactive_list(client, db, uid, meta):
     say(client, "settings")
-    msg = meta[-1]
-    assert msg["type"] == "interactive" and msg["interactive"]["type"] == "button"
-    assert msg["interactive"]["action"]["buttons"] == [
-        {"type": "reply", "reply": {"id": "menu:time", "title": "Reminder time"}},
-        {"type": "reply", "reply": {"id": "menu:bins", "title": "My bins"}},
-        {"type": "reply", "reply": {"id": "menu:pause", "title": "Pause reminders"}}]
+    i = meta[-1]["interactive"]
+    assert i["type"] == "list" and i["action"]["button"] == "Settings"
+    assert [r["id"] for r in i["action"]["sections"][0]["rows"]] == [
+        "menu:time", "menu:bins", "menu:wrong", "menu:pause"]
+
+
+def test_wrong_collection_day_in_the_menu_is_a_wrong_vote(client, db, uid):
+    from app.services.reminders import dispatch_due
+    first = scheduled(db, uid)[0]
+    dispatch_due(db, now_utc=first.send_at + timedelta(minutes=1))
+    assert say(client, "menu:wrong").startswith("Thanks, noted.")
+    db.expire_all()
+    assert db.get(Reminder, first.id).reply == "wrong"
 
 
 def test_time_and_bins_go_out_as_interactive_lists(client, db, uid, meta):
