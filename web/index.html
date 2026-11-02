@@ -25,6 +25,7 @@ button{font:inherit}
 .brow-nav a{color:var(--ink);font-size:17px;font-weight:500;text-decoration:none;white-space:nowrap;border-radius:4px}
 .brow-nav a:hover,.brow-nav a:focus-visible{text-decoration:underline;text-underline-offset:4px}
 .badge:focus-visible,.brow-nav a:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.brow-nav a[aria-current="page"]{font-weight:700;text-decoration:underline;text-underline-offset:4px}
 .hero{flex:1;min-height:0;position:relative;overflow:hidden;display:flex;flex-direction:column;background:#000000;color:#FFFFFF;border-radius:28px 28px 0 0}
 @media (min-width:601px){.brow-in{height:76px;padding:0 32px}.brow-nav{gap:28px}.brow-nav a{font-size:19px}.hero{border-radius:36px 36px 0 0}}
 .home-main{flex:1;width:100%;max-width:1200px;margin:0 auto;padding:clamp(28px,5vh,56px) 32px 0;display:flex;flex-direction:column;align-items:stretch;min-height:0}
@@ -117,20 +118,26 @@ button{font:inherit}
 .lbl{font-size:15px;font-weight:600}
 .hint{font-size:14px;color:var(--grey)}
 
-/* About and FAQs */
-.page-main{flex:1;width:100%;max-width:680px;margin:0 auto;padding:48px 24px 80px;display:flex;flex-direction:column;gap:20px}
-.page-main .h1{margin-bottom:8px}
+/* About and FAQs: same brow as home, content in the black card. Unlike home, these scroll. */
+.page-card{flex:1;background:#000000;color:#FFFFFF;border-radius:28px 28px 0 0}
+@media (min-width:601px){.page-card{border-radius:36px 36px 0 0}}
+/* Same 1200px column as the brow, so the title lines up under the badge; text kept to a readable width */
+.page-main{width:100%;max-width:1200px;margin:0 auto;padding:48px 32px 80px;display:flex;flex-direction:column;gap:20px}
+.page-main > *{max-width:680px}
+.page-card .h1{color:#FFFFFF;font-size:44px;line-height:1;letter-spacing:-0.035em;margin-bottom:8px}
+.page-card .lede{color:#9A9A9E;font-size:19px;line-height:1.5}
+.page-card a:not(.pill){color:#FFFFFF;text-decoration:underline;text-underline-offset:3px;border-radius:4px}
+.page-card a:focus-visible{outline:2px solid #FFFFFF;outline-offset:3px}
 .page-cta{align-self:flex-start;margin-top:16px;min-height:60px;padding:15px 32px;font-size:18px}
 .faqs{display:flex;flex-direction:column;gap:10px}
-.faq{background:var(--tile);border-radius:20px}
-.faq summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;font-size:18px;font-weight:600;line-height:1.35;border-radius:20px}
+.faq{background:#1C1C1E;border-radius:20px}
+.faq summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;font-size:18px;font-weight:600;line-height:1.35;color:#FFFFFF;border-radius:20px}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:"+";flex:none;width:28px;height:28px;border-radius:999px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;line-height:1}
+.faq summary::after{content:"+";flex:none;width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.14);color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;line-height:1}
 .faq[open] summary::after{content:"\2212"}
-.faq summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.faq p{margin:0;padding:0 20px 20px;font-size:17px;line-height:1.5;color:var(--grey)}
-.faq a{color:var(--ink);text-underline-offset:3px}
-@media (max-width:600px){.page-main{padding:32px 20px 64px}.faq summary{font-size:17px;padding:16px 18px}.faq p{font-size:16px;padding:0 18px 18px}}
+.faq summary:focus-visible{outline:2px solid #FFFFFF;outline-offset:2px}
+.faq p{margin:0;padding:0 20px 20px;font-size:17px;line-height:1.5;color:#9A9A9E}
+@media (max-width:600px){.page-main{padding:32px 20px 64px}.page-card .h1{font-size:34px}.page-card .lede{font-size:17px}.faq summary{font-size:17px;padding:16px 18px}.faq p{font-size:16px;padding:0 18px 18px}}
 
 /* Postcode */
 .field{width:100%;font:inherit;font-size:22px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;padding:18px 20px;border-radius:18px;border:0;background:var(--tile);color:var(--ink);outline:none;min-height:64px}
@@ -320,7 +327,8 @@ button{font:inherit}
 
 <!-- About (from the brow). Plain copy: edit it here. -->
 <section class="screen" data-screen="about" hidden>
-<div data-bar></div>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">about 💭</a><a href="#faqs">FAQs 🙋</a></nav></div></header>
+<div class="page-card">
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
 <p class="lede">{{BRAND}} is a WhatsApp bot that tells you which bins go out, the day before collection or on the morning.</p>
@@ -328,11 +336,13 @@ button{font:inherit}
 <p class="lede">{{BRAND}} is made by {{PARENT_NAME}}, the household bills membership. It's free for everyone and included with {{PARENT_NAME}} membership.</p>
 <a class="pill go page-cta" href="#postcode">Add to WhatsApp</a>
 </main>
+</div>
 </section>
 
 <!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
 <section class="screen" data-screen="faqs" hidden>
-<div data-bar></div>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home">{{BRAND}}</a><nav class="brow-nav" aria-label="Site"><a href="#about">about 💭</a><a href="#faqs" aria-current="page">FAQs 🙋</a></nav></div></header>
+<div class="page-card">
 <main class="page-main">
 <h1 class="h1">FAQs</h1>
 <div class="faqs">
@@ -348,6 +358,7 @@ button{font:inherit}
 </div>
 <a class="pill go page-cta" href="#postcode">Add to WhatsApp</a>
 </main>
+</div>
 </section>
 
 <!-- 2 · Postcode -->
@@ -533,11 +544,8 @@ Share with your street
 
   // Shared header + progress on each flow step
   document.querySelectorAll('[data-bar]').forEach(function (slot) {
-    var host = slot.closest('[data-step]');
+    var step = +slot.closest('[data-step]').dataset.step;
     slot.appendChild($('#bar-tpl').content.cloneNode(true));
-    // About and FAQs aren't sign-up steps: header with back and logo only.
-    if (!host) { slot.querySelector('.step-of').remove(); slot.querySelector('.progress').remove(); return; }
-    var step = +host.dataset.step;
     slot.querySelector('.step-of').textContent = 'Step ' + step + ' of 6';
     slot.querySelectorAll('.progress .seg').forEach(function (s, i) { if (i < step) s.classList.add('on'); });
   });
@@ -560,7 +568,19 @@ Share with your street
     if (target === 'binfluencer') { var rv = $('#reveal'); rv.classList.remove('play'); void rv.offsetWidth; rv.classList.add('play'); }
   }
   var current = 'home';
-  function go(id) { current = id; try { history.replaceState(null, '', '#' + id); } catch (e) {} show(); }
+  // About and FAQs get their own history entry so the browser's back button returns from them;
+  // sign-up steps replace the entry as before.
+  function go(id) {
+    var push = (id === 'about' || id === 'faqs') && id !== current;
+    current = id;
+    try { history[push ? 'pushState' : 'replaceState'](null, '', '#' + id); } catch (e) {}
+    show();
+  }
+  window.addEventListener('popstate', function () {
+    var h = location.hash.slice(1) || 'home';
+    current = document.querySelector('[data-screen="' + h + '"]') ? h : 'home';
+    show();
+  });
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[href^="#"]');
     if (!a) return;

@@ -52,6 +52,9 @@ def test_footer_links_and_parent_name(client, monkeypatch):
     assert "home-members" not in page and "Free for everyone. Included" not in page
     assert 'data-screen="about"' in page and 'data-screen="faqs"' in page
     assert '<a href="#about">' in page and '<a href="#faqs">' in page
+    # About and FAQs carry the same brow, each marking itself as the current page
+    assert '<a href="#about" aria-current="page">' in page and '<a href="#faqs" aria-current="page">' in page
+    assert page.count('class="brow"') == 3 and page.count('class="page-card"') == 2
 
     monkeypatch.setenv("PARENT_NAME", "Fred & Co")
     monkeypatch.setenv("PARENT_URL", "https://fred.example/")
