@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.adapters.manual import expand_rule
 from app.core.config import get_settings
 from app.models import (
+    LEVELS,
     ChangeLog,
     CollectionEvent,
     Reminder,
@@ -145,9 +146,15 @@ def welcome_message(db: Session, user: User) -> str:
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
         msg += f"\nFirst up: {bins} on {first.collection_date.strftime('%a %-d %b')}."
     msg += "\nReply STOP any time to turn reminders off."
-    # Invite link, same format as the referral API: people forward it to neighbours.
+    # Invite link, same format as the referral API: people forward it to neighbours. The level
+    # names and the top threshold come from LEVELS, so the copy follows any change there.
     link = f"{get_settings().public_base_url}/?ref={user.referral_code}"
-    msg += f"\n\nKnow a neighbour who forgets bin day? Send them your link: {link}"
+    top_at, top_name = LEVELS[-1]
+    words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
+             8: "eight", 9: "nine", 10: "ten"}
+    msg += (f"\n\nYou're a {LEVELS[0][1]} for now. Every neighbour who signs up with your link "
+            f"levels you up, and {words.get(top_at, str(top_at))} makes you a certified "
+            f"{top_name.lower()}: {link}")
     return msg[:4096]  # WhatsApp's text limit; the welcome is far shorter in practice
 
 

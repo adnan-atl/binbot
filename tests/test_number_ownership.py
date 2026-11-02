@@ -126,5 +126,6 @@ def test_welcome_ends_with_the_invite_link(client, db, live):
     uid, res = _turn_on(client)
     reply = _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}")
     ref = client.get(f"/api/users/{uid}/referral").json()
-    assert reply.endswith(f"\n\nKnow a neighbour who forgets bin day? Send them your link: {ref['link']}")
+    assert reply.endswith("\n\nYou're a Bin rookie for now. Every neighbour who signs up with your link "
+                          "levels you up, and five makes you a certified binfluencer: " + ref["link"])
     assert len(reply) <= 4096
