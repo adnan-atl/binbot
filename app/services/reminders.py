@@ -2,6 +2,7 @@
 Layer 3: reminders = council events + user overrides + user preferences.
 Rebuilt from scratch for a user whenever any input changes (idempotent).
 """
+import re
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -126,7 +127,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     """Replies to a user's message (DONE / SNOOZE / WRONG / STOP). Returns what we answered."""
     user = db.scalar(select(User).where(User.phone_e164 == phone))
     if not user:
-        return "Hi! Sign up at binbot.app to get bin reminders."
+        site = re.sub(r"^https?://", "", get_settings().public_base_url).rstrip("/")
+        return f"Hi! Sign up at {site} to get bin reminders."
     cmd = text.strip().upper().split()[0] if text.strip() else ""
     last = db.scalar(
         select(Reminder).where(Reminder.user_id == user.id, Reminder.status == ReminderStatus.sent)
@@ -160,7 +162,7 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
                                    "collection_date": last.collection_date.isoformat()}))
         # No promise to get back to them: nothing is sent unless their round actually changes.
         reply = ("Thanks, noted. If your home's days are different, tap \"These aren't my "
-                 "days\" in Binny to set your own.")
+                 f"days\" in {get_settings().brand_name} to set your own.")
     else:
         reply = "Reply DONE, SNOOZE, WRONG or STOP."
     send_message(db, phone, reply, kind="reply")

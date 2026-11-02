@@ -12,6 +12,10 @@ docker compose up --build     # API on http://localhost:8000, worker alongside
 
 Open http://localhost:8000 for the sign-up flow, http://localhost:8000/docs for the API.
 
+**Branding:** the product name lives in one setting. Set `BRAND_NAME` in `.env`, then
+`docker compose up -d --force-recreate api worker` (no rebuild; it's read at startup).
+If you've changed Python files too, add `--build`.
+
 Councils that need a real browser (~86 of 345) use the `selenium` service, which starts with everything else.
 
 Check which councils work: `docker compose exec api python -m app.workers.sweep` (add a name to filter, `--no-browser` to skip browser councils). Results go to the `councils` table.
