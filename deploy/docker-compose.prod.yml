@@ -14,28 +14,54 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       retries: 20
+    networks: [data]                   # only api, worker and backup can reach it
 
   api:
     build: ..
     restart: unless-stopped
     env_file: .env.production
     environment:
-      SELENIUM_URL: http://selenium:4444
+      SCRAPER_URL: http://scraper:8100   # council scrapers run in the scraper container
+    networks: [default, data]
     # Migrations run on every start (safe to repeat), then the web server behind Caddy.
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
     depends_on:
       db: { condition: service_healthy }
+      scraper: { condition: service_started }
 
   worker:
     build: ..
     restart: unless-stopped
     env_file: .env.production
     environment:
-      SELENIUM_URL: http://selenium:4444
+      SCRAPER_URL: http://scraper:8100
+    networks: [default, data]
     command: python -m app.workers.main
     depends_on:
       db: { condition: service_healthy }
       api: { condition: service_started }   # api applies the migrations first
+      scraper: { condition: service_started }
+
+  # Council scrapers: third-party code reading third-party websites, so they run here with
+  # no database access (not on the `data` network), no env file (no Meta, address or database
+  # secrets), a read-only filesystem, no Linux capabilities and no published port.
+  scraper:
+    build: ..
+    restart: unless-stopped
+    environment:
+      SELENIUM_URL: http://selenium:4444
+      BROWSER_SESSIONS: 2                # keep equal to SE_NODE_MAX_SESSIONS below
+      SCRAPE_TIMEOUT_SECONDS: 90
+      HOME: /tmp
+    command: uvicorn app.scraper.service:app --host 0.0.0.0 --port 8100
+    working_dir: /tmp                    # scrapers that write files write to the tmpfs
+    user: "65534:65534"                  # nobody
+    read_only: true
+    tmpfs: ["/tmp:size=256m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    pids_limit: 256
 
   # Some councils' sites only work in a real browser.
   selenium:
@@ -65,6 +91,7 @@ services:
     env_file: .env.production
     environment:
       PGHOST: db
+    networks: [data]
     volumes:
       - backups:/backups
     entrypoint: ["/bin/sh", "-c"]
@@ -80,6 +107,12 @@ services:
         done
     depends_on:
       db: { condition: service_healthy }
+
+networks:
+  default: {}
+  # The database's network: no internet, and only api, worker and backup are on it.
+  data:
+    internal: true
 
 volumes:
   pgdata:

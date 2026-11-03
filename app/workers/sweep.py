@@ -119,10 +119,11 @@ def main(argv=None) -> int:
     if not todo:
         print("No councils match.")
         return 1
-    if any(s.needs_browser for s, _ in todo) and not get_settings().selenium_url:
+    remote = bool(get_settings().scraper_url)  # browser lives behind the scraper container
+    if any(s.needs_browser for s, _ in todo) and not remote and not get_settings().selenium_url:
         print("Note: SELENIUM_URL is not set; browser councils will fail.")
 
-    if any(s.needs_browser for s, _ in todo):
+    if any(s.needs_browser for s, _ in todo) and not remote:
         _wait_for_browser()
     print(f"Sweeping {len(todo)} councils with {args.workers} workers…", flush=True)
     results = _run(todo, args.workers)

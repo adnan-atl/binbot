@@ -4,6 +4,7 @@ Everything runs on one small server in Alfred's AWS account (Lightsail, London),
 
 - **api**: the website and API
 - **worker**: sends reminders and checks councils
+- **scraper**: runs the council scrapers, locked down with no database access and no secrets
 - **selenium**: a browser for councils that need one
 - **db**: Postgres, plus a daily backup
 - **caddy**: HTTPS, with certificates that renew themselves

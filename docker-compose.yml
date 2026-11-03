@@ -17,23 +17,39 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://binbot:binbot@db:5432/binbot
-      SELENIUM_URL: http://selenium:4444
+      SCRAPER_URL: http://scraper:8100
     command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports: ["8000:8000"]
     volumes:
       - ./web:/srv/web:ro   # front-end edits apply on refresh, no rebuild
     depends_on:
       db: { condition: service_healthy }
+      scraper: { condition: service_started }
 
   worker:
     build: .
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://binbot:binbot@db:5432/binbot
-      SELENIUM_URL: http://selenium:4444
+      SCRAPER_URL: http://scraper:8100
     command: python -m app.workers.main
     depends_on:
       db: { condition: service_healthy }
+      scraper: { condition: service_started }
+
+  # Council scrapers, kept away from the database and secrets as in production
+  # (deploy/docker-compose.prod.yml has the full lockdown).
+  scraper:
+    build: .
+    environment:
+      SELENIUM_URL: http://selenium:4444
+      BROWSER_SESSIONS: 4
+      HOME: /tmp
+    command: uvicorn app.scraper.service:app --host 0.0.0.0 --port 8100
+    user: "65534:65534"
+    read_only: true
+    working_dir: /tmp
+    tmpfs: ["/tmp"]
 
   # ~86 councils' sites only work in a real browser. Always on, or those councils fail.
   # standalone-chromium is multi-arch (runs natively on Apple Silicon).

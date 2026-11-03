@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     scrape_timeout_seconds: int = 90
     browser_sessions: int = 4  # must match SE_NODE_MAX_SESSIONS in docker-compose.yml
     selenium_url: str = ""  # e.g. http://selenium:4444 for councils that need a browser
+    # Production: council scrapers run in their own container with no database or secrets
+    # (app/scraper). Empty runs them in-process (local dev, tests).
+    scraper_url: str = ""  # e.g. http://scraper:8100
+    scraper_token: str = ""  # shared secret between api/worker and the scraper container
     refresh_interval_days: int = 7
     refresh_window_days_before_holiday: int = 21
     horizon_days: int = 90  # how far ahead we keep events

@@ -30,7 +30,7 @@ def test_env_example_lists_every_production_setting():
 def test_compose_has_the_services_and_volumes():
     yaml = pytest.importorskip("yaml")
     c = yaml.safe_load((DEPLOY / "docker-compose.prod.yml").read_text())
-    assert set(c["services"]) == {"db", "api", "worker", "selenium", "caddy", "backup"}
+    assert set(c["services"]) == {"db", "api", "worker", "scraper", "selenium", "caddy", "backup"}
     assert {"pgdata", "backups", "caddy_data"} <= set(c["volumes"])
     assert c["services"]["caddy"]["ports"] == ["80:80", "443:443"]
     assert "alembic upgrade head" in c["services"]["api"]["command"]
@@ -41,3 +41,22 @@ def test_secrets_stay_out_of_git_and_the_image():
     root = DEPLOY.parent
     assert "deploy/.env.production" in (root / ".gitignore").read_text().split()
     assert "deploy/.env.production" in (root / ".dockerignore").read_text().split()
+
+
+def test_scrapers_are_locked_away_from_data_and_secrets():
+    yaml = pytest.importorskip("yaml")
+    c = yaml.safe_load((DEPLOY / "docker-compose.prod.yml").read_text())
+    sv = c["services"]
+    assert c["networks"]["data"]["internal"] is True
+    assert sv["db"]["networks"] == ["data"]
+    on_data = {n for n, v in sv.items() if "data" in (v.get("networks") or [])}
+    assert on_data == {"db", "api", "worker", "backup"}  # not scraper, selenium or caddy
+    scraper = sv["scraper"]
+    assert "env_file" not in scraper and "ports" not in scraper
+    assert not any(k.startswith(("META", "DATABASE", "POSTGRES", "OS_PLACES", "IDEAL", "TURNSTILE"))
+                   for k in scraper["environment"])
+    assert scraper["read_only"] is True and scraper["cap_drop"] == ["ALL"]
+    assert scraper["user"] != "0" and not scraper["user"].startswith("0:")
+    for name in ("api", "worker"):
+        assert sv[name]["environment"]["SCRAPER_URL"] == "http://scraper:8100"
+        assert "SELENIUM_URL" not in sv[name]["environment"]  # only the scraper drives the browser

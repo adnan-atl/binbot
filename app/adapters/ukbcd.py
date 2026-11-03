@@ -86,6 +86,14 @@ class UKBCDAdapter:
     def fetch(self, lookup: LookupInput, validate: bool = True) -> list[RawCollection]:
         if validate:
             self.validate(lookup)
+        if get_settings().scraper_url:  # production: run it in the locked-down scraper container
+            from app.scraper.client import remote_fetch
+
+            return remote_fetch(self.spec, lookup)
+        return self.fetch_local(lookup)
+
+    def fetch_local(self, lookup: LookupInput) -> list[RawCollection]:
+        """Run the scraper in this process. In production only the scraper container does this."""
         from app.adapters.overrides import OVERRIDES
 
         if self.spec.module in OVERRIDES:  # local fix for a broken upstream scraper
