@@ -388,6 +388,12 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 /* "Binfluencer" with a green stroke underneath */
 .hl{font-style:normal;color:inherit;text-decoration:underline;text-decoration-color:var(--green,#45C654);text-decoration-thickness:.12em;text-underline-offset:.14em;text-decoration-skip-ink:none}
 .share-lede{text-wrap:balance}  /* one sentence per line, no lonely words */
+/* Ready-made share messages */
+.msgs{display:flex;flex-direction:column;gap:8px}
+.msg{text-align:left;font:inherit;font-size:15px;line-height:1.45;color:var(--ink);background:var(--tile);border:2px solid transparent;border-radius:16px;padding:12px 14px;cursor:pointer}
+.msg[aria-checked="true"]{border-color:var(--ink);background:#FFFFFF}
+.msg:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.msg-link{color:var(--grey);overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -612,6 +618,10 @@ Say hi on WhatsApp
 <h1 class="h1 h1-flip"><span>You're all set</span><br>Now become a <em class="hl">Binfluencer</em></h1>
 <img class="selfie" src="/static/binji-selfie.webp" alt="Binji taking a selfie" width="640" height="630">
 <p class="lede share-lede">Help your neighbours never miss a bin&nbsp;day.<br>Share {{BRAND}} on your community WhatsApp&nbsp;groups.</p>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span class="lbl" id="msg-l">Pick a message</span>
+<div id="msgs" class="msgs" role="radiogroup" aria-labelledby="msg-l"></div>
+</div>
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="link" class="lbl">Your invite link</label>
 <div class="linkbox">
@@ -1212,7 +1222,7 @@ Share with your street
     e.preventDefault(); e.stopImmediatePropagation();
     api('POST', '/users/' + API.userId + '/reminders', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time) })
       .then(function (res) { hiLink = (res && res.start_link) || ''; return api('GET', '/users/' + API.userId + '/referral'); })
-      .then(function (r) { link = r.link.replace(/^https?:\/\//, ''); $('#link').value = link; $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent(r.share_text); })
+      .then(function (r) { link = r.link.replace(/^https?:\/\//, ''); $('#link').value = link; renderMsgs(); })
       .catch(function () {}).then(function () {
         // Live with a business number: one more step, saying hi from their own WhatsApp.
         if (hiLink) { $('#hi-go').href = hiLink; go('hi'); } else go('binfluencer');
@@ -1229,7 +1239,26 @@ Share with your street
   // Placeholder until the real invite link comes back from the API (demo mode keeps it).
   if (!$('#link').value) $('#link').value = location.host + '/?ref=[CODE]';
   var link = $('#link').value;
-  $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent('I use ' + BRAND + ' for bin day reminders on WhatsApp. Sign up with your postcode: https://' + link);
+  // Ready-made share messages: tap one, and "Share with your street" opens WhatsApp with it and
+  // the invite link filled in. Edit or add messages here.
+  var MSGS = [
+    'Where have you bin all my life? \uD83D\uDE0D This little bot tells you which bin to put out, the day before. Add it to your WhatsApp:',
+    'Never miss a bin day again \uD83D\uDDD1\uFE0F ' + BRAND + ' messages you the day before with which bin goes out. It\'s free:',
+    'Neighbours! \uD83D\uDC4B I get bin day reminders on WhatsApp from ' + BRAND + ' now, no more guessing. Sign up with your postcode:'
+  ];
+  var msgAt = 0;
+  function renderMsgs() {
+    $('#msgs').innerHTML = MSGS.map(function (m, i) {
+      return '<button type="button" class="msg" role="radio" aria-checked="' + (i === msgAt) + '" data-msg="' + i + '">' + esc(m) + ' <span class="msg-link">' + esc(link) + '</span></button>';
+    }).join('');
+    $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent(MSGS[msgAt] + ' https://' + link);
+  }
+  $('#msgs').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-msg]'); if (!b) return;
+    msgAt = +b.dataset.msg; renderMsgs();
+    var again = $('#msgs [data-msg="' + msgAt + '"]'); if (again) again.focus({ preventScroll: true });
+  });
+  renderMsgs();
   $('#copy').addEventListener('click', function () {
     var btn = this;
     try { navigator.clipboard.writeText('https://' + link); } catch (err) { $('#link').select(); }
