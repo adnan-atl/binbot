@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{BRAND}} – bin day reminders on WhatsApp</title>
-<link rel="icon" type="image/png" href="/static/favicon.png">
-<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="/static/favicon-blue.png">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon-blue.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..800&family=DM+Serif+Display:ital@0;1&display=swap">
@@ -422,13 +422,23 @@ button,input,select,textarea{font-family:inherit}
 }
 /* Footer: Privacy in the left corner, Terms in the right */
 .home-foot .foot-links{margin-left:0;width:100%;justify-content:space-between}
+/* Blue Binji sits on the phone's top edge: the whole figure is drawn behind the phone, then just his
+   legs (below the seat line, 72.5% down the image, where the phone frame starts) are drawn again in front of it, swinging */
+.binji{width:190px;right:-40px;top:-152px;filter:none;animation:none}
+.binji-back{z-index:0}
+.binji-legs{z-index:3;clip-path:inset(72.5% 0 0 0);transform-origin:50% 72.5%;animation:binji-swing 1.6s ease-in-out infinite alternate;filter:drop-shadow(0 6px 6px rgba(48,35,35,.25))}
+@keyframes binji-swing{from{transform:rotate(-5deg)}to{transform:rotate(5deg)}}
+@media (max-width:600px){.binji{width:140px;right:-8px;top:-112px}}
+@media (prefers-reduced-motion:reduce){.binji-legs{animation:none}}
+.binji-say{top:-100px}
+@media (min-width:601px){.binji-say{top:-128px}}
 </style>
 </head>
 <body>
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="hero">
 <main class="home-main">
 <div class="home-copy">
@@ -438,7 +448,8 @@ button,input,select,textarea{font-family:inherit}
 </div>
 <div class="phone-col" aria-hidden="true">
 <div class="phone-wrap">
-<img class="binji" src="/static/binji.svg" alt="" width="190" height="190">
+<img class="binji binji-back" src="/static/binji-blue.webp" alt="" width="190" height="195">
+<img class="binji binji-legs" src="/static/binji-blue.webp" alt="" width="190" height="195">
 <p class="binji-say">Where have you<br>bin all my life?</p>
 <div class="phone-outline">
 <div class="island"></div>
@@ -452,7 +463,7 @@ button,input,select,textarea{font-family:inherit}
 </div>
 </div>
 <div class="layer chat">
-<div class="chat-top"><div class="chat-av"><img src="/static/binji-logo.png" alt=""></div><div><div style="font-size:15px;font-weight:700">{{BRAND}}</div><div style="font-size:11px;color:#8E8E93">online</div></div></div>
+<div class="chat-top"><div class="chat-av"><img src="/static/binji-blue-logo.png" alt=""></div><div><div style="font-size:15px;font-weight:700">{{BRAND}}</div><div style="font-size:11px;color:#8E8E93">online</div></div></div>
 <div class="chat-body">
 <div class="bub in">Evening! Recycling goes out tomorrow, Tue 3 Nov.<br>Blue bin, kerbside by 7am.<small>19:00</small></div>
 <div class="qr"><span>Done, it's out</span><span>Remind me at 9pm</span></div>
@@ -478,7 +489,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- About (from the brow). Plain copy: edit it here. -->
 <section class="screen" data-screen="about" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
@@ -495,7 +506,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
 <section class="screen" data-screen="faqs" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">FAQs</h1>
@@ -697,7 +708,7 @@ Share with your street
 <div style="display:flex;align-items:center;gap:6px">
 <button type="button" class="back" data-back aria-label="Back"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
 <a class="logo" href="#home" aria-label="{{BRAND}} home">
-<span class="logo-mark"><img src="/static/binji-logo.png" alt="" width="38" height="38"></span>
+<span class="logo-mark"><img src="/static/binji-blue-logo.png" alt="" width="38" height="38"></span>
 <b>{{BRAND}}</b>
 </a>
 </div>
