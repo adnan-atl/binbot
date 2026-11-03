@@ -57,6 +57,7 @@ class Settings(BaseSettings):
 
     # Abuse protection on sign-up (address lookups are paid, council sites shouldn't be hammered).
     rate_limits: bool = True  # per-IP limits on the sign-up endpoints
+    rate_limit_allow: str = ""  # IPs/ranges that skip the limits, e.g. "203.0.113.7,10.0.0.0/8"
     turnstile_site_key: str = ""  # Cloudflare Turnstile; both empty = no human check
     turnstile_secret: str = ""
 

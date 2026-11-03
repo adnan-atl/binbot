@@ -31,7 +31,7 @@ def human_on(monkeypatch):
 
 
 def test_address_lookups_are_limited_per_ip(client, limits_on):
-    for _ in range(10):
+    for _ in range(20):
         assert client.get("/api/postcode/E8 3PB?addresses=true").status_code == 200
     r = client.get("/api/postcode/E8 3PB?addresses=true")
     assert r.status_code == 429 and r.json()["detail"] == guard.TOO_MANY
@@ -125,3 +125,11 @@ def test_index_gets_turnstile_key(monkeypatch):
     page = render_index()
     assert "{{TURNSTILE" not in page
     assert 'var TS_KEY = "0x4AAA\\u003c/script>";' in page
+
+
+def test_allowlisted_ip_skips_the_limits(monkeypatch):
+    from app.core import guard
+    s = get_settings()
+    monkeypatch.setattr(s, "rate_limit_allow", "203.0.113.7, 10.0.0.0/8, nonsense")
+    assert guard.allowlisted("203.0.113.7") and guard.allowlisted("10.1.2.3")
+    assert not guard.allowlisted("198.51.100.1") and not guard.allowlisted("testclient")

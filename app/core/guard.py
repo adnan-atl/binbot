@@ -6,6 +6,7 @@ set, need a short-lived "human pass" from POST /api/human.
 """
 import hashlib
 import hmac
+import ipaddress
 import threading
 import time
 from collections import defaultdict, deque
@@ -27,10 +28,28 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def allowlisted(ip: str) -> bool:
+    """RATE_LIMIT_ALLOW: comma-separated IPs or ranges (e.g. the office) that skip the limits."""
+    raw = get_settings().rate_limit_allow
+    if not raw:
+        return False
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    for item in raw.split(","):
+        try:
+            if item.strip() and addr in ipaddress.ip_network(item.strip(), strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def rate_limit(request: Request, bucket: str, max_hits: int, per_seconds: int) -> None:
     """Allow max_hits per IP in a sliding window of per_seconds; 429 after that. In memory: the
     API runs as one process, and a restart forgetting the counts is fine."""
-    if not get_settings().rate_limits:
+    if not get_settings().rate_limits or allowlisted(client_ip(request)):
         return
     key, now = (bucket, client_ip(request)), time.monotonic()
     with _lock:

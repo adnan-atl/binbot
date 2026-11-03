@@ -80,7 +80,7 @@ def postcode_lookup(postcode: str, request: Request, addresses: bool = False,
     rate_limit(request, "postcode", 60, 600)
     if addresses:
         require_human(request)
-        rate_limit(request, "addresses", 10, 3600)
+        rate_limit(request, "addresses", 20, 3600)  # every sign-up confirms its address
     try:
         info = geo.lookup_postcode(postcode)
     except geo.BadPostcode:
