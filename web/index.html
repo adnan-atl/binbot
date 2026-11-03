@@ -400,6 +400,14 @@ button,input,select,textarea{font-family:inherit}
 .home-main{padding-top:clamp(24px,4vh,44px)}
 .home-copy{gap:clamp(12px,2vh,20px)}
 @media (min-width:601px){.home-main{padding-top:clamp(32px,5vh,60px)}}
+/* Phone: the page scrolls, and the footer sits below the phone mockup instead of on screen */
+@media (max-width:600px){
+#home{height:auto;min-height:100svh;overflow:visible}
+#home .hero{overflow:visible;flex:none}
+#home .home-main{flex:none}
+#home .home-foot{position:static;background:none;padding-top:40px;padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+#home .home-cta{bottom:calc(20px + env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
