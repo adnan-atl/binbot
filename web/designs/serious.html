@@ -342,6 +342,12 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 @media (prefers-reduced-motion:reduce){.binji-say{animation:none}}
 /* Phones: leave room above the mockup for Binji and his bubble, so they never sit on the intro text */
 @media (max-width:600px){.phone-col{margin-top:clamp(132px,19vh,168px)}}
+/* Every sign-up step sits like "Here's your week": anchored under the header (not floating
+   mid-screen), in the same column width, with full-width buttons to move on. */
+.flow-main{align-items:flex-start;padding:64px 24px 80px}
+.col{max-width:560px}
+#pc-go,#tel-go,#hi-go,#wa-share,a.pill.go[href="#binfluencer"]{width:100%}
+@media (max-width:600px){.flow-main{padding:40px 16px 56px}}
 </style>
 </head>
 <body>
@@ -529,7 +535,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <!-- 6 · Reminders -->
 <section class="screen" data-screen="reminders" data-step="5" hidden>
 <div data-bar></div>
-<main class="flow-main" style="padding-top:56px">
+<main class="flow-main">
 <div class="col" style="gap:44px">
 <h1 class="h1">When should<br>{{BRAND}} nudge you?</h1>
 <div style="display:flex;flex-direction:column;gap:10px">
@@ -563,7 +569,7 @@ Say hi on WhatsApp
 <!-- 7 · Binfluencer -->
 <section class="screen" data-screen="binfluencer" data-step="6" hidden>
 <div data-bar></div>
-<main class="flow-main" style="padding-top:32px">
+<main class="flow-main">
 <div class="col">
 <div class="reveal" id="reveal" role="img" aria-label="Level 1 unlocked: Bin rookie. Invite 1 neighbour to reach Kerbside regular.">
 <div class="rays" aria-hidden="true"></div>
