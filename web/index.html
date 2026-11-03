@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..800&family=DM+Serif+Display:ital@0;1&display=swap">
 <style>
 :root{--ink:#1A1A1A;--grey:#6E6E73;--soft:#8A8A8E;--tile:#F4F4F5;--line:#E5E5EA;--green:#45C654}
 *{box-sizing:border-box}
@@ -377,7 +377,8 @@ button,input,select,textarea{font-family:inherit}
 .brow-nav a{color:var(--ink)}
 .badge:focus-visible,.brow-nav a:focus-visible{outline-color:var(--ink)}
 .hero,.page-card{background:var(--cream);color:var(--ink)}
-.home-h{letter-spacing:-0.035em}
+.home-h,.h1,.page-card .h1{font-family:"DM Serif Display",Georgia,"Times New Roman",serif;font-weight:400;letter-spacing:-0.01em}
+.home-h{line-height:1}
 .home-p,.page-card .lede,.faq p{color:var(--grey)}
 @media (max-width:1099px){.home-foot{background:linear-gradient(rgba(240,237,230,0),var(--cream) 22px)}}
 .home-foot{color:var(--grey)}
