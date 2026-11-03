@@ -131,6 +131,7 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
             r.status = ReminderStatus.sent
             r.sent_at = now_utc
             r.provider_message_id = row.provider_message_id
+            db.get(User, r.user_id).last_active_at = now_utc  # a reminder that reaches them is use
             sent += 1
     db.commit()
     return sent
@@ -478,12 +479,16 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     hi = _handle_hi(db, phone, text)
     if hi:
         send_reply(db, phone, hi[0], kind=hi[1])
+        u = db.scalar(select(User).where(User.phone_e164 == phone))
+        if u:
+            u.last_active_at = datetime.now(ZoneInfo("UTC"))
         db.commit()
         return hi[0]
     user = db.scalar(select(User).where(User.phone_e164 == phone))
     if not user:
         site = re.sub(r"^https?://", "", get_settings().public_base_url).rstrip("/")
         return f"Hi! Sign up at {site} to get bin reminders."
+    user.last_active_at = datetime.now(ZoneInfo("UTC"))
     if text.strip() == "menu:wrong":  # "Wrong collection day" in the settings menu
         text = "WRONG"
     words = text.strip().upper().split()

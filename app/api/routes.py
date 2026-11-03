@@ -1,7 +1,7 @@
 import logging
 import re
 import secrets
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -51,6 +51,7 @@ def _user(db: Session, user_id: str) -> User:
     u = db.get(User, user_id)
     if not u:
         raise HTTPException(404, "user not found")
+    u.last_active_at = datetime.now(timezone.utc)  # saved with whatever the request commits
     return u
 
 

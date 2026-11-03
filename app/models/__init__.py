@@ -225,6 +225,9 @@ class User(Base):
     # (META_DISPLAY_NUMBER set). Cleared once used.
     start_code: Mapped[str | None] = mapped_column(String(8), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    # Last time they used the service: a message or tap on WhatsApp, the site, or a reminder
+    # that reached them. Accounts idle for 2 years are deleted (services/retention.py).
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=now, index=True)
 
     property: Mapped[Property | None] = relationship()
     bin_settings: Mapped[list["UserBinSetting"]] = relationship(
@@ -307,7 +310,8 @@ class Referral(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
     referrer_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    referred_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    # Emptied when the friend's account is deleted, so the referrer keeps the credit.
+    referred_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
