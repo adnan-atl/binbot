@@ -415,6 +415,13 @@ button,input,select,textarea{font-family:inherit}
 @keyframes binji-say-in{from{opacity:0;transform:translateY(6px) scale(.9)}to{opacity:1;transform:none}}
 @media (max-width:600px){.binji-say{right:124px;top:-84px;max-width:160px;font-size:14px;padding:10px 14px}}
 @media (prefers-reduced-motion:reduce){.binji-say{animation:none}}
+/* Laptop and up: the bubble sits to Binji's right, tail pointing back at him */
+@media (min-width:601px){
+.binji-say{right:auto;left:calc(100% + 52px);top:-80px;width:max-content;max-width:210px}
+.binji-say::after{right:auto;left:-8px;border-right:8px solid transparent;border-left:0;border-right-color:#FFFFFF}
+}
+/* Footer: Privacy in the left corner, Terms in the right */
+.home-foot .foot-links{margin-left:0;width:100%;justify-content:space-between}
 </style>
 </head>
 <body>
@@ -432,7 +439,7 @@ button,input,select,textarea{font-family:inherit}
 <div class="phone-col" aria-hidden="true">
 <div class="phone-wrap">
 <img class="binji" src="/static/binji.svg" alt="" width="190" height="190">
-<p class="binji-say">Where have you bin all my life?</p>
+<p class="binji-say">Where have you<br>bin all my life?</p>
 <div class="phone-outline">
 <div class="island"></div>
 <div class="pscreen anim" id="anim" data-s="0">
