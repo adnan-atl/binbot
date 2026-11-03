@@ -432,6 +432,12 @@ button,input,select,textarea{font-family:inherit}
 @media (prefers-reduced-motion:reduce){.binji-legs{animation:none}}
 .binji-say{top:-100px}
 @media (min-width:601px){.binji-say{top:-128px}}
+/* Seat fix: the front copy only works if it never moves relative to the back copy, so no swing.
+   Both copies share one size; the cut line (72.5% of the image) lands exactly on the top of the phone frame,
+   which starts 8px above the phone (its outer ring). Image height = width x 1.028. */
+.binji{--bw:190px;width:var(--bw);top:calc(-0.7455 * var(--bw) - 8px);right:-40px;transform:none;animation:none;filter:none}
+.binji-legs{animation:none;transform:none;filter:none}
+@media (max-width:600px){.binji{--bw:140px;right:-8px}}
 </style>
 </head>
 <body>
