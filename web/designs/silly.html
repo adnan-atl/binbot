@@ -411,7 +411,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 @media (max-width:600px){.flow-main{padding:40px 16px 56px}}
 .badge-name{flex-direction:row;align-items:baseline;gap:.3em;white-space:nowrap}  /* one line: Binjamin by [Alfred logo] */
 .badge-name small{display:inline-flex;align-items:baseline;gap:.3em;font:inherit;opacity:1;color:inherit;letter-spacing:inherit}  /* "by" set exactly like Binjamin */
-.by-logo{height:.74em;width:auto;display:inline-block}  /* logo's cap height = the text's, sitting on the same baseline */
+.by-logo{height:.88em;width:auto;display:inline-block;position:relative;top:.1em}  /* "by Alfred" artwork: its capitals match the text's, on the same baseline */
 /* No lonely last words: paragraphs avoid a single word on their last line, headings balance */
 .page-main p,.page-main li,.lede{text-wrap:pretty}
 .page-main h1,.page-main h2,.h1{text-wrap:balance}
@@ -421,7 +421,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<small>by <img class="by-logo" src="/static/alfred-logo-white.svg" alt="{{PARENT_NAME}}" width="53" height="15"></small></span></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg" alt="by {{PARENT_NAME}}" width="74" height="18"></span></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="hero">
 <main class="home-main">
 <div class="home-copy">
@@ -472,7 +472,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 
 <!-- About (from the brow). Plain copy: edit it here. -->
 <section class="screen" data-screen="about" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<small>by <img class="by-logo" src="/static/alfred-logo-white.svg" alt="{{PARENT_NAME}}" width="53" height="15"></small></span></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg" alt="by {{PARENT_NAME}}" width="74" height="18"></span></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
@@ -489,7 +489,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 
 <!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
 <section class="screen" data-screen="faqs" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<small>by <img class="by-logo" src="/static/alfred-logo-white.svg" alt="{{PARENT_NAME}}" width="53" height="15"></small></span></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg" alt="by {{PARENT_NAME}}" width="74" height="18"></span></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">FAQs</h1>
