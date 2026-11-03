@@ -268,7 +268,7 @@ class Reply:
 
 SETTINGS_BUTTON = ("menu:settings", "Settings")
 # The times offered in the menu: (id, title). Typed TIME 5:45pm still works for anything else.
-DAY_BEFORE_TIMES = [("16:00", "4pm"), ("18:00", "6pm"), ("19:00", "7pm"), ("20:00", "8pm"), ("21:00", "9pm")]
+DAY_BEFORE_TIMES = [("16:00", "4pm"), ("17:00", "5pm"), ("18:00", "6pm"), ("19:00", "7pm"), ("20:00", "8pm"), ("21:00", "9pm")]
 MORNING_TIMES = [("06:00", "6am"), ("06:30", "6:30am"), ("07:00", "7am")]
 
 
@@ -307,7 +307,7 @@ def settings_menu(db: Session, user: User) -> Reply:
             + f"Bins on: {', '.join(on) if on else 'none'}.\n"
             + "What would you like to change?")
     last = ("menu:resume", "Turn reminders on", "") if paused else ("menu:pause", "Pause reminders", "")
-    rows = [("menu:time", "Reminder time", "Day before or morning of"),
+    rows = [("menu:time", "Reminder time", "When I message you the day before"),
             ("menu:bins", "My bins", "Turn bins on or off"),
             ("menu:wrong", "Wrong collection day", "Tell us your days don't match"),
             last,
@@ -320,9 +320,10 @@ def time_menu(user: User) -> Reply:
         return [(f"{prefix}:{hhmm}", title,
                  "Current" if user.reminder_mode == mode and user.reminder_time == hhmm else "")
                 for hhmm, title in times]
+    # Day before only: a morning-of reminder lands after many councils' 6-7am pickups. Morning
+    # times still work if typed (MORNING 6:30am) or tapped from an old menu.
     return Reply("Pick a time for your reminders.", list_button="Pick a time", sections=[
-        ("Day before", rows(DAY_BEFORE_TIMES, "time", ReminderMode.night_before)),
-        ("Morning of", rows(MORNING_TIMES, "time_m", ReminderMode.morning_of))])
+        ("Day before", rows(DAY_BEFORE_TIMES, "time", ReminderMode.night_before))])
 
 
 def bins_menu(db: Session, user: User) -> Reply:

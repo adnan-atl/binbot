@@ -454,7 +454,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
 <h2 class="h2">What is it?</h2>
-<p class="lede">{{BRAND}} is a WhatsApp bot that tells you which bins go out, the day before collection or on the morning.</p>
+<p class="lede">{{BRAND}} is a WhatsApp bot that tells you which bins go out, the day before collection.</p>
 <p class="lede">It reads your council's own collection calendar. It keeps checking it for changes, like bank holidays, and messages you if your dates move.</p>
 <h2 class="h2">Who made it?</h2>
 <p class="lede">{{BRAND}} is made by {{PARENT_NAME}}. Our goal is to take the hassle out of running a home for {{PARENT_NAME}} members, starting with the small jobs that are easy to forget, like bin day.</p>
@@ -522,10 +522,6 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div class="col">
 <h1 class="h1">{{BRAND}}'s on it<br><span id="p-title">Reading your council's calendar</span></h1>
 <div id="psteps" aria-live="polite"></div>
-<div class="row-actions">
-<a class="pill solid" id="p-next" href="#confirm">See my dates</a>
-<a href="#postcode" style="font-size:15px;font-weight:600;padding:12px 4px">Change postcode</a>
-</div>
 </div>
 </main>
 </section>
@@ -590,11 +586,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div class="col" style="gap:44px">
 <h1 class="h1">When should<br>{{BRAND}} nudge you?</h1>
 <div style="display:flex;flex-direction:column;gap:10px">
-<span class="lbl" id="when-l">Day</span>
-<div role="group" aria-labelledby="when-l" id="whens" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px"></div>
-</div>
-<div style="display:flex;flex-direction:column;gap:10px">
-<span class="lbl" id="time-l">Time</span>
+<span class="lbl" id="time-l">The day before, at</span>
 <div role="group" aria-labelledby="time-l" id="times" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"></div>
 </div>
 <div style="display:flex;flex-direction:column;align-items:stretch;gap:12px">
@@ -779,6 +771,7 @@ Share with your street
     var i = ORDER_SCREENS.indexOf(current);
     var prev = ORDER_SCREENS[Math.max(0, i - 1)];
     if (prev === 'hi' && !hiLink) prev = 'reminders';  // the say-hi step only exists when it's live
+    if (prev === 'parsing') prev = 'postcode';  // the loading screen isn't a step to go back to
     go(prev);
   });
 
@@ -993,7 +986,6 @@ Share with your street
         : i === at ? '<div class="mark"><div class="spin"></div></div>' : '<div class="mark todo"></div>';
       return '<div class="pstep">' + mark + '<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:700;color:' + (i > at ? '#8A8A8E' : '#1A1A1A') + '">' + s.label + '</span><span class="hint">' + s.sub + '</span></div></div>';
     }).join('');
-    $('#p-next').hidden = at < PSTEPS.length;
   }
   var fetching = false, parseAt = 0, hold = 1;
   function runParsing() {
@@ -1004,7 +996,13 @@ Share with your street
     var ms = API.live ? 220 : 900;
     if (!API.live) parseAt = 0;
     drawParsing(parseAt);
-    timer = setInterval(function () { parseAt++; drawParsing(parseAt); if (parseAt >= PSTEPS.length) clearInterval(timer); }, ms);
+    if (parseAt >= PSTEPS.length) { parsingDone(); return; }
+    timer = setInterval(function () { parseAt++; drawParsing(parseAt); if (parseAt >= PSTEPS.length) { clearInterval(timer); parsingDone(); } }, ms);
+  }
+  // Nothing for the resident to do on this screen: once every step is ticked, give the last
+  // tick a moment to register, then show their dates.
+  function parsingDone() {
+    setTimeout(function () { if (current === 'parsing' && !fetching) go('confirm'); }, 900);
   }
 
   // Confirm
@@ -1197,15 +1195,10 @@ Share with your street
   // Reminders
   var when = 'night', time = '7:00pm';
   function renderReminders() {
-    var W = [{ id: 'night', label: 'Day before', sub: 'Most people pick this' }, { id: 'morning', label: 'Morning of', sub: 'Before the lorry comes' }];
-    var T = when === 'night' ? ['4:00pm', '6:00pm', '7:00pm', '8:00pm', '9:00pm'] : ['6:00am', '6:30am', '7:00am'];
-    $('#whens').innerHTML = W.map(function (w) { return '<button type="button" class="big" data-when="' + w.id + '" aria-pressed="' + (when === w.id) + '"><b>' + w.label + '</b><small>' + w.sub + '</small></button>'; }).join('');
+    // Day before only: a morning-of reminder can land after the lorry's been.
+    var T = ['4:00pm', '5:00pm', '6:00pm', '7:00pm', '8:00pm', '9:00pm'];
     $('#times').innerHTML = T.map(function (t) { return '<button type="button" class="opt" data-time="' + t + '" aria-pressed="' + (time === t) + '">' + t + '</button>'; }).join('');
   }
-  $('#whens').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-when]'); if (!b) return;
-    when = b.dataset.when; time = when === 'night' ? '7:00pm' : '6:30am'; renderReminders();
-  });
   $('#times').addEventListener('click', function (e) {
     var b = e.target.closest('[data-time]'); if (!b) return;
     time = b.dataset.time; renderReminders();

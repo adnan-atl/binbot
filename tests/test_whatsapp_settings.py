@@ -75,7 +75,7 @@ def test_parse_time_rejects_nonsense(raw):
     assert parse_time(raw, ReminderMode.night_before) is None
 
 
-MENU = ("\nSettings:\n- Reminder time (Day before or morning of)\n- My bins (Turn bins on or off)\n"
+MENU = ("\nSettings:\n- Reminder time (When I message you the day before)\n- My bins (Turn bins on or off)\n"
         "- Wrong collection day (Tell us your days don't match)\n- {}\n"
         "- Delete my data (Remove your account for good)")
 
@@ -100,8 +100,8 @@ def test_menu_shows_turn_on_when_paused(client, db, uid):
 
 def test_time_list_marks_the_current_time(client, db, uid):
     assert say(client, "menu:time") == "Pick a time for your reminders."
-    assert last_sent(db) == ("Pick a time for your reminders.\nDay before:\n- 4pm\n- 6pm\n- 7pm (Current)\n"
-                             "- 8pm\n- 9pm\nMorning of:\n- 6am\n- 6:30am\n- 7am")
+    assert last_sent(db) == ("Pick a time for your reminders.\nDay before:\n- 4pm\n- 5pm\n- 6pm\n"
+                             "- 7pm (Current)\n- 8pm\n- 9pm")
 
 
 def test_tapping_a_time_saves_it_and_rebuilds_reminders(client, db, uid):
@@ -122,7 +122,6 @@ def test_tapping_a_time_saves_it_and_rebuilds_reminders(client, db, uid):
     for r in scheduled(db, uid):
         local = r.send_at.astimezone(LONDON)
         assert local.date() == r.collection_date and (local.hour, local.minute) == (6, 30)
-    assert "- 6:30am (Current)" in (say(client, "menu:time") and last_sent(db))
 
 
 def test_a_time_that_isnt_offered_shows_the_list_again(client, db, uid):
@@ -278,9 +277,8 @@ def test_time_and_bins_go_out_as_interactive_lists(client, db, uid, meta):
     say(client, "menu:time")
     i = meta[-1]["interactive"]
     assert i["type"] == "list" and i["action"]["button"] == "Pick a time"
-    assert [s["title"] for s in i["action"]["sections"]] == ["Day before", "Morning of"]
-    assert i["action"]["sections"][0]["rows"][2] == {"id": "time:19:00", "title": "7pm", "description": "Current"}
-    assert i["action"]["sections"][1]["rows"][1] == {"id": "time_m:06:30", "title": "6:30am"}
+    assert [s["title"] for s in i["action"]["sections"]] == ["Day before"]
+    assert i["action"]["sections"][0]["rows"][3] == {"id": "time:19:00", "title": "7pm", "description": "Current"}
     say(client, "menu:bins")
     rows = meta[-1]["interactive"]["action"]["sections"][0]["rows"]
     assert len(rows) == 4 and all(r["id"].startswith("bin:") and len(r["title"]) <= 24 for r in rows)
