@@ -396,6 +396,11 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .msg[aria-checked="true"]{border-color:var(--ink);background:#FFFFFF}
 .msg:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .msg-link{color:var(--grey);overflow-wrap:anywhere}
+.msg{position:relative}
+.msg-tag{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 10px;border-radius:999px;background:var(--ink);color:#FFFFFF;font-size:13px;font-weight:600;animation:tag-in .2s ease both}
+.msg-tag::before{content:"\2713"}
+@keyframes tag-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.msg-tag{animation:none}}
 </style>
 </head>
 <body>
@@ -623,6 +628,8 @@ Say hi on WhatsApp
 <div style="display:flex;flex-direction:column;gap:8px">
 <span class="lbl" id="msg-l">Pick a message</span>
 <div id="msgs" class="msgs" role="radiogroup" aria-labelledby="msg-l"></div>
+<span id="msg-live" class="sr" aria-live="polite"></span>
+<span class="hint">Tap a message to copy it.</span>
 </div>
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="link" class="lbl">Your invite link</label>
@@ -1259,7 +1266,22 @@ Share with your street
     var b = e.target.closest('[data-msg]'); if (!b) return;
     msgAt = +b.dataset.msg; renderMsgs();
     var again = $('#msgs [data-msg="' + msgAt + '"]'); if (again) again.focus({ preventScroll: true });
+    // Tapping a message also copies it, link included, ready to paste into any group.
+    var text = MSGS[msgAt] + ' https://' + link;
+    var done = function () {
+      if (!again) return;
+      again.insertAdjacentHTML('beforeend', '<span class="msg-tag">Copied to clipboard</span>');
+      $('#msg-live').textContent = 'Message copied to clipboard';
+      clearTimeout(copiedT); copiedT = setTimeout(function () { var t = $('#msgs .msg-tag'); if (t) t.remove(); $('#msg-live').textContent = ''; }, 1800);
+    };
+    try { navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); }); }
+    catch (err) { fallbackCopy(text); done(); }
   });
+  var copiedT = null;
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove();
+  }
   renderMsgs();
   $('#copy').addEventListener('click', function () {
     var btn = this;
