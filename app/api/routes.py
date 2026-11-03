@@ -73,9 +73,9 @@ def human(body: S.HumanIn, request: Request):
 def postcode_lookup(postcode: str, request: Request, addresses: bool = False,
                     db: Session = Depends(get_db)):
     """
-    What we know about a postcode. `addresses=true` runs the (paid) address lookup; the
-    UI only asks for it when the council needs an address AND no neighbour has signed up
-    yet (round_known=false). Otherwise the first neighbour's calendar is reused for free.
+    What we know about a postcode. `addresses=true` runs the (paid) address lookup, which the
+    site does for every sign-up so each resident confirms their exact home. round_known says a
+    neighbour's calendar can be reused, so sign-up skips the council lookup.
     """
     rate_limit(request, "postcode", 60, 600)
     if addresses:

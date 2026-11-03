@@ -752,7 +752,7 @@ Share with your street
         if (!r.ok) throw new Error((j && j.detail) || 'Something went wrong on our side (' + r.status + '). Try again in a moment.');
         return j; }); });
   }
-  api('GET', '/health').then(function () { API.live = true; $('#house-wrap').hidden = false; }).catch(function () { API.live = false; });
+  api('GET', '/health').then(function () { API.live = true; }).catch(function () { API.live = false; });
   var DAY_IN = { MON: 'Mon', TUE: 'Tue', WED: 'Wed', THU: 'Thu', FRI: 'Fri', SAT: 'Sat', SUN: 'Sun' };
   var DAY_OUT = { Mon: 'MON', Tue: 'TUE', Wed: 'WED', Thu: 'THU', Fri: 'FRI', Sat: 'SAT', Sun: 'SUN' };
   var FREQ_IN = { weekly: 'weekly', fortnightly: 'fortnightly', three_weekly: 'three', four_weekly: 'monthly', irregular: 'unknown' };
@@ -803,25 +803,26 @@ Share with your street
     // neighbour on this postcode already signed up? Only when both "yes/no" do we run the paid
     // address lookup; otherwise the neighbours' calendar is reused and nobody pays.
     if (v !== postcode || ownLookup === 'start') {
-      postcode = v; wrap.hidden = true; sel.innerHTML = '';
-      var own = ownLookup === 'start'; if (own) ownLookup = 'picking';
-      api('GET', '/postcode/' + encodeURIComponent(v)).then(function (p) {
+      postcode = v; wrap.hidden = true; sel.innerHTML = ''; $('#house-wrap').hidden = true;
+      if (ownLookup === 'start') ownLookup = 'picking';
+      // Everyone confirms their exact address from the list, so we always hold the right home
+      // (UPRN, number, street). If a neighbour on this postcode already has the calendar, the
+      // next step reuses it instead of asking the council, so it loads in a moment.
+      ensureHuman().then(function () { return api('GET', '/postcode/' + encodeURIComponent(v) + '?addresses=true'); }).then(function (p) {
         API.council = p.council;
-        // Always pin the exact home (UPRN + house number + postcode) on a new postcode, so
-        // every council scraper gets every input it might read. Neighbours reuse it for free.
-        var needsAddr = own || !p.round_known;
-        if (!needsAddr) { done(); submitPostcode(); return; }
-        return ensureHuman().then(function () { return api('GET', '/postcode/' + encodeURIComponent(v) + '?addresses=true'); }).then(function (p2) {
-          if (!p2.addresses || !p2.addresses.length) { done(); submitPostcode(); return; }
-          sel.innerHTML = '<option value="">Pick your address…</option>' + p2.addresses.map(function (a, i) {
-            return '<option value="' + i + '">' + esc(a.line) + '</option>'; }).join('');
-          sel.dataset.list = JSON.stringify(p2.addresses);
-          wrap.hidden = false; done(); setTimeout(function () { sel.focus(); }, 30);
-        });
+        if (!p.addresses || !p.addresses.length) {
+          // The address service had nothing for this postcode: ask for the house instead.
+          $('#house-wrap').hidden = false; done(); setTimeout(function () { $('#house').focus(); }, 30);
+          return;
+        }
+        sel.innerHTML = '<option value="">Pick your address…</option>' + p.addresses.map(function (a, i) {
+          return '<option value="' + i + '">' + esc(a.line) + '</option>'; }).join('');
+        sel.dataset.list = JSON.stringify(p.addresses);
+        wrap.hidden = false; done(); setTimeout(function () { sel.focus(); }, 30);
       }).catch(function (e) { $('#pc-err').textContent = e.message; $('#pc-err').hidden = false; done(); });
       return;
     }
-    // Step B: address required but not picked yet.
+    // Step B: address picked (or typed, when the list came back empty).
     var addr = null;
     if (!wrap.hidden) {
       if (!sel.value) { done(); sel.focus(); return; }
