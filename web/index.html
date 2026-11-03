@@ -358,6 +358,13 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .brow-in{padding:0 28px}
 .home-foot{padding-left:28px;padding-right:28px}
 @media (min-width:601px){.brow-in{padding:0 64px}.home-foot{padding-left:max(64px,calc(50% - 536px));padding-right:max(64px,calc(50% - 536px))}}
+/* About: section headings */
+.page-card .h2{margin:24px 0 0;font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-0.02em;color:var(--ink)}
+.page-card .h1 + .h2{margin-top:4px}
+@media (max-width:600px){.page-card .h2{font-size:22px}}
+/* About and FAQs text lines up with the logo */
+.page-main{padding-left:64px;padding-right:64px}
+@media (max-width:600px){.page-main{padding-left:28px;padding-right:28px}}
 </style>
 </head>
 <body>
@@ -418,9 +425,12 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
+<h2 class="h2">What is it?</h2>
 <p class="lede">{{BRAND}} is a WhatsApp bot that tells you which bins go out, the day before collection or on the morning.</p>
 <p class="lede">It reads your council's own collection calendar. It keeps checking it for changes, like bank holidays, and messages you if your dates move.</p>
-<p class="lede">{{BRAND}} is made by {{PARENT_NAME}}, the household bills membership. It's free for everyone and included with {{PARENT_NAME}} membership.</p>
+<h2 class="h2">Who made it?</h2>
+<p class="lede">{{BRAND}} is made by {{PARENT_NAME}}. Our goal is to take the hassle out of running a home for {{PARENT_NAME}} members, starting with the small jobs that are easy to forget, like bin day.</p>
+<p class="lede">In 2027 we're launching {{PARENT_NAME}} as one provider for your household bills. <a href="{{PARENT_URL}}" target="_blank" rel="noopener">Check us out</a>.</p>
 <a class="pill go page-cta" href="#postcode">Add to WhatsApp</a>
 </main>
 </div>
