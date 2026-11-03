@@ -12,6 +12,7 @@ Four jobs, run by the worker process (see app/workers/main.py):
 import logging
 from datetime import date, datetime, timedelta, timezone
 
+import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,8 @@ from app.models import (
     Council,
     CouncilStatus,
     Property,
+    Reminder,
+    ReminderStatus,
     Snapshot,
     User,
     UserStatus,
@@ -177,4 +180,29 @@ def resolve_disputes(db: Session) -> dict:
 
 
 def dispatch(db: Session) -> int:
-    return dispatch_due(db)
+    """Send due reminders, then ping the heartbeat (if set) so an outside monitor notices when
+    reminders stop: the worker died, or every send in a run failed (expired Meta token, say)."""
+    def failed() -> int:
+        return db.scalar(select(func.count()).select_from(Reminder)
+                         .where(Reminder.status == ReminderStatus.failed)) or 0
+    before = failed()
+    try:
+        sent = dispatch_due(db)
+    except Exception:
+        heartbeat(ok=False)
+        raise
+    newly_failed = failed() - before
+    heartbeat(ok=not (newly_failed and not sent))
+    return sent
+
+
+def heartbeat(ok: bool) -> None:
+    """Ping HEARTBEAT_URL (healthchecks.io style: the URL for a good run, URL + /fail for a bad
+    one). A ping that can't get through is logged and never stops reminders."""
+    url = get_settings().heartbeat_url
+    if not url:
+        return
+    try:
+        httpx.get(url.rstrip("/") + ("" if ok else "/fail"), timeout=10)
+    except httpx.HTTPError as e:
+        log.warning("heartbeat ping failed: %s", e)

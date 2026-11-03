@@ -105,3 +105,7 @@ class ReminderOut(BaseModel):
 class InboundIn(BaseModel):
     phone: str
     text: str
+
+
+class HumanIn(BaseModel):
+    token: str = Field(max_length=4096)

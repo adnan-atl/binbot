@@ -415,6 +415,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <select id="addr" class="field" style="text-transform:none;letter-spacing:0;font-size:18px;appearance:auto"></select>
 <span class="hint" id="addr-hint">Your council files collection days by address, not postcode.</span>
 </div>
+<div id="ts" hidden></div>
 <div><button type="button" class="pill go" id="pc-go">Find my bin days</button></div>
 </div>
 </div>
@@ -586,7 +587,8 @@ Share with your street
 
 <script>
 (function () {
-  var BRAND = {{BRAND_JSON}};  // set by the server from BRAND_NAME
+  var BRAND = {{BRAND_JSON}};
+  var TS_KEY = {{TURNSTILE_SITE_KEY_JSON}};  // Cloudflare Turnstile; empty = no check  // set by the server from BRAND_NAME
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var esc = function (t) { return String(t).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
 
@@ -689,8 +691,36 @@ Share with your street
 
   // ---- API layer. Falls back to the built-in demo data when the API isn't reachable.
   var API = { base: (window.BINBOT_API || '') + '/api', live: false, userId: null, council: null };
+  // ---- Bot check. With a Turnstile key set, the widget sits in the postcode form; its token is
+  // swapped for a 30-minute pass that goes with the address lookup and sign-up calls.
+  var human = { pass: '', exp: 0, token: '', wait: null };
+  if (TS_KEY) {
+    window.onTsLoad = function () {
+      $('#ts').hidden = false;
+      window.turnstile.render('#ts', { sitekey: TS_KEY, size: 'flexible', appearance: 'interaction-only',
+        callback: function (t) { human.token = t; if (human.wait) { var w = human.wait; human.wait = null; w(t); } },
+        'expired-callback': function () { human.token = ''; } });
+    };
+    var tsScript = document.createElement('script');
+    tsScript.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTsLoad';
+    tsScript.async = true; tsScript.defer = true; document.head.appendChild(tsScript);
+  }
+  function ensureHuman() {
+    if (!TS_KEY || (human.pass && Date.now() < human.exp)) return Promise.resolve();
+    var token = human.token ? Promise.resolve(human.token) : new Promise(function (res, rej) {
+      human.wait = res;
+      setTimeout(function () { if (human.wait === res) { human.wait = null; rej(new Error("The quick check didn't load. Refresh the page and try again.")); } }, 20000);
+    });
+    return token.then(function (t) {
+      human.token = '';
+      if (window.turnstile) try { window.turnstile.reset('#ts'); } catch (e) {}
+      return api('POST', '/human', { token: t });
+    }).then(function (r) { human.pass = r.pass || ''; human.exp = Date.now() + 25 * 60 * 1000; });
+  }
   function api(method, path, body) {
-    return fetch(API.base + path, { method: method, headers: { 'Content-Type': 'application/json' },
+    var headers = { 'Content-Type': 'application/json' };
+    if (human.pass) headers['X-Human-Pass'] = human.pass;
+    return fetch(API.base + path, { method: method, headers: headers,
       body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { return r.text().then(function (t) {
         var j; try { j = JSON.parse(t); } catch (e) { j = null; }
@@ -756,7 +786,7 @@ Share with your street
         // every council scraper gets every input it might read. Neighbours reuse it for free.
         var needsAddr = own || !p.round_known;
         if (!needsAddr) { done(); submitPostcode(); return; }
-        return api('GET', '/postcode/' + encodeURIComponent(v) + '?addresses=true').then(function (p2) {
+        return ensureHuman().then(function () { return api('GET', '/postcode/' + encodeURIComponent(v) + '?addresses=true'); }).then(function (p2) {
           if (!p2.addresses || !p2.addresses.length) { done(); submitPostcode(); return; }
           sel.innerHTML = '<option value="">Pick your address…</option>' + p2.addresses.map(function (a, i) {
             return '<option value="' + i + '">' + esc(a.line) + '</option>'; }).join('');
@@ -775,9 +805,10 @@ Share with your street
     var ref = (location.search.match(/[?&]ref=([^&]+)/) || [])[1] || null;
     var typed = $('#house').value.trim();
     var body = { uprn: addr && addr.uprn, house_number: (addr && addr.house_number) || typed || null, address_line: (addr && addr.line) || (typed ? typed + ', ' + v : null) };
-    var req = ownLookup === 'picking' && API.userId
+    var picking = ownLookup === 'picking' && API.userId;
+    var req = ensureHuman().then(function () { return picking
       ? api('POST', '/users/' + API.userId + '/own-calendar', body)
-      : api('POST', '/signup/start', Object.assign({ postcode: v, referral_code: ref }, body));
+      : api('POST', '/signup/start', Object.assign({ postcode: v, referral_code: ref }, body)); });
     ownLookup = null;
     // Show progress while the council answers (seconds for some sites), instead of a frozen
     // button followed by a replayed animation.

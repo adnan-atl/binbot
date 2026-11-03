@@ -1,0 +1,37 @@
+# After the tests pass on main, moves the `live` branch to that commit. The server polls `live`
+# every 2 minutes and rebuilds when it moves (deploy/autoupdate.sh), so GitHub never needs SSH
+# access to the server and port 22 can stay closed to the internet.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [tests]
+    types: [completed]
+    branches: [main]
+
+concurrency: deploy
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Only after a green test run on a push to main (not on pull requests)
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Move live to the tested commit
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Fast-forward only: an older run finishing late can't roll live back.
+          git fetch -q origin live || true
+          if git rev-parse -q --verify origin/live >/dev/null && ! git merge-base --is-ancestor origin/live "$SHA"; then
+            echo "live is already ahead of $SHA; leaving it"; exit 0
+          fi
+          git push origin "$SHA:refs/heads/live"
+          echo "live -> $SHA (the server picks it up within 2 minutes)"

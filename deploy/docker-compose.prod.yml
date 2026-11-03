@@ -39,7 +39,7 @@ services:
 
   # Some councils' sites only work in a real browser.
   selenium:
-    image: selenium/standalone-chromium:latest
+    image: selenium/standalone-chromium:4.48.0-20260905  # pinned; bump on purpose
     restart: unless-stopped
     shm_size: 1g
     environment:

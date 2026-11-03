@@ -4,7 +4,7 @@ import secrets
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from app.providers.messaging import send_message
 from app.api import schemas as S
 from app.core.config import get_settings
 from app.core.db import get_db, session_factory
+from app.core.guard import client_ip, human_check_on, issue_pass, rate_limit, require_human, verify_turnstile
 from app.models import (
     BinCategory,
     ChangeLog,
@@ -56,13 +57,29 @@ def _user(db: Session, user_id: str) -> User:
 # ---- step 1: postcode -------------------------------------------------------------
 
 
+@router.post("/human")
+def human(body: S.HumanIn, request: Request):
+    """Turnstile token in, a 30-minute pass out (sent back as X-Human-Pass on the sign-up calls)."""
+    rate_limit(request, "human", 20, 600)
+    if not human_check_on():
+        return {"pass": ""}
+    if not verify_turnstile(body.token, client_ip(request)):
+        raise HTTPException(403, "The quick check didn't go through. Refresh the page and try again.")
+    return {"pass": issue_pass()}
+
+
 @router.get("/postcode/{postcode}", response_model=S.PostcodeOut)
-def postcode_lookup(postcode: str, addresses: bool = False, db: Session = Depends(get_db)):
+def postcode_lookup(postcode: str, request: Request, addresses: bool = False,
+                    db: Session = Depends(get_db)):
     """
     What we know about a postcode. `addresses=true` runs the (paid) address lookup; the
     UI only asks for it when the council needs an address AND no neighbour has signed up
     yet (round_known=false). Otherwise the first neighbour's calendar is reused for free.
     """
+    rate_limit(request, "postcode", 60, 600)
+    if addresses:
+        require_human(request)
+        rate_limit(request, "addresses", 10, 3600)
     try:
         info = geo.lookup_postcode(postcode)
     except geo.BadPostcode:
@@ -86,7 +103,9 @@ def postcode_lookup(postcode: str, addresses: bool = False, db: Session = Depend
 
 
 @router.post("/signup/start", response_model=S.StartOut)
-def signup_start(body: S.StartIn, db: Session = Depends(get_db)):
+def signup_start(body: S.StartIn, request: Request, db: Session = Depends(get_db)):
+    require_human(request)
+    rate_limit(request, "signup", 8, 600)  # each sign-up can mean a council lookup
     try:
         prop = resolve_property(db, body.postcode, body.uprn, body.house_number, body.address_line)
     except geo.BadPostcode:
@@ -151,11 +170,14 @@ def _seed_settings(db: Session, user: User, prop) -> None:
 
 
 @router.post("/users/{user_id}/own-calendar", response_model=S.StartOut)
-def own_calendar(user_id: str, body: S.OwnCalendarIn, db: Session = Depends(get_db)):
+def own_calendar(user_id: str, body: S.OwnCalendarIn, request: Request,
+                 db: Session = Depends(get_db)):
     """
     'These aren't my days': detach this home from the postcode round and fetch its own
     calendar. This is the one place a paid address lookup happens for a non-first neighbour.
     """
+    require_human(request)
+    rate_limit(request, "own-calendar", 5, 600)
     user = _user(db, user_id)
     prop = user.property
     if prop is None:

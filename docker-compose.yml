@@ -38,7 +38,7 @@ services:
   # ~86 councils' sites only work in a real browser. Always on, or those councils fail.
   # standalone-chromium is multi-arch (runs natively on Apple Silicon).
   selenium:
-    image: selenium/standalone-chromium:latest
+    image: selenium/standalone-chromium:4.48.0-20260905  # pinned; bump on purpose
     shm_size: 2g
     environment:
       SE_NODE_MAX_SESSIONS: 4

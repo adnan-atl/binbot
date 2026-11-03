@@ -50,6 +50,15 @@ class Settings(BaseSettings):
     meta_display_number: str = ""
 
     public_base_url: str = "http://localhost:8000"
+
+    # Abuse protection on sign-up (address lookups are paid, council sites shouldn't be hammered).
+    rate_limits: bool = True  # per-IP limits on the sign-up endpoints
+    turnstile_site_key: str = ""  # Cloudflare Turnstile; both empty = no human check
+    turnstile_secret: str = ""
+
+    # Dead man's switch: the worker pings this URL after every reminder run (healthchecks.io,
+    # Better Stack...), and the service alerts you when the pings stop. Empty = off.
+    heartbeat_url: str = ""
     # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.
     brand_name: str = "Binjamin"
     # The company behind the product, and the links in the page footer and consent text.

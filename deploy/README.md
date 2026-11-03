@@ -12,7 +12,8 @@ The domain is **binjamin.uk**. Allow about an hour the first time.
 
 ## Before you start
 
-- [ ] A login to **Alfred's AWS account** with access to Lightsail, and the London region (eu-west-2) enabled
+- [ ] An **SSO login** (IAM Identity Center) to the AWS account Binjamin runs in, with access to Lightsail and the London region (eu-west-2) enabled. Not the root user, and not a shared IAM user. Best is a separate Binjamin account inside Alfred's AWS organisation, so it can't touch anything else Alfred runs and its bill shows on its own
+- [ ] A free **Cloudflare** account for the bot check, and a free **healthchecks.io** account for the reminder alert (step 6)
 - [ ] **binjamin.uk** registered to Alfred, with auto-renew on, and someone who can add a DNS record at its registrar
 - [ ] These to hand for the settings file (step 6). Never paste them in chat, a ticket or git:
   - Meta: permanent token, phone number ID, app secret, and the business number
@@ -23,14 +24,17 @@ The domain is **binjamin.uk**. Allow about an hour the first time.
 
 1. Sign in to Alfred's AWS, open **Lightsail** (https://lightsail.aws.amazon.com) and check the region at the top says **London**.
 2. **Create instance** → Platform **Linux/Unix** → blueprint **OS Only → Ubuntu 24.04 LTS**.
-3. Plan: **2 GB RAM** ($12 a month). Move to 4 GB later with a snapshot if reminders grow past a few thousand a night.
+3. Plan: **4 GB RAM** ($24 a month). The council browser is memory-hungry; 2 GB works with the swap file in step 4 but runs close to the edge.
 4. Name it `binjamin` and click **Create instance**.
 
 ## 2. Static IP and firewall
 
 1. Lightsail → **Networking** → **Create static IP** → attach it to `binjamin`. Note the IP.
-2. Open the instance → **Networking** → **IPv4 Firewall** → **Add rule**: **HTTPS (443)**.
-   SSH (22) and HTTP (80) are open already. Keep 80 open: Caddy needs it to get certificates.
+2. Open the instance → **Networking** → **IPv4 Firewall**:
+   - **Add rule**: **HTTPS (443)**.
+   - Edit the **SSH (22)** rule → tick **Restrict to IP address** → tick **Allow Lightsail browser SSH** and add no other IPs → **Save**. Now only the **Connect using SSH** button in Lightsail can open a terminal, behind your AWS login. Nothing else needs SSH: deploys are pulled by the server (step 9).
+   - Keep **HTTP (80)** open: Caddy needs it to get certificates.
+3. Instance → **Snapshots** → turn on **Automatic snapshots** (daily, kept 7 days).
 
 ## 3. Point binjamin.uk at it
 
@@ -88,7 +92,9 @@ nano deploy/.env.production
 
 1. Fill in every line marked **REQUIRED**.
 2. Put the database password in **both** `POSTGRES_PASSWORD` and `DATABASE_URL`.
-3. Save with Ctrl+O, Enter, then Ctrl+X.
+3. **Bot check:** Cloudflare dashboard → **Turnstile** → **Add widget**, hostname `binjamin.uk`, mode **Managed**. Put the site key in `TURNSTILE_SITE_KEY` and the secret key in `TURNSTILE_SECRET`.
+4. **Reminder alert:** healthchecks.io → **Add check**, period **5 minutes**, grace **10 minutes**, and add your email (or Slack) under **Integrations**. Put the check's ping URL in `HEARTBEAT_URL`. The worker pings it every minute, so if reminders stop sending (worker down, server down, sends failing) you hear within about 15 minutes.
+5. Save with Ctrl+O, Enter, then Ctrl+X.
 
 ## 7. Start it
 
@@ -117,31 +123,43 @@ The health check returns `{"ok":true,...}` and the site loads at https://binjami
 Until the real number is registered and the Meta app is published, only the numbers you've added as
 test recipients get messages. The site itself works for everyone.
 
-## 9. Auto-deploy (optional, about 10 minutes)
+## 9. Auto-deploy (about 5 minutes)
 
-After this, every push to main that passes the tests goes live by itself in about two minutes. A
-push with failing tests never deploys. Until these secrets exist, the deploy workflow does nothing.
+After this, every push to main that passes the tests goes live by itself within a few minutes, and a
+push with failing tests never deploys. Nothing logs in to the server: GitHub moves a `live` branch to
+the tested commit, and the server checks `live` every 2 minutes and rebuilds when it moves. If the
+new version doesn't come up healthy, it goes back to the previous one by itself.
 
-On the server (still in the browser SSH terminal):
+On the server (browser SSH terminal):
 
 ```
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/actions -C "github actions" -q
-cat ~/.ssh/actions.pub >> ~/.ssh/authorized_keys
-cat ~/.ssh/actions          # the private key: for DEPLOY_SSH_KEY
-ssh-keyscan -t ed25519 localhost 2>/dev/null | sed "s/^localhost/<static IP>/"   # for DEPLOY_KNOWN_HOSTS
+sudo tee /etc/systemd/system/binjamin-update.service >/dev/null <<'UNIT'
+[Unit]
+Description=Binjamin: deploy the live branch if it moved
+After=docker.service network-online.target
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/home/ubuntu/binbot/deploy/autoupdate.sh
+UNIT
+sudo tee /etc/systemd/system/binjamin-update.timer >/dev/null <<'UNIT'
+[Unit]
+Description=Binjamin: check for a new version every 2 minutes
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+[Install]
+WantedBy=timers.target
+UNIT
+sudo systemctl daemon-reload && sudo systemctl enable --now binjamin-update.timer
 ```
 
-Replace `<static IP>` in the last command with the real IP before running it. On GitHub:
-**adnan-atl/binbot → Settings → Secrets and variables → Actions → New repository secret**, three times:
+**See what it did:** `journalctl -u binjamin-update -n 50`
 
-| Name | Value |
-|---|---|
-| `DEPLOY_HOST` | the static IP |
-| `DEPLOY_SSH_KEY` | everything `cat ~/.ssh/actions` printed, including the BEGIN and END lines |
-| `DEPLOY_KNOWN_HOSTS` | the line the `ssh-keyscan` command printed |
+**Pause deploys** (say, during an incident): `sudo systemctl stop binjamin-update.timer`, and
+`start` to resume.
 
-Then `rm ~/.ssh/actions` on the server (GitHub has the only copy it needs). Each deploy shows under
-the repo's **Actions** tab as **deploy**.
+Each release shows under the repo's **Actions** tab as **deploy**.
 
 ## Everyday commands
 
@@ -192,8 +210,28 @@ ssh ubuntu@<static IP> "cd ~/binbot && docker compose -f deploy/docker-compose.p
 scp ubuntu@<static IP>:binbot/binny-2026-11-02.sql.gz .
 ```
 
-Lightsail **snapshots** (instance → Snapshots → enable automatic) are a good second copy of
-the whole server.
+The daily Lightsail **snapshots** (step 2) are the second copy, of the whole server.
+
+**Test a restore before launch, then every few months.** A backup you haven't restored isn't a
+backup. This loads the latest daily backup into a throwaway database on the same server, without
+touching the real one:
+
+```
+cd ~/binbot
+C="docker compose -f deploy/docker-compose.prod.yml"
+F=$($C exec -T backup sh -c 'ls -t /backups/*.sql.gz | head -1')
+$C cp "backup:$F" /tmp/latest.sql.gz
+docker run -d --name restore-test -e POSTGRES_PASSWORD=test postgres:16-alpine && sleep 8
+gunzip -c /tmp/latest.sql.gz | docker exec -i restore-test psql -q -U postgres
+docker exec restore-test psql -U postgres -c "select count(*) from users;"
+$C exec db psql -U binny binny -c "select count(*) from users;"
+docker rm -f restore-test && rm /tmp/latest.sql.gz
+```
+
+The two counts should match (or nearly, if someone signed up since last night's backup).
+
+Don't test a snapshot by starting a new instance from it while production is running: everything
+starts by itself on boot, including the worker, and residents would get every reminder twice.
 
 ## Restoring a backup
 

@@ -15,7 +15,7 @@ dependencies = [
   "python-multipart>=0.0.9",
   "beautifulsoup4>=4.12",
   "apscheduler>=3.10,<4",
-  "uk-bin-collection>=0.173",
+  "uk-bin-collection==0.173.5",  # pinned: council scrapers change often; bump deliberately and re-test
   "yarl>=1.9",  # Birmingham's scraper imports it; the library doesn't declare it
 ]
 

@@ -35,6 +35,7 @@ def render_index() -> str:
     page = (WEB / "index.html").read_text(encoding="utf-8")
     brand_json = json.dumps(s.brand_name).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     page = page.replace("{{BRAND_JSON}}", brand_json)
+    page = page.replace("{{TURNSTILE_SITE_KEY_JSON}}", json.dumps(s.turnstile_site_key).replace("<", "\\u003c"))
     for token, value in (("BRAND", s.brand_name), ("PARENT_NAME", s.parent_name),
                          ("PARENT_URL", s.parent_url), ("PRIVACY_URL", s.privacy_url),
                          ("TERMS_URL", s.terms_url)):
