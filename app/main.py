@@ -1,9 +1,10 @@
 import html
 import json
 import logging
+import re
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -29,13 +30,13 @@ app.include_router(webhook_router)
 WEB = Path(__file__).resolve().parent.parent / "web"
 
 
-def render_index() -> str:
+def render_index(page: Path | None = None) -> str:
     """The page with the brand and links filled in. Read on every request, so edits to web/
     (mounted into the container) show on refresh. {{BRAND}}, {{PARENT_NAME}}, {{PARENT_URL}},
     {{PRIVACY_URL}} and {{TERMS_URL}} are for HTML text and attributes; {{BRAND_JSON}} is a JS
     string literal, safe inside <script>."""
     s = get_settings()
-    page = (WEB / "index.html").read_text(encoding="utf-8")
+    page = (page or WEB / "index.html").read_text(encoding="utf-8")
     brand_json = json.dumps(s.brand_name).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     page = page.replace("{{BRAND_JSON}}", brand_json)
     page = page.replace("{{TURNSTILE_SITE_KEY_JSON}}", json.dumps(s.turnstile_site_key).replace("<", "\\u003c"))
@@ -51,5 +52,13 @@ if WEB.exists():
     @app.get("/static/index.html", include_in_schema=False, response_class=HTMLResponse)
     def index():
         return HTMLResponse(render_index())
+
+    @app.get("/d/{name}", include_in_schema=False, response_class=HTMLResponse)
+    def design(name: str):
+        """Design variants side by side: web/designs/<name>.html at /d/<name> (e.g. /d/silly)."""
+        page = WEB / "designs" / f"{name}.html"
+        if not re.fullmatch(r"[a-z0-9-]{1,40}", name) or not page.is_file():
+            raise HTTPException(404, "No such design")
+        return HTMLResponse(render_index(page))
 
     app.mount("/static", StaticFiles(directory=WEB), name="static")
