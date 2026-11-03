@@ -1170,13 +1170,13 @@ Share with your street
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
     var empty = !bins.length;
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
-      : editing ? 'Edit your bins' : "Here's your week<br><span>Look right?</span>";
+      : editing ? 'Edit your bins' : "Here's your week<br><span>Looks right?</span>";
     $('#c-lede').textContent = empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
       : editing ? 'Tap a bin to change its day or how often.'
-      : note ? note : shared ? 'Your neighbours on ' + postcode + ' get these days. Same lorry, same street.' : '';
+      : note ? note : '';  // a council problem still shows here
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
-    $('#c-lede').hidden = !empty && !editing && !shared && !note;
+    $('#c-lede').hidden = !empty && !editing && !note;
     $('#c-own').hidden = !(editing && shared && API.live && !empty);
     $('#c-view').hidden = editing;
     $('#c-editor').hidden = !editing;
