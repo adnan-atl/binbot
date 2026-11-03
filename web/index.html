@@ -6,6 +6,9 @@
 <title>{{BRAND}} – bin day reminders on WhatsApp</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..800&display=swap">
 <style>
 :root{--ink:#1A1A1A;--grey:#6E6E73;--soft:#8A8A8E;--tile:#F4F4F5;--line:#E5E5EA;--green:#45C654}
 *{box-sizing:border-box}
@@ -365,6 +368,28 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 /* About and FAQs text lines up with the logo */
 .page-main{padding-left:64px;padding-right:64px}
 @media (max-width:600px){.page-main{padding-left:28px;padding-right:28px}}
+/* Alfred version: Alfred's warm off-white ground, its ink and its yellow, set in DM Sans.
+   Everything here overrides the silly lander above; delete this block to go back. */
+:root{--ink:#302323;--grey:#6E6363;--soft:#8C8282;--tile:#E6E1D7;--line:#D9D2C5;--cream:#F0EDE6;--a-yellow:#FFFF00;--a-pink:#FF0080;--a-blue:#0080FF}
+body{font-family:"DM Sans",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;background:var(--cream)}
+button,input,select,textarea{font-family:inherit}
+.screen:has(> .brow),#home{background:var(--ink)}
+.brow-nav a{color:var(--cream)}
+.hero,.page-card{background:var(--cream);color:var(--ink)}
+.home-h{letter-spacing:-0.035em}
+.home-p,.page-card .lede,.faq p{color:var(--grey)}
+@media (max-width:1099px){.home-foot{background:linear-gradient(rgba(240,237,230,0),var(--cream) 22px)}}
+.home-foot{color:var(--grey)}
+.cta,.go{background:var(--a-yellow);color:var(--ink)}
+.cta:hover,.go:hover{filter:brightness(.96)}
+.home-cta .cta{color:var(--ink);box-shadow:0 12px 34px rgba(48,35,35,.18)}
+.phone-outline{box-shadow:0 0 0 7px #3D2F2F,0 24px 60px rgba(48,35,35,.22)}
+.faq{background:var(--tile)}
+.pm{background:rgba(48,35,35,.08)}
+.binlist,.editcard,.levelcard,.linkbox,.big,.opt,.field{background:var(--tile)}
+.daychip,.copy{background:var(--ink);color:var(--cream)}
+.screen,.bar{background:var(--cream)}
+.screen:has(> .brow),#home{background:var(--ink)}
 </style>
 </head>
 <body>
