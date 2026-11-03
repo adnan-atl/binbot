@@ -349,6 +349,9 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 /* No lonely last words: paragraphs avoid a single word on their last line, headings balance */
 .page-main p,.page-main li,.lede{text-wrap:pretty}
 .page-main h1,.page-main h2,.h1{text-wrap:balance}
+/* Reminder times: a 3 x 2 grid that spans the same width as the button below */
+#times{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#times .opt{width:100%;justify-content:center;text-align:center}
 </style>
 </head>
 <body>
@@ -539,7 +542,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <h1 class="h1">When should<br>{{BRAND}} nudge you?</h1>
 <div style="display:flex;flex-direction:column;gap:10px">
 <span class="lbl" id="time-l">The day before, at</span>
-<div role="group" aria-labelledby="time-l" id="times" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"></div>
+<div role="group" aria-labelledby="time-l" id="times" style="margin-top:4px"></div>
 </div>
 <div style="display:flex;flex-direction:column;align-items:stretch;gap:12px">
 <a class="pill go" href="#binfluencer" style="width:100%;min-height:68px;font-size:21px">Turn on reminders</a>

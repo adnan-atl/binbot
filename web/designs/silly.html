@@ -442,6 +442,9 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .page-card .page-cta{margin:32px auto 0;width:100%;align-self:center}
 .faqs,.page-card .h2,.page-card .lede{text-align:left}  /* only page titles are centred; sections, text and FAQs read left-aligned */
 @media (max-width:600px){.page-card .h1{margin-bottom:32px}.page-card .lede + .h2{margin-top:24px}}
+/* Reminder times: a 3 x 2 grid that spans the same width as the button below */
+#times{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#times .opt{width:100%;justify-content:center;text-align:center}
 </style>
 </head>
 <body>
@@ -634,7 +637,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <h1 class="h1">When should<br>{{BRAND}} nudge you?</h1>
 <div style="display:flex;flex-direction:column;gap:10px">
 <span class="lbl" id="time-l">The day before, at</span>
-<div role="group" aria-labelledby="time-l" id="times" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px"></div>
+<div role="group" aria-labelledby="time-l" id="times" style="margin-top:4px"></div>
 </div>
 <div style="display:flex;flex-direction:column;align-items:stretch;gap:12px">
 <a class="pill go" href="#binfluencer" style="width:100%;min-height:68px;font-size:21px">Turn on reminders</a>
