@@ -514,16 +514,15 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">Where should {{BRAND}}<br>message you?</h1>
-<p class="lede">Your WhatsApp number. {{BRAND}} only uses it to send your bin reminders.</p>
+<h1 class="h1">What's your WhatsApp number?</h1>
 <div style="display:flex;flex-direction:column;gap:8px">
-<label for="tel" class="lbl">WhatsApp number</label>
+<label for="tel" class="sr">WhatsApp number</label>
 <div style="display:flex;gap:8px">
 <span aria-hidden="true" style="display:flex;align-items:center;justify-content:center;min-width:84px;border-radius:18px;background:var(--tile);font-size:20px;font-weight:700">+44</span>
 <input id="tel" class="field" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="7700 900123" value="7700 900123" aria-describedby="tel-err tel-hint" style="text-transform:none;letter-spacing:0.02em">
 </div>
 <span id="tel-err" class="error" hidden>Enter a UK mobile number, like 7700 900123.</span>
-<span id="tel-hint" class="hint">{{BRAND}} is made by {{PARENT_NAME}}. By continuing, you agree to {{PARENT_NAME}}'s <a href="{{TERMS_URL}}" target="_blank" rel="noopener">terms</a> and <a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">privacy policy</a>, and to get bin reminders and {{BRAND}} updates on WhatsApp. {{PARENT_NAME}} may also tell you about its other home admin services. Reply STOP any time.</span>
+<span id="tel-hint" class="hint">{{BRAND}} is made by {{PARENT_NAME}}. By continuing, you agree to {{PARENT_NAME}}'s <a href="{{TERMS_URL}}" target="_blank" rel="noopener">terms</a> and <a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">privacy policy</a>, and to get bin reminders and {{BRAND}} updates on WhatsApp. {{PARENT_NAME}} may also tell you about its other home admin services.</span>
 </div>
 <label style="display:flex;gap:12px;align-items:flex-start;font-size:15px;color:var(--grey);cursor:pointer">
 <input id="no-offers" type="checkbox" style="width:22px;height:22px;margin:0;accent-color:var(--ink);flex:none">
