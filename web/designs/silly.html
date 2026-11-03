@@ -493,9 +493,8 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 @keyframes tag-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.msg-tag{animation:none}}
 /* Last step: headline with a small selfie Binji, the message as a WhatsApp bubble, then share */
-.done-head{display:flex;align-items:flex-start;gap:12px}
-.done-head .h1{flex:1;min-width:0}
-.done-head .selfie{width:96px;flex:none;margin:-4px -6px 0 0}
+.done-head{display:flow-root}  /* Binji floats right; the headline wraps around him, never squeezed into a column */
+.done-head .selfie{float:right;width:88px;margin:-6px -4px 4px 10px}
 @media (min-width:601px){.done-head .selfie{width:132px}}
 .wa-chat{background:#EFE7DD;border-radius:22px;padding:18px 14px 14px;touch-action:pan-y;user-select:none}
 .wa-bubble{position:relative;margin-left:auto;max-width:94%;background:#D9FDD3;color:#111B21;border-radius:14px 14px 4px 14px;padding:10px 12px 24px;font-size:16px;line-height:1.42;box-shadow:0 1px 1px rgba(11,20,26,.12);text-align:left}
@@ -513,6 +512,14 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .ghostpill{width:100%;min-height:56px;padding:15px 26px;font-size:17px;background:var(--tile);color:var(--ink)}
 .linkbtn{align-self:center;border:0;background:none;font:inherit;font-size:15px;font-weight:600;color:var(--grey);text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:6px 8px;border-radius:8px}
 .msg-next:focus-visible,.share-more:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.wa-chat{position:relative}
+.wa-bubble{cursor:pointer}
+.wa-bubble:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.wa-copied{position:absolute;left:50%;top:50%;z-index:2;transform:translate(-50%,-40%) scale(.96);opacity:0;pointer-events:none;padding:10px 16px;border-radius:999px;background:rgba(17,27,33,.92);color:#FFFFFF;font-size:15px;font-weight:600;white-space:nowrap;transition:opacity .18s ease,transform .18s ease}
+.wa-copied::before{content:"\2713  "}
+.wa-copied.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+@media (prefers-reduced-motion:reduce){.wa-copied{transition:none}}
+@media (max-width:360px){.done-head .h1{font-size:30px}.done-head .selfie{width:58px;margin-left:8px}}  /* small phones: headline keeps its lines */
 </style>
 </head>
 <body>
@@ -737,12 +744,13 @@ Say hi on WhatsApp
 <main class="flow-main">
 <div class="col">
 <div class="done-head">
-<h1 class="h1 h1-flip"><span>You're all set</span><br>Now become a <em class="hl">Binfluencer</em></h1>
 <img class="selfie" src="/static/binji-selfie.webp" alt="" width="640" height="630">
+<h1 class="h1 h1-flip"><span>You're all set</span><br>Now become a <em class="hl">Binfluencer</em></h1>
 </div>
 <p class="lede share-lede">Share with your neighbours so they never miss a bin&nbsp;day.</p>
 <div class="wa-chat" id="wa-chat" aria-label="The message you'll send">
-<div class="wa-bubble"><span id="bubble-text"></span> <span class="wa-link" id="bubble-link"></span><span class="wa-time" aria-hidden="true">19:04 &#10003;&#10003;</span></div>
+<div class="wa-copied" id="wa-copied" aria-hidden="true">Copied to clipboard</div>
+<div class="wa-bubble" id="wa-bubble" role="button" tabindex="0" aria-label="Copy this message"><span id="bubble-text"></span> <span class="wa-link" id="bubble-link"></span><span class="wa-time" aria-hidden="true">19:04 &#10003;&#10003;</span></div>
 </div>
 <div class="bubble-nav">
 <span class="dots" id="msg-dots" aria-hidden="true"></span>
@@ -751,14 +759,10 @@ Say hi on WhatsApp
 <span id="msg-live" class="sr" aria-live="polite"></span>
 <input id="link" type="hidden" value="">
 <div class="share-actions">
-<div class="share-row">
 <a class="pill go" id="wa-share" href="#" target="_blank" rel="noopener" style="min-height:68px;font-size:21px"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"></path></svg>
-Share on WhatsApp
+Share to WhatsApp
 </a>
-<button type="button" class="share-more" id="share-more" aria-label="More ways to share" hidden><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"></path><path d="M7 8l5-5 5 5"></path><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"></path></svg></button>
-</div>
-<button type="button" class="pill ghostpill" id="copy-msg">Copy message</button>
-<button type="button" class="linkbtn" id="copy">Copy link only</button>
+<button type="button" class="pill ghostpill" id="copy">Copy link only</button>
 </div>
 </div>
 </main>
@@ -1373,9 +1377,9 @@ Share on WhatsApp
   // Ready-made share messages, shown as the WhatsApp bubble neighbours will see. "Try another"
   // (or a swipe) changes it; Share opens WhatsApp with it and the invite link. Edit or add here.
   var MSGS = [
-    'Where have you bin all my life? 😍 This little bot tells you which bin to put out, the day before. Add it to your WhatsApp:',
-    'Never miss a bin day again 🗑️ ' + BRAND + ' messages you the day before with which bin goes out. It\'s free:',
-    'Neighbours! 👋 I get bin day reminders on WhatsApp from ' + BRAND + ' now, no more guessing. Sign up with your postcode:'
+    'Where have you bin all my life? 😍 This little bot tells you which bin to put out, the day before collection. Add it to your WhatsApp:',
+    'Never miss a bin day again 🗑️ ' + BRAND + ' tells you which bin to put out, the day before collection. Add it to your WhatsApp:',
+    'Hi neighbours! 👋 Anyone else always forgetting which bin goes out? I\'ve started using ' + BRAND + ', it tells me which bin to put out the day before collection. Add it to your WhatsApp:'
   ];
   var msgAt = 0, copiedT = null;
   function shareText() { return MSGS[msgAt] + ' https://' + link; }
@@ -1395,9 +1399,24 @@ Share on WhatsApp
     chat.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
     chat.addEventListener('touchend', function (e) {
       if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0; x0 = null;
-      if (Math.abs(dx) > 40) stepMsg(dx < 0 ? 1 : -1);
+      if (Math.abs(dx) > 40) { swiped = true; setTimeout(function () { swiped = false; }, 350); stepMsg(dx < 0 ? 1 : -1); }
     });
   })();
+  var swiped = false, popT = null;
+  // Tap the message to copy it, link included; a "Copied to clipboard" pop-up confirms it.
+  function copyBubble() {
+    if (swiped) return;
+    var text = shareText(), pop = $('#wa-copied');
+    var done = function () {
+      pop.classList.remove('show'); void pop.offsetWidth; pop.classList.add('show');
+      $('#msg-live').textContent = 'Message copied to clipboard';
+      clearTimeout(popT); popT = setTimeout(function () { pop.classList.remove('show'); $('#msg-live').textContent = ''; }, 1600);
+    };
+    try { navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); }); }
+    catch (err) { fallbackCopy(text); done(); }
+  }
+  $('#wa-bubble').addEventListener('click', copyBubble);
+  $('#wa-bubble').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copyBubble(); } });
   function fallbackCopy(text) {
     var ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove();
@@ -1410,13 +1429,7 @@ Share on WhatsApp
     try { navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); }); }
     catch (err) { fallbackCopy(text); done(); }
   }
-  $('#copy-msg').addEventListener('click', function () { copyText(shareText(), this, 'Copy message', 'Message copied to clipboard'); });
   $('#copy').addEventListener('click', function () { copyText('https://' + link, this, 'Copy link only', 'Link copied to clipboard'); });
-  // Phones: the system share menu reaches Messages, Nextdoor, Facebook groups and the rest.
-  if (navigator.share) {
-    $('#share-more').hidden = false;
-    $('#share-more').addEventListener('click', function () { navigator.share({ text: shareText() }).catch(function () {}); });
-  }
   renderMsgs();
 
   try { var h = location.hash.slice(1); if (h && document.querySelector('[data-screen="' + h + '"]')) current = h; } catch (e) {}
