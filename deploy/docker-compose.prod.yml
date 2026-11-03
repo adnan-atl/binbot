@@ -108,6 +108,34 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
+  # Copies the daily backups to an S3 bucket, so they survive losing the server. Upload-only
+  # key: it can add files but not read or delete them (deploy/README.md, "Off-server backups").
+  # Idle until BACKUP_S3_BUCKET is set.
+  offsite:
+    image: amazon/aws-cli:2.38.0
+    restart: unless-stopped
+    env_file: .env.production
+    volumes:
+      - backups:/backups:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          if [ -n "$$BACKUP_S3_BUCKET" ]; then
+            if AWS_ACCESS_KEY_ID="$$BACKUP_AWS_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$$BACKUP_AWS_SECRET_ACCESS_KEY" \
+               aws s3 sync /backups "s3://$$BACKUP_S3_BUCKET/db/" --region "$${BACKUP_S3_REGION:-eu-west-2}" \
+                 --exclude "*.tmp" --sse AES256 --only-show-errors; then
+              echo "offsite: backups copied to $$BACKUP_S3_BUCKET"
+              [ -n "$$BACKUP_HEARTBEAT_URL" ] && curl -fsS -m 10 -o /dev/null "$$BACKUP_HEARTBEAT_URL" || true
+            else
+              echo "offsite: copy failed" >&2
+              [ -n "$$BACKUP_HEARTBEAT_URL" ] && curl -fsS -m 10 -o /dev/null "$$BACKUP_HEARTBEAT_URL/fail" || true
+            fi
+          fi
+          sleep 21600
+        done
+    depends_on: [backup]
+
 networks:
   default: {}
   # The database's network: no internet, and only api, worker and backup are on it.

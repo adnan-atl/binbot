@@ -23,14 +23,17 @@ def test_env_example_lists_every_production_setting():
         assert k in keys, k
     # Every app setting in the file is one the app actually reads
     known = {f.upper() for f in Settings.model_fields}
-    extra = keys - known - {"DOMAIN", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"}
+    compose_only = {"DOMAIN", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "BACKUP_S3_BUCKET",
+                    "BACKUP_S3_REGION", "BACKUP_AWS_ACCESS_KEY_ID", "BACKUP_AWS_SECRET_ACCESS_KEY",
+                    "BACKUP_HEARTBEAT_URL"}
+    extra = keys - known - compose_only
     assert not extra, extra
 
 
 def test_compose_has_the_services_and_volumes():
     yaml = pytest.importorskip("yaml")
     c = yaml.safe_load((DEPLOY / "docker-compose.prod.yml").read_text())
-    assert set(c["services"]) == {"db", "api", "worker", "scraper", "selenium", "caddy", "backup"}
+    assert set(c["services"]) == {"db", "api", "worker", "scraper", "selenium", "caddy", "backup", "offsite"}
     assert {"pgdata", "backups", "caddy_data"} <= set(c["volumes"])
     assert c["services"]["caddy"]["ports"] == ["80:80", "443:443"]
     assert "alembic upgrade head" in c["services"]["api"]["command"]
@@ -60,3 +63,26 @@ def test_scrapers_are_locked_away_from_data_and_secrets():
     for name in ("api", "worker"):
         assert sv[name]["environment"]["SCRAPER_URL"] == "http://scraper:8100"
         assert "SELENIUM_URL" not in sv[name]["environment"]  # only the scraper drives the browser
+
+
+def test_offsite_copy_reads_backups_only():
+    yaml = pytest.importorskip("yaml")
+    c = yaml.safe_load((DEPLOY / "docker-compose.prod.yml").read_text())
+    off = c["services"]["offsite"]
+    assert off["volumes"] == ["backups:/backups:ro"]
+    assert "data" not in (off.get("networks") or [])  # no route to the database
+    assert ":latest" not in off["image"] and off["image"].count(":") == 1
+
+
+def test_ready_checks_database_and_scraper(client, monkeypatch):
+    import httpx
+
+    from app.core.config import get_settings
+    assert client.get("/api/ready").json() == {"ok": True}
+    monkeypatch.setattr(get_settings(), "scraper_url", "http://scraper:8100")
+
+    def down(*a, **k):
+        raise httpx.ConnectError("refused")
+    monkeypatch.setattr(httpx, "get", down)
+    r = client.get("/api/ready")
+    assert r.status_code == 503 and "scraper" in r.json()["detail"]

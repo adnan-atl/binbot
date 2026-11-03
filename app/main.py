@@ -18,6 +18,9 @@ logging.basicConfig(level=logging.INFO)
 for _name in ("httpx", "httpcore"):
     logging.getLogger(_name).setLevel(logging.WARNING)
 
+from app.core.errors import init_errors  # noqa: E402
+
+init_errors("api")
 app = FastAPI(title=get_settings().brand_name, version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(api_router)

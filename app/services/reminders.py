@@ -310,7 +310,8 @@ def settings_menu(db: Session, user: User) -> Reply:
     rows = [("menu:time", "Reminder time", "Day before or morning of"),
             ("menu:bins", "My bins", "Turn bins on or off"),
             ("menu:wrong", "Wrong collection day", "Tell us your days don't match"),
-            last]
+            last,
+            ("menu:delete", "Delete my data", "Remove your account for good")]
     return Reply(text, list_button="Settings", sections=[("Settings", rows)])
 
 
@@ -472,6 +473,32 @@ FALLBACK = ("Tap Done or Snooze on your last reminder, or tap Settings to change
             "or tell us about a wrong collection day.")
 
 
+DELETE_CONFIRM = ("This deletes your account for good: your number, address, bins and reminders. "
+                  "You'll stop getting reminders straight away. Sure?")
+DELETED = ("Done. Your account and everything we held about you is deleted, and you won't hear "
+           "from us again. You can sign up again any time.")
+
+
+def _erase(db: Session, user: User, phone: str, text: str) -> str | None:
+    """DELETE (or Settings → Delete my data) asks first; DELETE YES or the button deletes the
+    account there and then (right to erasure). Returns the reply text, or None."""
+    t = text.strip()
+    words = t.upper().split()
+    if t == "menu:delete" or words in (["DELETE"], ["DELETE", "MY", "DATA"], ["DELETE", "ME"]):
+        send_reply(db, phone, DELETE_CONFIRM, kind="reply",
+                   buttons=[("menu:delete_yes", "Yes, delete it"), ("menu:settings", "No, keep it")])
+        db.commit()
+        return DELETE_CONFIRM
+    if t == "menu:delete_yes" or words == ["DELETE", "YES"]:
+        from app.services.retention import delete_account
+
+        send_reply(db, phone, DELETED, kind="reply")
+        delete_account(db, user)  # also removes the messages we sent, this one included
+        db.commit()
+        return DELETED
+    return None
+
+
 def handle_inbound(db: Session, phone: str, text: str) -> str:
     """Replies to a user's message or tap: the sign-up hi ("start my reminders <code>"), DONE /
     SNOOZE / WRONG / STOP / START, the settings menus (taps, or "settings"), and typed shortcuts
@@ -491,6 +518,9 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     user.last_active_at = datetime.now(ZoneInfo("UTC"))
     if text.strip() == "menu:wrong":  # "Wrong collection day" in the settings menu
         text = "WRONG"
+    erase = _erase(db, user, phone, text)
+    if erase:
+        return erase
     words = text.strip().upper().split()
     cmd = words[0] if words else ""
     last = db.scalar(

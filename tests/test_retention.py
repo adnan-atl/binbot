@@ -121,3 +121,27 @@ def test_old_sent_messages_are_deleted(db):
     purge_inactive(db)
     db.expire_all()
     assert [o.body for o in db.scalars(select(Outbox))] == ["new"]
+
+
+# ---- delete on request ---------------------------------------------------------------------------
+
+def test_delete_asks_first_then_wipes_the_account(client, db, uid):  # noqa: F811
+    from app.services.reminders import DELETE_CONFIRM, DELETED
+    assert say(client, "DELETE") == DELETE_CONFIRM
+    assert user(db, uid)  # nothing deleted yet
+    assert say(client, "menu:delete_yes") == DELETED
+    db.expire_all()
+    assert db.get(User, uid) is None
+    assert not db.scalars(select(Outbox).where(Outbox.to_phone == PHONE)).all()
+    assert not db.scalars(select(Reminder).where(Reminder.user_id == uid)).all()
+    # Afterwards they're a stranger again
+    assert "Sign up at" in say(client, "hello")
+
+
+def test_delete_from_the_settings_menu_and_typed_yes(client, db, uid):  # noqa: F811
+    from app.services.reminders import DELETE_CONFIRM, DELETED
+    assert say(client, "menu:delete") == DELETE_CONFIRM
+    assert say(client, "no thanks") != DELETED  # anything else keeps the account
+    assert user(db, uid)
+    assert say(client, "delete yes") == DELETED
+    assert user(db, uid) is None

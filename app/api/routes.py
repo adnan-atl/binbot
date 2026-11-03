@@ -434,3 +434,26 @@ def inbound(body: S.InboundIn, db: Session = Depends(get_db)):
 @router.get("/health")
 def health():
     return {"ok": True, "demo_mode": get_settings().demo_mode, "coverage": coverage()}
+
+
+@router.get("/ready")
+def ready(db: Session = Depends(get_db)):
+    """For the uptime monitor: 200 only if the site, the database and (in production) the
+    scraper container all answer. 503 says which one didn't."""
+    import httpx
+    from sqlalchemy import text
+
+    down = []
+    try:
+        db.execute(text("select 1"))
+    except Exception:
+        down.append("database")
+    url = get_settings().scraper_url
+    if url:
+        try:
+            httpx.get(url.rstrip("/") + "/health", timeout=5).raise_for_status()
+        except Exception:
+            down.append("scraper")
+    if down:
+        raise HTTPException(503, f"down: {', '.join(down)}")
+    return {"ok": True}

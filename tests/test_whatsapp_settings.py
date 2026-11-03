@@ -76,7 +76,8 @@ def test_parse_time_rejects_nonsense(raw):
 
 
 MENU = ("\nSettings:\n- Reminder time (Day before or morning of)\n- My bins (Turn bins on or off)\n"
-        "- Wrong collection day (Tell us your days don't match)\n- {}")
+        "- Wrong collection day (Tell us your days don't match)\n- {}\n"
+        "- Delete my data (Remove your account for good)")
 
 
 # ---- settings menu ------------------------------------------------------------------------------
@@ -261,7 +262,7 @@ def test_menu_goes_out_as_an_interactive_list(client, db, uid, meta):
     i = meta[-1]["interactive"]
     assert i["type"] == "list" and i["action"]["button"] == "Settings"
     assert [r["id"] for r in i["action"]["sections"][0]["rows"]] == [
-        "menu:time", "menu:bins", "menu:wrong", "menu:pause"]
+        "menu:time", "menu:bins", "menu:wrong", "menu:pause", "menu:delete"]
 
 
 def test_wrong_collection_day_in_the_menu_is_a_wrong_vote(client, db, uid):

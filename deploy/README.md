@@ -14,7 +14,7 @@ The domain is **binjamin.uk**. Allow about an hour the first time.
 ## Before you start
 
 - [ ] An **SSO login** (IAM Identity Center) to the AWS account Binjamin runs in, with access to Lightsail and the London region (eu-west-2) enabled. Not the root user, and not a shared IAM user. Best is a separate Binjamin account inside Alfred's AWS organisation, so it can't touch anything else Alfred runs and its bill shows on its own
-- [ ] A free **Cloudflare** account for the bot check, and a free **healthchecks.io** account for the reminder alert (step 6)
+- [ ] Free accounts for the monitoring: **Cloudflare** (bot check), **healthchecks.io** (reminder alert), **sentry.io** (error alerts, EU region) and **uptimerobot.com** (site-down alert)
 - [ ] **binjamin.uk** registered to Alfred, with auto-renew on, and someone who can add a DNS record at its registrar
 - [ ] These to hand for the settings file (step 6). Never paste them in chat, a ticket or git:
   - Meta: permanent token, phone number ID, app secret, and the business number
@@ -95,7 +95,10 @@ nano deploy/.env.production
 2. Put the database password in **both** `POSTGRES_PASSWORD` and `DATABASE_URL`.
 3. **Bot check:** Cloudflare dashboard → **Turnstile** → **Add widget**, hostname `binjamin.uk`, mode **Managed**. Put the site key in `TURNSTILE_SITE_KEY` and the secret key in `TURNSTILE_SECRET`.
 4. **Reminder alert:** healthchecks.io → **Add check**, period **5 minutes**, grace **10 minutes**, and add your email (or Slack) under **Integrations**. Put the check's ping URL in `HEARTBEAT_URL`. The worker pings it every minute, so if reminders stop sending (worker down, server down, sends failing) you hear within about 15 minutes.
-5. Save with Ctrl+O, Enter, then Ctrl+X.
+5. **Error alerts:** sentry.io → sign up and choose the **EU** data region → **Create project**,
+   platform **FastAPI**, alert on every new issue. Put the **DSN** in `SENTRY_DSN`. Unexpected errors
+   in the site or the worker then email you, with phone numbers, postcodes and form data removed.
+6. Save with Ctrl+O, Enter, then Ctrl+X.
 
 ## 7. Start it
 
@@ -161,6 +164,13 @@ sudo systemctl daemon-reload && sudo systemctl enable --now binjamin-update.time
 `start` to resume.
 
 Each release shows under the repo's **Actions** tab as **deploy**.
+
+## 10. Site-down alert (2 minutes)
+
+The reminder alert (step 6) watches the worker. This watches the website: uptimerobot.com → sign
+up (free) → **New monitor** → **HTTP(s)**, URL `https://binjamin.uk/api/ready`, every 5 minutes,
+alert by email. `/api/ready` only answers OK when the site, the database and the scraper container
+are all up, so it also catches a database that's fallen over.
 
 ## Everyday commands
 
@@ -233,6 +243,39 @@ The two counts should match (or nearly, if someone signed up since last night's 
 
 Don't test a snapshot by starting a new instance from it while production is running: everything
 starts by itself on boot, including the worker, and residents would get every reminder twice.
+
+## Off-server backups (about 15 minutes)
+
+The daily backups above live on the server, so losing the server loses them too. This copies
+each one to an S3 bucket in the same AWS account, every 6 hours. The server gets a key that can
+**add** files to the bucket but can't read, list contents of other buckets, or delete anything,
+so someone who broke into the server still couldn't wipe the backups.
+
+In the AWS console (region **London**):
+
+1. **S3 → Create bucket**: name `binjamin-backups-` plus a few random letters. Leave **Block all
+   public access** on. **Bucket Versioning: Enable**. **Create bucket**.
+2. Open the bucket → **Management → Create lifecycle rule**: name `keep 35 days`, apply to all
+   objects, tick **Expire current versions** (35 days) and **Permanently delete noncurrent
+   versions** (7 days). This is also what makes deleted accounts disappear from backups.
+3. **IAM → Users → Create user**: `binjamin-backup-upload`, no console access, no groups. Open it →
+   **Add permissions → Create inline policy → JSON**, paste this with your bucket name, save:
+
+   ```json
+   {"Version": "2012-10-17", "Statement": [
+     {"Effect": "Allow", "Action": "s3:ListBucket", "Resource": "arn:aws:s3:::BUCKET"},
+     {"Effect": "Allow", "Action": "s3:PutObject", "Resource": "arn:aws:s3:::BUCKET/db/*"}]}
+   ```
+4. The user → **Security credentials → Create access key** → **Application running outside AWS**.
+   Put the bucket name and both halves of the key in `.env.production` (`BACKUP_S3_BUCKET`,
+   `BACKUP_AWS_ACCESS_KEY_ID`, `BACKUP_AWS_SECRET_ACCESS_KEY`). Never paste the key in chat.
+5. Optional: a second healthchecks.io check (period **1 day**, grace **12 hours**) in
+   `BACKUP_HEARTBEAT_URL`, so you hear if the copies stop.
+6. `docker compose -f deploy/docker-compose.prod.yml up -d`, then check
+   `docker compose -f deploy/docker-compose.prod.yml logs offsite` says "backups copied".
+
+**To get one back** (server gone): sign in to the console with your own login, open the bucket →
+`db/` → the file → **Download**, and copy it to the new server. Then restore it as below.
 
 ## Restoring a backup
 

@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     # Dead man's switch: the worker pings this URL after every reminder run (healthchecks.io,
     # Better Stack...), and the service alerts you when the pings stop. Empty = off.
     heartbeat_url: str = ""
+    # Error alerts (sentry.io, EU region). Empty = off.
+    sentry_dsn: str = ""
     # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.
     brand_name: str = "Binjamin"
     # The company behind the product, and the links in the page footer and consent text.

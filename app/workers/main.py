@@ -28,6 +28,9 @@ def _with_db(fn):
 
 
 def main():
+    from app.core.errors import init_errors
+
+    init_errors("worker")
     sched = BlockingScheduler(timezone="Europe/London")
     sched.add_job(_with_db(monitor.dispatch), "interval", minutes=1, id="dispatch")
     sched.add_job(_with_db(monitor.refresh_stale), "interval", hours=1, id="refresh")

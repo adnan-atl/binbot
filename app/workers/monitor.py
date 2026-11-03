@@ -168,7 +168,7 @@ def resolve_disputes(db: Session) -> dict:
         try:
             result = split.probe(db, key)["result"]
         except Exception as e:  # one broken round mustn't stop the rest, tonight or any night
-            log.exception("resolve_disputes: probe failed for %s", key)
+            log.warning("resolve_disputes: probe failed for %s", key, exc_info=True)  # councils fail; not a bug
             db.rollback()
             result = "error"
             # Marks it probed, so it waits for a fresh vote instead of failing first every night.
