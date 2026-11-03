@@ -409,19 +409,42 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .col{max-width:560px}
 #pc-go,#tel-go,#hi-go,#wa-share,a.pill.go[href="#binfluencer"]{width:100%}
 @media (max-width:600px){.flow-main{padding:40px 16px 56px}}
-.badge-name{flex-direction:column;align-items:flex-start;gap:.22em;white-space:nowrap;line-height:1}  /* Binjamin, with "by Alfred" underneath */
+.badge-name{flex-direction:row;align-items:baseline;gap:.3em;white-space:nowrap;line-height:1}  /* one line: Binjamin by [Alfred] */
 .badge-name small{display:inline-flex;align-items:baseline;gap:.3em;font:inherit;opacity:1;color:inherit;letter-spacing:inherit}  /* "by" set exactly like Binjamin */
-.by-logo{height:.74em;width:auto;display:block}  /* "by Alfred" artwork under the name, a touch smaller */
+.by-logo{height:.96em;width:auto;display:inline-block;position:relative;top:.17em}  /* Alfred's capitals match the name's, on one baseline */
 /* No lonely last words: paragraphs avoid a single word on their last line, headings balance */
 .page-main p,.page-main li,.lede{text-wrap:pretty}
 .page-main h1,.page-main h2,.h1{text-wrap:balance}
+/* Phones: About and FAQs move into a menu behind a hamburger, so the header is one clean line */
+.menu-btn{display:none}
+@media (max-width:600px){
+.brow-in{position:relative}
+.menu-btn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:-10px;border:0;padding:0;background:none;color:#FFFFFF;cursor:pointer;border-radius:12px}
+.menu-btn:focus-visible{outline:2px solid #FFFFFF;outline-offset:2px}
+.menu-btn .i-close,.brow-in.open .menu-btn .i-open{display:none}
+.brow-in.open .menu-btn .i-close{display:block}
+.brow-nav{display:none}
+.brow-in.open .brow-nav{display:flex;position:absolute;top:100%;left:0;right:0;z-index:30;flex-direction:column;gap:0;padding:4px 28px 18px;background:#000000;border-radius:0 0 24px 24px;box-shadow:0 18px 30px rgba(0,0,0,.18)}
+.brow-in.open .brow-nav a,.brow-in.open .brow-nav a:first-child{position:static;transform:none;padding:14px 0;font-size:22px;font-weight:600;border-bottom:1px solid rgba(255,255,255,.12)}
+.brow-in.open .brow-nav a:last-child{border-bottom:0}
+}
+/* Sign-up steps: text centred, like "Here's your week" */
+.flow-main .col{text-align:center}
+.flow-main .col .field{text-align:center}
+.flow-main .col select.field{text-align-last:center}
+#times{justify-content:center}
+.flow-main .col label[style*="display:flex"]{justify-content:center;text-align:left}
+#psteps{text-align:left;align-self:center}
+/* Less air above the headline */
+.home-main{padding-top:clamp(40px,6vh,72px)}
+@media (max-width:600px){.home-main{padding-top:28px}}
 </style>
 </head>
 <body>
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="hero">
 <main class="home-main">
 <div class="home-copy">
@@ -472,7 +495,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 
 <!-- About (from the brow). Plain copy: edit it here. -->
 <section class="screen" data-screen="about" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
@@ -489,7 +512,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 
 <!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
 <section class="screen" data-screen="faqs" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">FAQs</h1>
@@ -1296,6 +1319,25 @@ Share with your street
 
   show();
 })();
+</script>
+<script>
+  // Phone menu: the hamburger opens About / FAQs; a tap on a link, outside, Escape or a page change closes it.
+  (function () {
+    function close(row) { row.classList.remove('open'); row.querySelector('.menu-btn').setAttribute('aria-expanded', 'false'); }
+    function closeAll() { document.querySelectorAll('.brow-in.open').forEach(close); }
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('.menu-btn');
+      if (btn) {
+        var row = btn.closest('.brow-in'), on = !row.classList.contains('open');
+        closeAll(); row.classList.toggle('open', on); btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+        return;
+      }
+      if (!e.target.closest('.brow-nav')) closeAll();
+      else if (e.target.closest('.brow-nav a')) closeAll();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+    window.addEventListener('hashchange', closeAll);
+  })();
 </script>
 </body>
 </html>
