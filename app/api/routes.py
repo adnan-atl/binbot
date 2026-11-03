@@ -1,7 +1,8 @@
 import logging
 import re
 import secrets
-from datetime import date
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import func, select
@@ -218,7 +219,19 @@ def _confirm_round(property_id: str) -> None:
         db.close()
 
 
-def _bins_out(db: Session, user: User) -> list[S.BinOut]:
+# Councils ask for bins out by about 7am, so after that today's collection has as good as gone:
+# from then on "next" means the next one after today.
+SAME_DAY_CUTOFF = time(7, 0)
+
+
+def _first_showable_day(now: datetime | None = None) -> date:
+    """Today until SAME_DAY_CUTOFF (London time), then tomorrow."""
+    now = now or datetime.now(ZoneInfo(get_settings().timezone))
+    return now.date() if now.time() < SAME_DAY_CUTOFF else now.date() + timedelta(days=1)
+
+
+def _bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.BinOut]:
+    first = _first_showable_day(now).isoformat()
     council_bins = {b["bin_type_id"]: b for b in schedule_for(db, user.property)} if user.property else {}
     out = []
     for s in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id)):
@@ -227,18 +240,20 @@ def _bins_out(db: Session, user: User) -> list[S.BinOut]:
             rule = describe_rule(dates)
             rule["days"] = s.override_rule.get("days", rule["days"])
             rule["frequency"] = s.override_rule.get("frequency", rule["frequency"])
-            upcoming = [d.isoformat() for d in dates[:4]]
+            upcoming = [d.isoformat() for d in dates if d.isoformat() >= first][:4]
             colour, manual = None, True
         elif s.bin_type_id in council_bins:
             cb = council_bins[s.bin_type_id]
             rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"],
                     "purpose": cb["purpose"], "frequency_source": cb.get("frequency_source", "")}
             # The round's real dates (bank holiday moves included), as schedule_for has them
-            upcoming = cb["dates"][:4]
+            upcoming = [d for d in cb["dates"] if d >= first][:4]
             colour, manual = cb["colour"], False
         else:
             rule, colour, manual = {"days": [], "frequency": "irregular", "next": None}, None, True
             upcoming = []
+        if upcoming:  # today's collection after the cutoff isn't "next" any more
+            rule["next"] = upcoming[0]
         out.append(S.BinOut(setting_id=s.id, bin_type_id=s.bin_type_id, label=s.label,
                             category=s.category.value, colour=colour, enabled=s.enabled,
                             manual=manual, upcoming=upcoming, **rule))
