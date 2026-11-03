@@ -445,6 +445,37 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 /* Reminder times: a 3 x 2 grid that spans the same width as the button below */
 #times{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 #times .opt{width:100%;justify-content:center;text-align:center}
+/* Bin editor: one row per bin, one open at a time */
+.elist{background:var(--tile);border-radius:22px;overflow:hidden}
+.erow{width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px 12px 12px;min-height:68px;background:none;border:0;border-bottom:1px solid var(--line);text-align:left;cursor:pointer;color:var(--ink);font:inherit}
+.erow:last-child,.eopen:last-child{border-bottom:0}
+.erow.off .binic,.erow.off .erow-t{opacity:.45}
+.erow-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.erow-t b{font-size:17px;font-weight:700}
+.erow-t small{font-size:14px;color:var(--grey)}
+.e-miss{color:#B42318;font-weight:600}
+.erow-go{color:var(--grey);display:flex}
+.erow:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.eopen{background:#FFFFFF;margin:8px;border-radius:18px;padding:14px 14px 10px;display:flex;flex-direction:column;gap:18px;box-shadow:0 1px 0 rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.06)}
+.eopen-h{display:flex;align-items:center;gap:10px}
+.eopen.off .binic,.eopen.off .name{opacity:.45}
+.sw{position:relative;flex:none;width:52px;height:32px;border-radius:999px;border:0;padding:0;cursor:pointer;background:#D1D1D6;transition:background .2s}
+.sw span{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:999px;background:#FFFFFF;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.sw[aria-checked="true"]{background:var(--green,#34C759)}
+.sw[aria-checked="true"] span{transform:translateX(20px)}
+.sw:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.efield{display:flex;flex-direction:column;gap:8px}
+.edays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.eday{height:40px;border-radius:12px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;padding:0}
+.eseg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;background:var(--tile);border-radius:14px;padding:4px}
+.eseg-b{height:38px;border:0;border-radius:10px;background:none;color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;padding:0 2px;white-space:nowrap}
+.eday[aria-pressed="true"],.eseg-b[aria-pressed="true"]{background:var(--ink);color:#FFFFFF;border-color:var(--ink)}
+.eday:focus-visible,.eseg-b:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.e-hint,.e-note{font-size:13px;color:var(--grey);margin:0}
+.eopen-f{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:6px}
+.e-remove,.e-done{border:0;background:none;font:inherit;font-size:15px;font-weight:600;cursor:pointer;padding:10px 4px;border-radius:8px}
+.e-remove{color:#B42318}
+.e-done{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -1112,9 +1143,9 @@ Share with your street
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
     var empty = !bins.length;
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
-      : editing ? 'Fix your bins<br><span>Day and how often, bin by bin</span>' : "Here's your week<br><span>Look right?</span>";
+      : editing ? 'Edit your bins' : "Here's your week<br><span>Look right?</span>";
     $('#c-lede').textContent = empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
-      : editing ? 'Change the day, how often, or the name. Add any bin ' + BRAND + ' missed.'
+      : editing ? 'Tap a bin to change its day or how often.'
       : note ? note : shared ? 'Your neighbours on ' + postcode + ' get these days. Same lorry, same street.' : '';
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
@@ -1139,17 +1170,40 @@ Share with your street
           '</div>';
       }).join('');
     } else {
-      $('#c-cards').innerHTML = bins.map(function (b) {
-        var days = DAYS.map(function (d) { return '<button type="button" class="day" data-day="' + b.id + ':' + d + '" aria-pressed="' + (b.days.indexOf(d) > -1) + '" aria-label="' + LONG[d] + '">' + d.slice(0, 2) + '</button>'; }).join('');
-        var freqs = FREQ.map(function (f) { return '<button type="button" class="freq" data-freq="' + b.id + ':' + f.id + '" aria-pressed="' + (b.freq === f.id) + '"><span>' + f.label + '</span><span style="font-size:13px;font-weight:500;opacity:.7">' + f.hint + '</span></button>'; }).join('');
+      // Phone-first editor: every bin is one row ("Tue & Fri · Every week"); only the bin you tap
+      // opens, with an on/off switch, day chips and a one-row "how often" control.
+      var SHORT = { weekly: 'Weekly', fortnightly: '2 weeks', three: '3 weeks', monthly: '4 weeks' };
+      var chev = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>';
+      function summary(b) {
+        if (b.on === false) return 'Off';
+        var chosen = DAYS.filter(function (d) { return b.days.indexOf(d) > -1; });
+        if (!chosen.length) return '<span class="e-miss">Day not set</span>';
+        var f = (FREQ.filter(function (x) { return x.id === b.freq; })[0] || {}).label;
+        return (chosen.length === 7 ? 'Every day' : chosen.join(' & ')) + (f && chosen.length < 7 ? ' · ' + f : '');
+      }
+      $('#c-cards').innerHTML = '<div class="elist">' + bins.map(function (b) {
         var off = b.on === false;
-        return '<div class="editcard' + (off ? ' off' : '') + '">' +
-          '<div style="display:flex;align-items:center;gap:12px"><span class="binic">' + binSvg(b, 40) + '</span><label class="sr" for="n-' + b.id + '">Bin name</label><input id="n-' + b.id + '" class="name" data-name="' + b.id + '" value="' + esc(b.name) + '">' +
-          '<button type="button" class="x" data-remove="' + b.id + '" aria-label="Remove ' + esc(b.name) + '"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>' +
-          '<button type="button" class="freq" data-onoff="' + b.id + '" aria-pressed="' + off + '"><span>' + (off ? "I don't put this bin out" : 'I put this bin out') + '</span><span style="font-size:13px;font-weight:500;opacity:.7">' + (off ? 'Tap to turn reminders back on' : 'Tap if you don\'t have it or don\'t use it') + '</span></button>' +
-          (off ? '' : '<div class="editgrid"><div style="display:flex;flex-direction:column;gap:10px"><span class="sublabel" id="d-' + b.id + '">Collection day</span><div role="group" class="days" aria-labelledby="d-' + b.id + '" style="display:flex;gap:6px;flex-wrap:wrap">' + days + '</div><span style="font-size:13px;color:#6E6E73">Collected twice a week? Pick both days.</span></div>' +
-          '<div style="display:flex;flex-direction:column;gap:10px"><span class="sublabel" id="f-' + b.id + '">How often</span><div role="group" aria-labelledby="f-' + b.id + '" style="display:flex;flex-direction:column;gap:6px">' + freqs + '</div></div></div>') + '</div>';
-      }).join('');
+        if (b.id !== openBin) {
+          return '<button type="button" class="erow' + (off ? ' off' : '') + '" data-open="' + b.id + '" aria-expanded="false">' +
+            '<span class="binic">' + binSvg(b, 36) + '</span>' +
+            '<span class="erow-t"><b>' + esc(b.name) + '</b><small>' + summary(b) + '</small></span>' +
+            '<span class="erow-go">' + chev + '</span></button>';
+        }
+        var days = DAYS.map(function (d) { return '<button type="button" class="eday" data-day="' + b.id + ':' + d + '" aria-pressed="' + (b.days.indexOf(d) > -1) + '" aria-label="' + LONG[d] + '">' + d.slice(0, 2) + '</button>'; }).join('');
+        var freqs = FREQ.map(function (f) { return '<button type="button" class="eseg-b" data-freq="' + b.id + ':' + f.id + '" aria-pressed="' + (b.freq === f.id) + '">' + SHORT[f.id] + '</button>'; }).join('');
+        return '<div class="eopen' + (off ? ' off' : '') + '">' +
+          '<div class="eopen-h"><span class="binic">' + binSvg(b, 36) + '</span>' +
+          '<label class="sr" for="n-' + b.id + '">Bin name</label><input id="n-' + b.id + '" class="name" data-name="' + b.id + '" value="' + esc(b.name) + '">' +
+          '<button type="button" class="sw" role="switch" data-onoff="' + b.id + '" aria-checked="' + !off + '" aria-label="Remind me about ' + esc(b.name) + '"><span></span></button></div>' +
+          (off ? '<p class="e-note">Off: no reminders for this bin. Switch it on if you put it out.</p>' :
+          '<div class="efield"><span class="sublabel" id="d-' + b.id + '">Collection day</span>' +
+          '<div role="group" class="edays" aria-labelledby="d-' + b.id + '">' + days + '</div>' +
+          '<span class="e-hint">Collected twice a week? Tap both days.</span></div>' +
+          '<div class="efield"><span class="sublabel" id="f-' + b.id + '">How often</span>' +
+          '<div role="group" class="eseg" aria-labelledby="f-' + b.id + '">' + freqs + '</div></div>') +
+          '<div class="eopen-f"><button type="button" class="e-remove" data-remove="' + b.id + '">Remove bin</button>' +
+          '<button type="button" class="e-done" data-close="' + b.id + '">Done</button></div></div>';
+      }).join('') + '</div>';
     }
     renderAdder();
   }
@@ -1157,9 +1211,15 @@ Share with your street
     var id = e.target.dataset.toggle; if (!id) return;
     find(id).on = e.target.checked; renderConfirm();
   });
+  var openBin = null;  // the bin open in the editor; the rest are one-line rows
   $('#c-cards').addEventListener('click', function (e) {
     var t = e.target.closest('button'); if (!t) return;
-    if (t.dataset.day) {
+    if (t.dataset.open) {
+      openBin = t.dataset.open; renderConfirm();
+      var o = $('#c-cards .eopen'); if (o) { o.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+    } else if (t.dataset.close) {
+      openBin = null; renderConfirm();
+    } else if (t.dataset.day) {
       var p = t.dataset.day.split(':'), b = find(p[0]), i = b.days.indexOf(p[1]);
       if (i > -1) b.days.splice(i, 1); else b.days.push(p[1]);
       b.dirty = true;
@@ -1176,10 +1236,12 @@ Share with your street
   $('#c-cards').addEventListener('input', function (e) {
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
   });
-  $('#c-edit').addEventListener('click', function () { editing = true; renderConfirm(); });
+  $('#c-edit').addEventListener('click', function () { editing = true; openBin = null; renderConfirm(); });
   document.addEventListener('click', function (e) {
     var y = e.target.closest('#c-yes'); if (!y || !y.dataset.missing) return;
-    e.preventDefault(); e.stopImmediatePropagation(); editing = true; renderConfirm(); window.scrollTo(0, 0);
+    e.preventDefault(); e.stopImmediatePropagation(); editing = true;
+    var gap = bins.filter(function (b) { return b.on !== false && !b.days.length; })[0]; openBin = gap ? gap.id : null;  // open the first bin missing a day
+    renderConfirm(); window.scrollTo(0, 0);
   }, true);
   $('#c-save').addEventListener('click', function () { editing = false; adding = null; saveBins(); renderConfirm(); window.scrollTo(0, 0); });
   $('#c-view').addEventListener('click', function (e) { var y = e.target.closest('#c-yes'); if (y && !y.dataset.missing) saveBins(); });
