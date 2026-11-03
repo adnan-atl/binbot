@@ -372,6 +372,18 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .binji-back{z-index:0}
 .binji-legs{z-index:3;clip-path:inset(72.5% 0 0 0)}
 @media (max-width:600px){.binji{--bw:140px;right:-8px;display:block}}
+/* Footer: small and quiet, Privacy in the left corner and Terms in the right */
+.home-foot{font-size:13px;opacity:.6}
+@media (min-width:1100px){.home-foot{font-size:15px}}
+.home-foot .foot-links{flex-direction:row;gap:16px;margin-left:0;width:100%;justify-content:space-between}
+/* Phone: the page scrolls, and the footer sits below the phone mockup instead of on screen */
+@media (max-width:600px){
+#home{height:auto;min-height:100svh;overflow:visible}
+#home .hero{overflow:visible;flex:none}
+#home .home-main{flex:none}
+#home .home-foot{position:static;background:none;padding-top:40px;padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+#home .home-cta{bottom:calc(20px + env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
@@ -421,7 +433,6 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </div>
 </main>
 <footer class="home-foot">
-<a href="{{PARENT_URL}}" target="_blank" rel="noopener">A product of {{PARENT_NAME}}</a>
 <nav class="foot-links" aria-label="Legal"><a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">Privacy</a><a href="{{TERMS_URL}}" target="_blank" rel="noopener">Terms &amp; Conditions</a></nav>
 </footer>
 </div>
