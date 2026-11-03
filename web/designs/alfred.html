@@ -462,6 +462,17 @@ button,input,select,textarea{font-family:inherit}
 /* Less air above the headline */
 .home-main{padding-top:clamp(40px,6vh,72px)}
 @media (max-width:600px){.home-main{padding-top:28px}}
+/* About and FAQs: centred, on one spacing scale. Title -> 40, heading -> 12 -> paragraph,
+   paragraph -> 16 -> paragraph, section -> 48 -> next heading, 32 before the button. */
+.page-main{align-items:center;text-align:center;gap:0}
+.page-main > *{max-width:600px;width:100%}
+.page-card .h1{margin:0 0 40px}
+.page-card .h2,.page-card .h1 + .h2{margin:0 0 12px}
+.page-card .lede{margin:0 0 16px}
+.page-card .lede + .h2{margin-top:32px}
+.page-card .page-cta{margin:32px auto 0;width:100%;align-self:center}
+.faqs{text-align:left}  /* questions and answers read as before; only the page title is centred */
+@media (max-width:600px){.page-card .h1{margin-bottom:32px}.page-card .lede + .h2{margin-top:24px}}
 </style>
 </head>
 <body>
