@@ -197,6 +197,15 @@ button{font:inherit}
 @media (min-width:601px){.badge-ic{width:52px;height:52px;border-radius:14px}}
 .logo-mark{background:none;overflow:hidden}
 .logo-mark img{width:100%;height:100%;border-radius:12px;display:block}
+/* Round avatar, as in the WhatsApp chat, with "Binjamin by Alfred" beside it */
+.badge,.logo{color:inherit;gap:10px}
+.badge{display:inline-flex;align-items:center}
+.badge-ic,.logo-mark,.logo-mark img{border-radius:999px}
+.badge-name{display:flex;flex-direction:column;line-height:1.1;font-size:18px;font-weight:700;letter-spacing:-0.01em}
+.badge-name small,.logo .by{font-size:13px;font-weight:500;opacity:.6;letter-spacing:0}
+.logo b{display:block;line-height:1.1}
+.logo .by{display:block;line-height:1.2}
+@media (min-width:601px){.badge-name{font-size:20px}.badge-name small{font-size:14px}}
 .chat-av img{width:100%;height:100%;object-fit:cover}
 html.vt .home-main{view-transition-name:home-content}
 html.vt .home-foot{view-transition-name:home-foot}
@@ -440,13 +449,14 @@ button,input,select,textarea{font-family:inherit}
 @media (max-width:600px){.binji{--bw:140px;right:-8px}}
 /* Phones: leave room above the mockup for Binji and his bubble, so they never sit on the intro text */
 @media (max-width:600px){.phone-col{margin-top:clamp(132px,19vh,168px)}}
+@media (max-width:600px){.brow-nav{flex:none;width:auto;justify-content:flex-end;gap:18px}.brow-nav a:first-child{position:static;transform:none}}  /* name + links side by side on phones */
 </style>
 </head>
 <body>
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<small>by {{PARENT_NAME}}</small></span></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="hero">
 <main class="home-main">
 <div class="home-copy">
@@ -497,7 +507,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- About (from the brow). Plain copy: edit it here. -->
 <section class="screen" data-screen="about" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<small>by {{PARENT_NAME}}</small></span></a><nav class="brow-nav" aria-label="Site"><a href="#about" aria-current="page">About</a><a href="#faqs">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
@@ -514,7 +524,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
 <section class="screen" data-screen="faqs" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><img class="badge-ic" src="/static/binji-blue-logo.png" alt="" width="40" height="40"><span class="badge-name">{{BRAND}}<small>by {{PARENT_NAME}}</small></span></a><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs" aria-current="page">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">FAQs</h1>
@@ -540,7 +550,6 @@ button,input,select,textarea{font-family:inherit}
 <main class="flow-main">
 <div class="col">
 <h1 class="h1">What's your postcode?</h1>
-<p class="lede">{{BRAND}} looks up your council and your road. You'll check the dates next, then choose where reminders go.</p>
 <div id="pc-form" style="display:flex;flex-direction:column;gap:24px">
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="pc" class="lbl">Postcode</label>
@@ -710,7 +719,7 @@ Share with your street
 <button type="button" class="back" data-back aria-label="Back"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
 <a class="logo" href="#home" aria-label="{{BRAND}} home">
 <span class="logo-mark"><img src="/static/binji-blue-logo.png" alt="" width="38" height="38"></span>
-<b>{{BRAND}}</b>
+<span><b>{{BRAND}}</b><span class="by">by {{PARENT_NAME}}</span></span>
 </a>
 </div>
 <span class="step-of"></span>
