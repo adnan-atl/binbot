@@ -389,7 +389,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .selfie{display:block;width:min(200px,55%);height:auto;margin:4px auto 0}
 /* "Binfluencer" with a green stroke underneath */
 .hl{font-style:normal;color:inherit;text-decoration:underline;text-decoration-color:var(--green,#45C654);text-decoration-thickness:.12em;text-underline-offset:.14em;text-decoration-skip-ink:none}
-.share-lede{text-wrap:balance}  /* one sentence per line, no lonely words */
+.share-lede{text-wrap:pretty}
 /* Ready-made share messages */
 .msgs{display:flex;flex-direction:column;gap:8px}
 .msg{text-align:left;font:inherit;font-size:15px;line-height:1.45;color:var(--ink);background:var(--tile);border:2px solid transparent;border-radius:16px;padding:12px 14px;cursor:pointer}
@@ -429,6 +429,8 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .wa-copied.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
 @media (prefers-reduced-motion:reduce){.wa-copied{transition:none}}
 @media (max-width:360px){.done-head .h1{font-size:30px}.done-head .selfie{width:58px;margin-left:8px}}  /* small phones: headline keeps its lines */
+/* Wider screens: Binji sits beside the headline, centred on it; small phones keep the wrap-around */
+@media (min-width:401px){.done-head{display:flex;align-items:center;gap:16px}.done-head .h1{flex:1;min-width:0}.done-head .selfie{float:none;order:2;flex:none;margin:0}}
 </style>
 </head>
 <body>
