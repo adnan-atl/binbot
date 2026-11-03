@@ -385,6 +385,9 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .e-done{color:var(--ink)}
 /* Last step: headline where every step's sits, then Binji's selfie */
 .selfie{display:block;width:min(200px,55%);height:auto;margin:4px auto 0}
+/* "Binfluencer" marked with a green highlighter stroke */
+.hl{font-style:normal;color:inherit;padding:0 .06em;margin:0 -.06em;border-radius:.12em;background:linear-gradient(transparent 52%,rgba(69,198,84,.55) 52%,rgba(69,198,84,.55) 86%,transparent 86%);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.share-lede{text-wrap:balance}  /* one sentence per line, no lonely words */
 </style>
 </head>
 <body>
@@ -606,9 +609,9 @@ Say hi on WhatsApp
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1 h1-flip"><span>You're all set</span><br>Now become a binfluencer</h1>
+<h1 class="h1 h1-flip"><span>You're all set</span><br>Now become a <em class="hl">Binfluencer</em></h1>
 <img class="selfie" src="/static/binji-selfie.webp" alt="Binji taking a selfie" width="640" height="630">
-<p class="lede">Help your neighbours never miss a bin day. Share {{BRAND}} on your community WhatsApp groups.</p>
+<p class="lede share-lede">Help your neighbours never miss a bin&nbsp;day.<br>Share {{BRAND}} on your community WhatsApp&nbsp;groups.</p>
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="link" class="lbl">Your invite link</label>
 <div class="linkbox">
