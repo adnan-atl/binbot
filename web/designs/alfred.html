@@ -507,6 +507,8 @@ button,input,select,textarea{font-family:inherit}
 .e-remove,.e-done{border:0;background:none;font:inherit;font-size:15px;font-weight:600;cursor:pointer;padding:10px 4px;border-radius:8px}
 .e-remove{color:#B42318}
 .e-done{color:var(--ink)}
+/* Last step: headline where every step's sits, then Binji's selfie */
+.selfie{display:block;width:min(260px,70%);height:auto;margin:4px auto 0}
 </style>
 </head>
 <body>
@@ -730,28 +732,8 @@ Say hi on WhatsApp
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<div class="reveal" id="reveal" role="img" aria-label="Level 1 unlocked: Bin rookie. Invite 1 neighbour to reach Kerbside regular.">
-<div class="rays" aria-hidden="true"></div>
-<div class="glow" aria-hidden="true"></div>
-<div class="sparks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-<div class="rv-top" aria-hidden="true">Level unlocked</div>
-<div class="badge-wrap" aria-hidden="true">
-<div class="shield"><svg viewBox="0 0 40 40" width="58" height="58" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h26"></path><path d="M15 11V8h10v3"></path><path d="M10 11l2 23h16l2-23"></path><circle cx="16.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><circle cx="23.5" cy="20" r="1.8" fill="currentColor" stroke="none"></circle><path d="M17 26c1.8 1.4 4.2 1.4 6 0"></path></svg></div>
-<div class="lvl">1</div>
-</div>
-<div class="rv-name" aria-hidden="true">Bin rookie</div>
-<div class="ladder" aria-hidden="true">
-<div class="rung on"><span class="rdot">1</span><span>Rookie</span></div>
-<div class="rung"><span class="rdot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span><span>Kerbside</span></div>
-<div class="rung"><span class="rdot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span><span>Captain</span></div>
-<div class="rung"><span class="rdot"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span><span>Binfluencer</span></div>
-</div>
-<div class="xp" aria-hidden="true">
-<div class="xp-bar"><div class="xp-fill"></div></div>
-<div class="xp-txt"><span>Next: <b>Kerbside regular</b></span><span>0 / 1 neighbour</span></div>
-</div>
-</div>
-<h1 class="h1">You're all set<br><span>Now become a binfluencer</span></h1>
+<h1 class="h1 h1-flip"><span>You're all set</span><br>Now become a binfluencer</h1>
+<img class="selfie" src="/static/binji-selfie.webp" alt="Binji taking a selfie" width="640" height="630">
 <p class="lede">Every neighbour who joins levels you up. Five, and you're a binfluencer.</p>
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="link" class="lbl">Your invite link</label>
@@ -813,7 +795,6 @@ Share with your street
     
     if (target === 'postcode') setTimeout(function () { $('#pc').focus(); }, 50);
     if (target === 'phone') setTimeout(function () { $('#tel').focus(); }, 50);
-    if (target === 'binfluencer') { var rv = $('#reveal'); rv.classList.remove('play'); void rv.offsetWidth; rv.classList.add('play'); }
   }
   var current = 'home';
   // About and FAQs get their own history entry so the browser's back button returns from them;
