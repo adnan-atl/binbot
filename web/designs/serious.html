@@ -748,7 +748,7 @@ Share to WhatsApp
     var from = current;
     var push = (id === 'about' || id === 'faqs') && id !== current;
     current = id;
-    try { history[push ? 'pushState' : 'replaceState'](null, '', '#' + id); } catch (e) {}
+    try { history[push ? 'pushState' : 'replaceState'](null, '', id === 'home' ? location.pathname + location.search : '#' + id); } catch (e) {}
     swap(from);
   }
   window.addEventListener('popstate', function () {
