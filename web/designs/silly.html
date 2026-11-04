@@ -550,6 +550,10 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .legal .h2{font-size:20px;margin:28px 0 10px}
 .legal .h1 + .updated + .h2{margin-top:0}
 @media (max-width:600px){.legal .updated{margin:-20px 0 24px}.legal p,.legal ul{font-size:15px}.legal .h2{font-size:18px}}
+.pc-head{display:flex;align-items:flex-end;gap:12px}  /* Binji beside the question, feet on the line above the field */
+.pc-head .h1{flex:1;min-width:0}
+.pc-binji{flex:none;width:84px;height:auto;margin:0 -4px -6px 0}
+@media (min-width:601px){.pc-head{align-items:center;gap:24px}.pc-binji{width:120px;margin:0}}
 </style>
 </head>
 <body>
@@ -769,7 +773,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">What's your postcode?</h1>
+<div class="pc-head"><h1 class="h1">What's your postcode?</h1><img class="pc-binji" src="/static/binji-think.webp" alt="" width="359" height="480"></div>
 <div id="pc-form" style="display:flex;flex-direction:column;gap:24px">
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="pc" class="lbl">Postcode</label>
