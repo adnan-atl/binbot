@@ -1075,7 +1075,7 @@ Share to WhatsApp
     // button followed by a replayed animation.
     // Steps say what's really happening for this sign-up: which home we're asking about,
     // then the council's calendar, then the cross-check with the street.
-    fetching = true; parseAt = 0; hold = 2;
+    fetching = true; shown = 0; hold = 2;
     var home = addr ? addr.line.replace(/,\s*[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i, '') : typed ? typed + ', ' + v : '';
     // Each step reads as what's happening now (spinner), what happened (tick) or what's next.
     PSTEPS[0] = step('Find your council', 'Finding your council', 'Found your council', '', API.council || 'Your council');
@@ -1084,7 +1084,7 @@ Share to WhatsApp
     PSTEPS[2] = step('Read the collection calendar', 'Reading the collection calendar', 'Read the collection calendar',
                      'Asking ' + (API.council || 'your council') + ' for your dates', 'Straight from ' + (API.council || 'your council'));
     PSTEPS[3] = step('Spot your bins', 'Spotting your bins', 'Spotted your bins', '', '');
-    setTimeout(function () { if (fetching) { PSTEPS[hold].sub = 'Some council websites are slow. Nearly there…'; drawParsing(parseAt); } }, 8000);
+    setTimeout(function () { if (fetching) { PSTEPS[hold].sub = 'Some council websites are slow. Nearly there…'; drawParsing(Math.min(shown, hold)); } }, 8000);
     go('parsing');
     req.then(function (j) {
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
@@ -1096,7 +1096,7 @@ Share to WhatsApp
       // Calendar in hand: keep the loader on while we double-check it against the
       // street (fills anything this address's calendar left out) before showing anything.
       if (shared) PSTEPS[2].subDone = 'Same round as your neighbours on ' + postcode;
-      hold = 3; drawParsing(parseAt = 3);
+      hold = 3;  // the ticker walks up to it, one step at a time
       return api('POST', '/users/' + API.userId + '/verify').then(function (list) { bins = list.map(binFromApi); return j; },
                                                                 function () { return j; });
     }).then(function (j) {
@@ -1162,17 +1162,22 @@ Share to WhatsApp
       return '<div class="pstep">' + mark + '<div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:17px;font-weight:700;color:' + (i > at ? '#8A8A8E' : '#1A1A1A') + '">' + s.label + '</span><span class="hint">' + s.sub + '</span></div></div>';
     }).join('');
   }
-  var fetching = false, parseAt = 0, hold = 1;
+  // The steps tick one at a time, never faster than STEP_MS each, even when the answer is
+  // already in (a neighbour's calendar comes back instantly): a beat per tick reads as work
+  // being done, all ticks at once reads as a glitch. Slow councils keep the spinner on the
+  // step that's really in progress (hold) until the answer arrives.
+  var fetching = false, shown = 0, hold = 1, STEP_MS = 550;
+  function parseTarget() { return fetching ? hold : PSTEPS.length; }
   function runParsing() {
     clearInterval(timer);
-    // Work still running: tick what's done, spin on the step in progress.
-    if (fetching) { parseAt = hold; drawParsing(parseAt); return; }
-    // Answer is in: finish the remaining steps quickly. Demo mode keeps the slower show.
-    var ms = API.live ? 220 : 900;
-    if (!API.live) parseAt = 0;
-    drawParsing(parseAt);
-    if (parseAt >= PSTEPS.length) { parsingDone(); return; }
-    timer = setInterval(function () { parseAt++; drawParsing(parseAt); if (parseAt >= PSTEPS.length) { clearInterval(timer); parsingDone(); } }, ms);
+    var ms = API.live ? STEP_MS : 900;  // demo mode keeps the slower show
+    if (!API.live && !fetching) shown = 0;
+    drawParsing(Math.min(shown, parseTarget()));
+    if (!fetching && shown >= PSTEPS.length) { parsingDone(); return; }
+    timer = setInterval(function () {
+      if (shown < parseTarget()) { shown++; drawParsing(shown); }
+      if (!fetching && shown >= PSTEPS.length) { clearInterval(timer); parsingDone(); }
+    }, ms);
   }
   // Nothing for the resident to do on this screen: once every step is ticked, give the last
   // tick a moment to register, then show their dates.
