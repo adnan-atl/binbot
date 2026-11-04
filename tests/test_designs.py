@@ -45,6 +45,6 @@ def test_home_page_can_show_a_design(client, monkeypatch):
 
 
 def test_about_and_faqs_have_their_own_addresses(client):
-    for path in ("/about", "/faqs", "/d/silly/about", "/d/silly/faqs"):
+    for path in ("/about", "/faqs", "/privacy", "/terms", "/d/silly/about", "/d/silly/faqs", "/d/silly/terms"):
         assert client.get(path).status_code == 200, path
     assert client.get("/d/nope/about").status_code == 404

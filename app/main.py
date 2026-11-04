@@ -53,6 +53,7 @@ if WEB.exists():
     @app.get("/about", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/faqs", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/privacy", include_in_schema=False, response_class=HTMLResponse)
+    @app.get("/terms", include_in_schema=False, response_class=HTMLResponse)
     def index():
         name = get_settings().home_design
         page = WEB / "designs" / f"{name}.html"
@@ -64,6 +65,7 @@ if WEB.exists():
     @app.get("/d/{name}/about", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/d/{name}/faqs", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/d/{name}/privacy", include_in_schema=False, response_class=HTMLResponse)
+    @app.get("/d/{name}/terms", include_in_schema=False, response_class=HTMLResponse)
     def design(name: str):
         """Design variants side by side: web/designs/<name>.html at /d/<name> (e.g. /d/silly)."""
         page = WEB / "designs" / f"{name}.html"

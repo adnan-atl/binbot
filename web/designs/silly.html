@@ -708,6 +708,59 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </div>
 </section>
 
+<!-- Terms (linked from the footer and the number step). DRAFT: have it checked before launch. -->
+<section class="screen" data-screen="terms" hidden>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<div class="page-card">
+<main class="page-main legal">
+<h1 class="h1">Terms</h1>
+<p class="updated">Last updated 4 November 2026</p>
+
+<h2 class="h2">About these terms</h2>
+<p>These terms cover your use of {{BRAND}}, the WhatsApp bin reminder, and this website. By signing up, you agree to them. Our <a href="/privacy">privacy policy</a> explains how we use your data.</p>
+<p>{{BRAND}} is run by Alfred Wholesale Limited, a company registered in England and Wales (company number 16293586), 9 Thorney Leys Park, Witney, Oxfordshire, OX28 4GE. VAT number GB515464789. "We" and "us" mean Alfred Wholesale Limited.</p>
+
+<h2 class="h2">What {{BRAND}} does</h2>
+<p>{{BRAND}} reads your council's collection calendar and sends you a WhatsApp message the day before collection, saying which bins to put out. It keeps checking for changes, such as bank holiday moves, and tells you if your dates change.</p>
+<p>{{BRAND}} is free. We'll tell you before we ever charge for any part of it.</p>
+
+<h2 class="h2">Reminders are a helping hand</h2>
+<p>We get your bin days from your council's own website. Councils sometimes change dates at short notice, publish them late or get them wrong, and collections can be missed for reasons we can't see. So we can't promise every reminder will be on time or correct.</p>
+<p>Your council's information always comes first. If something looks wrong, check with your council, and reply WRONG so we can look again. We're not responsible for missed collections, or for any charges or penalties your council applies.</p>
+
+<h2 class="h2">Using {{BRAND}}</h2>
+<ul>
+<li>You need a WhatsApp account and a UK address, and you must be old enough to use WhatsApp.</li>
+<li>Only sign up with a phone number that's yours, or that you have permission to use.</li>
+<li>Don't misuse {{BRAND}}: no automated sign-ups, no attempts to break or overload it, and nothing unlawful.</li>
+<li>WhatsApp's own terms also apply to your use of WhatsApp.</li>
+</ul>
+
+<h2 class="h2">Messages from us</h2>
+<p>By signing up, you agree to get bin reminders and {{BRAND}} updates on WhatsApp. Unless you opt out, {{PARENT_NAME}} may also tell you about its other home admin services. Reply STOP at any time to stop all messages, or START to turn them back on.</p>
+
+<h2 class="h2">Invite links</h2>
+<p>You can share your invite link with neighbours. Only share it with people who'd want it, and don't post it anywhere that breaks that site's rules.</p>
+
+<h2 class="h2">Stopping and deleting</h2>
+<p>You can stop using {{BRAND}} at any time: reply STOP, or message DELETE to erase your account. We can suspend or close an account that breaks these terms. We may also change {{BRAND}}, or stop running it, and we'll give you notice on WhatsApp where we can.</p>
+
+<h2 class="h2">Our responsibility to you</h2>
+<p>We provide {{BRAND}} with reasonable care and skill. We're not responsible for losses we couldn't reasonably have foreseen, for problems caused by your council, WhatsApp or your phone, or for events outside our control.</p>
+<p>Nothing in these terms limits our liability for death or personal injury caused by our negligence, for fraud, or for anything else that can't be limited by law. Nothing in them affects your legal rights as a consumer.</p>
+
+<h2 class="h2">Changes to these terms</h2>
+<p>We may update these terms, for example when {{BRAND}} changes or the law does. We'll update the date at the top, and tell you on WhatsApp about any important change.</p>
+
+<h2 class="h2">The law</h2>
+<p>These terms are governed by the law of England and Wales. If you live in Scotland or Northern Ireland, you can also bring proceedings in your local courts.</p>
+
+<h2 class="h2">Contact</h2>
+<p>Questions or complaints: <a href="mailto:privacy@alfred.co.uk">privacy@alfred.co.uk</a>, or message {{BRAND}} on WhatsApp.</p>
+</main>
+</div>
+</section>
+
 <!-- 2 · Postcode -->
 <section class="screen" data-screen="postcode" data-step="1" hidden>
 <div data-bar></div>
@@ -915,17 +968,17 @@ Share to WhatsApp
   var current = 'home';
   // Clean addresses: About and FAQs live at /about and /faqs (/d/<name>/about for a design);
   // the home page and every sign-up step stay on the plain address.
-  var BASE = location.pathname.replace(/\/(about|faqs|privacy)\/?$/, '').replace(/\/$/, '');
-  function urlFor(id) { return (id === 'about' || id === 'faqs' || id === 'privacy') ? BASE + '/' + id : (BASE || '/') + location.search; }
+  var BASE = location.pathname.replace(/\/(about|faqs|privacy|terms)\/?$/, '').replace(/\/$/, '');
+  function urlFor(id) { return (id === 'about' || id === 'faqs' || id === 'privacy' || id === 'terms') ? BASE + '/' + id : (BASE || '/') + location.search; }
   function screenFromUrl() {
-    var m = location.pathname.match(/\/(about|faqs|privacy)\/?$/) || location.hash.match(/^#(about|faqs|privacy)$/);
+    var m = location.pathname.match(/\/(about|faqs|privacy|terms)\/?$/) || location.hash.match(/^#(about|faqs|privacy|terms)$/);
     return m ? m[1] : 'home';
   }
   // About and FAQs get their own history entry so the browser's back button returns from them;
   // sign-up steps replace the entry as before.
   function go(id) {
     var from = current;
-    var push = (id === 'about' || id === 'faqs' || id === 'privacy') && id !== current;
+    var push = (id === 'about' || id === 'faqs' || id === 'privacy' || id === 'terms') && id !== current;
     current = id;
     try { history[push ? 'pushState' : 'replaceState'](null, '', urlFor(id)); } catch (e) {}
     swap(from);
@@ -937,7 +990,7 @@ Share to WhatsApp
   });
   // Between home, About and FAQs: the old content fades out (View Transitions where the browser
   // has them) and the new content rises in. Elsewhere, or with reduced motion, screens just swap.
-  var PAGES = { home: 1, about: 1, faqs: 1, privacy: 1 };
+  var PAGES = { home: 1, about: 1, faqs: 1, privacy: 1, terms: 1 };
   var REDUCE = false; try { REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   function swap(from) {
     var pageMove = from !== current && PAGES[from] && PAGES[current];
