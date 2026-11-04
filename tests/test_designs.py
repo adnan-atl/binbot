@@ -28,3 +28,17 @@ def test_added_bin_keeps_its_colour(client):
     assert [b["colour"] for b in out if b["label"] == "Purple bin"] == ["purple"]
     body["bins"][-1]["colour"] = "tartan"
     assert client.put(f"/api/users/{uid}/bins", json=body).status_code == 400
+
+
+def test_home_page_can_show_a_design(client, monkeypatch):
+    from app.core.config import get_settings
+    monkeypatch.setenv("HOME_DESIGN", "silly")
+    get_settings.cache_clear()
+    try:
+        assert client.get("/").text == client.get("/d/silly").text
+        monkeypatch.setenv("HOME_DESIGN", "nope")
+        get_settings.cache_clear()
+        assert client.get("/").status_code == 200  # unknown design falls back to index.html
+    finally:
+        monkeypatch.delenv("HOME_DESIGN")
+        get_settings.cache_clear()

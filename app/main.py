@@ -51,6 +51,10 @@ if WEB.exists():
     @app.get("/", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/static/index.html", include_in_schema=False, response_class=HTMLResponse)
     def index():
+        name = get_settings().home_design
+        page = WEB / "designs" / f"{name}.html"
+        if name and re.fullmatch(r"[a-z0-9-]{1,40}", name) and page.is_file():
+            return HTMLResponse(render_index(page))
         return HTMLResponse(render_index())
 
     @app.get("/d/{name}", include_in_schema=False, response_class=HTMLResponse)
