@@ -1351,7 +1351,7 @@ Share to WhatsApp
   }
   $('#c-add').addEventListener('click', function () {
     adding = { type: null, days: [], freq: null };
-    renderAdder();
+    openBin = null; renderConfirm();  // fold any open bin so the new one has the stage
     setTimeout(function () { var el = $('#c-adder .editcard'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); var f = $('#c-adder .btype'); if (f) f.focus({ preventScroll: true }); }, 30);
   });
   $('#c-adder').addEventListener('click', function (e) {
