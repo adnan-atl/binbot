@@ -1082,11 +1082,11 @@ Share to WhatsApp
   // Grey line under each bin: what goes in it, how often, and the next date it goes out.
   // Phones drop how often so the line stays short: just the next date.
   var narrowMq = null; try { narrowMq = matchMedia('(max-width:420px)'); } catch (e) {}
-  // Every row reads the same way: how often, then the next date ("Every 2 weeks · next Thu 12 Nov").
+  // Every row reads the same way: the next date ("next Thu 12 Nov"), worked out for added bins too.
   var subline = function (b) {
     var nx = nextDate(b);
     // the date never splits over two lines (non-breaking spaces)
-    return [purposeText(b), freqText(b), nx ? ('next ' + fmtDate(nx)).replace(/ /g, '\u00A0') : ''].filter(Boolean).join(' · ');
+    return [purposeText(b), nx ? ('next ' + fmtDate(nx)).replace(/ /g, '\u00A0') : freqText(b)].filter(Boolean).join(' · ');  // just the next date; how often only if there's no date
   };
   // The next collection: the council's own date for untouched bins, otherwise worked out from the
   // days, how often and (for 2/3/4-weekly bins) the week the resident picked.
