@@ -550,10 +550,11 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .legal .h2{font-size:20px;margin:28px 0 10px}
 .legal .h1 + .updated + .h2{margin-top:0}
 @media (max-width:600px){.legal .updated{margin:-20px 0 24px}.legal p,.legal ul{font-size:15px}.legal .h2{font-size:18px}}
-.pc-head{display:flex;align-items:flex-end;gap:12px}  /* Binji beside the question, feet on the line above the field */
-.pc-head .h1{flex:1;min-width:0}
-.pc-binji{flex:none;width:84px;height:auto;margin:0 -4px -6px 0}
-@media (min-width:601px){.pc-head{align-items:center;gap:24px}.pc-binji{width:120px;margin:0}}
+.pc-head .h1{padding-right:96px}  /* room for Binji, who stands on the postcode box */
+.pc-wrap{position:relative}
+.pc-wrap .field{width:100%;box-sizing:border-box}
+.pc-binji{position:absolute;right:18px;bottom:calc(100% - 5px);width:84px;height:auto;pointer-events:none;z-index:1}
+@media (min-width:601px){.pc-head .h1{padding-right:130px}.pc-binji{width:112px;right:28px}}
 </style>
 </head>
 <body>
@@ -773,11 +774,11 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<div class="pc-head"><h1 class="h1">What's your postcode?</h1><img class="pc-binji" src="/static/binji-think.webp" alt="" width="359" height="480"></div>
+<div class="pc-head"><h1 class="h1">What's your postcode?</h1></div>
 <div id="pc-form" style="display:flex;flex-direction:column;gap:24px">
 <div style="display:flex;flex-direction:column;gap:8px">
 <label for="pc" class="lbl">Postcode</label>
-<input id="pc" class="field" type="text" autocomplete="postal-code" placeholder="e.g. E8 3PB" aria-describedby="pc-err">
+<div class="pc-wrap"><img class="pc-binji" src="/static/binji-think.webp" alt="" width="359" height="480"><input id="pc" class="field" type="text" autocomplete="postal-code" placeholder="e.g. E8 3PB" aria-describedby="pc-err"></div>
 <span id="pc-err" class="error" hidden>Enter a UK postcode, like E8 3PB.</span>
 </div>
 <div id="house-wrap" style="display:flex;flex-direction:column;gap:8px" hidden>
