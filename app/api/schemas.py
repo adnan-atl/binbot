@@ -67,6 +67,7 @@ class BinIn(BaseModel):
     days: list[str] | None = None  # when set: manual rule
     frequency: str | None = None
     anchor: str | None = None
+    colour: str | None = Field(default=None, max_length=24)  # blue, black, green, brown, grey, purple...
 
 
 class BinsIn(BaseModel):

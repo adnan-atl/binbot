@@ -278,12 +278,14 @@ def _bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.Bi
         if upcoming:  # today's collection after the cutoff isn't "next" any more
             rule["next"] = upcoming[0]
         out.append(S.BinOut(setting_id=s.id, bin_type_id=s.bin_type_id, label=s.label,
-                            category=s.category.value, colour=colour, enabled=s.enabled,
+                            category=s.category.value, colour=s.colour or colour, enabled=s.enabled,
                             manual=manual, upcoming=upcoming, **rule))
     return out
 
 
 # ---- step 3: confirm / edit bins ---------------------------------------------------
+
+BIN_COLOURS = {"blue", "black", "green", "brown", "grey", "purple", "red", "yellow", "white", "orange", "pink"}
 
 
 @router.get("/users/{user_id}/bins", response_model=list[S.BinOut])
@@ -304,6 +306,11 @@ def put_bins(user_id: str, body: S.BinsIn, db: Session = Depends(get_db)):
             s = UserBinSetting(user_id=user.id)
             db.add(s)
         s.label, s.category, s.enabled = b.label, BinCategory(b.category), b.enabled
+        if b.colour is not None:
+            c = b.colour.strip().lower()
+            if c and c not in BIN_COLOURS:
+                raise HTTPException(400, "Unknown bin colour")
+            s.colour = c or None
         if b.days is not None:
             s.override_rule = {"days": b.days, "frequency": b.frequency or "weekly",
                                "anchor": b.anchor}

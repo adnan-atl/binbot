@@ -432,6 +432,13 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .done-head .h1{flex:1;min-width:0}
 .done-head .selfie{float:none;order:2;flex:none;margin:0 0 -2px}
 @media (min-width:401px){.done-head{gap:16px}}
+/* Add a bin: colour swatches */
+.acolours{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.acolour{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:64px;padding:0 4px;border-radius:12px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;min-width:0;white-space:nowrap}
+.acolour i{flex:none;width:22px;height:22px;border-radius:999px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.acolour[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.acolour:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+#c-save:disabled{background:var(--line);color:var(--grey);cursor:not-allowed;opacity:1}
 </style>
 </head>
 <body>
@@ -584,7 +591,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div class="row-actions stack-all" style="justify-content:center;margin-top:32px">
 <button type="button" class="pill solid" id="c-save" style="width:100%">Save changes</button>
 <button type="button" class="ghost" id="c-own" hidden>These aren't my days. Look up my address</button>
-<span class="hint" style="text-align:center">Or tell {{BRAND}} in the chat, in your own words.</span>
+<span class="hint" id="c-chat-hint" style="text-align:center">Or tell {{BRAND}} in the chat, in your own words.</span>
 </div>
 </div>
 </main>
@@ -849,12 +856,13 @@ Share to WhatsApp
     var m = CAT_META[b.category] || CAT_META.other;
     return { id: b.setting_id, name: b.label, kind: m.kind, days: (b.days || []).map(function (d) { return DAY_IN[d]; }),
       freq: FREQ_IN[b.frequency] || 'unknown', next0: fmtDate(b.next), color: COLOUR_HEX[b.colour] || m.color, shape: m.shape, cat: b.category, on: b.enabled !== false,
-      purpose: b.purpose || '', manual: !!b.manual, upcoming: b.upcoming || [] };
+      purpose: b.purpose || '', manual: !!b.manual, upcoming: b.upcoming || [], colour: b.colour || null };
   }
   function binToApi(b) {
     var o = { setting_id: b.id && b.id.indexOf('new') !== 0 ? b.id : null, label: b.name, category: b.cat || 'other', enabled: b.on !== false };
     // Only send a rule for bins the user changed or added; untouched bins keep council dates.
     if (b.dirty || !o.setting_id) { o.days = b.days.map(function (d) { return DAY_OUT[d]; }); o.frequency = FREQ_OUT[b.freq] || 'weekly'; }
+    if (b.colour && !o.setting_id) o.colour = b.colour;  // the colour they picked for a bin they added
     return o;
   }
   function saveBins() {
@@ -1197,8 +1205,21 @@ Share to WhatsApp
     return '<svg viewBox="0 0 60 60" width="' + size + '" height="' + size + '" aria-hidden="true"><ellipse cx="30" cy="55" rx="22" ry="2.5" fill="#E5E5EA"></ellipse><rect x="10" y="8" width="40" height="7" rx="3" fill="' + t.color + '"></rect><rect x="25" y="4" width="10" height="5" rx="2" fill="' + t.color + '"></rect><path d="M13 15h34l-3 38H16z" fill="' + t.color + '"></path><path d="M19 22h22" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"></path><circle cx="41" cy="53" r="3.5" fill="#1A1A1A"></circle></svg>';
   }
   var adding = null;
+  // Colours offered when adding a bin; each type starts on its usual colour.
+  var BIN_COLOURS = [['blue', 'Blue'], ['black', 'Black'], ['green', 'Green'], ['brown', 'Brown'], ['grey', 'Grey'], ['purple', 'Purple'], ['red', 'Red'], ['yellow', 'Yellow']];
+  var TYPE_COLOUR = { rec: 'blue', gen: 'black', gar: 'green', food: 'brown' };
+  function addName(a, t) {  // "Other bin" becomes "Purple bin" once a colour is picked
+    var cn = (BIN_COLOURS.filter(function (c) { return c[0] === a.colour; })[0] || [])[1];
+    return a.name || (t.id === 'other' && cn ? cn + ' bin' : t.name);
+  }
   function renderAdder() {
     $('#c-add').hidden = !!adding;
+    // While a bin is half-added, Save is greyed out so nobody saves before tapping "Add …".
+    $('#c-save').disabled = !!adding || !bins.length;
+    // ...and the side options step aside until the new bin is added.
+    $('#c-chat-hint').hidden = !!adding;
+    if (adding) $('#c-own').hidden = true;
+    else $('#c-own').hidden = !(editing && shared && API.live && bins.length);
     if (!adding) { $('#c-adder').innerHTML = ''; return; }
     var a = adding;
     var html = '<div class="editcard" style="margin-top:12px">' +
@@ -1208,18 +1229,24 @@ Share to WhatsApp
       TYPES.map(function (t) { return '<button type="button" class="btype" data-atype="' + t.id + '" aria-pressed="' + (a.type === t.id) + '">' + binSvg(t) + '<span>' + t.name + '</span><small>' + t.kind + '</small></button>'; }).join('') +
       '</div></div>';
     if (a.type) {
-      html += '<div class="addsec"><span class="sublabel" id="a-days">2. Which day is it collected?</span><div class="days" role="group" aria-labelledby="a-days" style="display:flex;gap:6px;flex-wrap:wrap">' +
-        DAYS.map(function (d) { return '<button type="button" class="day" data-aday="' + d + '" aria-pressed="' + (a.days.indexOf(d) > -1) + '" aria-label="' + LONG[d] + '">' + d.slice(0, 2) + '</button>'; }).join('') +
-        '</div><span style="font-size:13px;color:#6E6E73">Collected twice a week? Pick both days.</span></div>';
-    }
-    if (a.type && a.days.length) {
-      html += '<div class="addsec"><span class="sublabel" id="a-freq">3. How often?</span><div role="group" aria-labelledby="a-freq" style="display:flex;flex-direction:column;gap:6px">' +
-        FREQ.map(function (f) { return '<button type="button" class="freq" data-afreq="' + f.id + '" aria-pressed="' + (a.freq === f.id) + '"><span>' + f.label + '</span><span style="font-size:13px;font-weight:500;opacity:.7">' + f.hint + '</span></button>'; }).join('') +
+      html += '<div class="addsec"><span class="sublabel" id="a-colour">2. What colour is it?</span><div class="acolours" role="group" aria-labelledby="a-colour">' +
+        BIN_COLOURS.map(function (c) { return '<button type="button" class="acolour" data-acolour="' + c[0] + '" aria-pressed="' + (a.colour === c[0]) + '"><i style="background:' + COLOUR_HEX[c[0]] + '"></i>' + c[1] + '</button>'; }).join('') +
         '</div></div>';
     }
-    if (a.type && a.days.length && a.freq) {
+    if (a.type && a.colour) {
+      html += '<div class="addsec"><span class="sublabel" id="a-days">3. Which day is it collected?</span><div class="edays" role="group" aria-labelledby="a-days">' +
+        DAYS.map(function (d) { return '<button type="button" class="eday" data-aday="' + d + '" aria-pressed="' + (a.days.indexOf(d) > -1) + '" aria-label="' + LONG[d] + '">' + d.slice(0, 2) + '</button>'; }).join('') +
+        '</div><span class="e-hint">Collected twice a week? Tap both days.</span></div>';
+    }
+    if (a.type && a.colour && a.days.length) {
+      var SHORTF = { weekly: 'Weekly', fortnightly: '2 weeks', three: '3 weeks', monthly: '4 weeks' };
+      html += '<div class="addsec"><span class="sublabel" id="a-freq">4. How often?</span><div class="eseg" role="group" aria-labelledby="a-freq">' +
+        FREQ.map(function (f) { return '<button type="button" class="eseg-b" data-afreq="' + f.id + '" aria-pressed="' + (a.freq === f.id) + '">' + SHORTF[f.id] + '</button>'; }).join('') +
+        '</div></div>';
+    }
+    if (a.type && a.colour && a.days.length && a.freq) {
       var t = TYPES.filter(function (x) { return x.id === a.type; })[0];
-      html += '<div class="addsec"><button type="button" class="pill solid" data-acommit="1" style="width:100%">Add ' + (a.name || t.name).toLowerCase() + '</button></div>';
+      html += '<div class="addsec"><button type="button" class="pill solid" data-acommit="1" style="width:100%">Add ' + addName(a, t).toLowerCase() + '</button></div>';
     }
     $('#c-adder').innerHTML = html + '</div>';
   }
@@ -1232,12 +1259,14 @@ Share to WhatsApp
     var b = e.target.closest('button'); if (!b || !adding) return;
     var d = b.dataset;
     if (d.acancel) { adding = null; renderAdder(); $('#c-add').focus(); return; }
-    if (d.atype) { adding.type = d.atype; adding.cat = null; adding.name = null; }
+    if (d.atype) { adding.type = d.atype; adding.cat = null; adding.name = null; adding.colour = TYPE_COLOUR[d.atype] || null; }
+    if (d.acolour) adding.colour = d.acolour;
     if (d.aday) { var i = adding.days.indexOf(d.aday); if (i > -1) adding.days.splice(i, 1); else adding.days.push(d.aday); if (!adding.days.length) adding.freq = null; }
     if (d.afreq) adding.freq = d.afreq;
     if (d.acommit) {
       var t = TYPES.filter(function (x) { return x.id === adding.type; })[0];
-      bins.push({ id: 'new' + seq++, name: adding.name || t.name, kind: t.id === 'other' ? '' : t.kind, days: adding.days.slice(), freq: adding.freq, next0: '', color: t.color, shape: t.shape, cat: adding.cat || ({rec:'recycling',gen:'general',gar:'garden',food:'food',other:'other'})[t.id], on: true });
+      var cn = (BIN_COLOURS.filter(function (c) { return c[0] === adding.colour; })[0] || [])[1];
+      bins.push({ id: 'new' + seq++, name: addName(adding, t), kind: cn ? cn + (t.shape === 'caddy' ? ' caddy' : ' bin') : '', days: adding.days.slice(), freq: adding.freq, next0: '', color: COLOUR_HEX[adding.colour] || t.color, colour: adding.colour, shape: t.shape, cat: adding.cat || ({rec:'recycling',gen:'general',gar:'garden',food:'food',other:'other'})[t.id], on: true });
       adding = null; renderConfirm(); return;
     }
     var sel = d.atype ? '[data-atype="' + d.atype + '"]' : d.aday ? '[data-aday="' + d.aday + '"]' : d.afreq ? '[data-afreq="' + d.afreq + '"]' : null;

@@ -252,6 +252,8 @@ class UserBinSetting(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     # Manual rule: {"days": ["TUE","FRI"], "frequency": "weekly", "anchor": "2026-11-03"}
     override_rule: Mapped[dict | None] = mapped_column(JSON)
+    # The bin's colour as the resident told us (bins they add or recolour); overrides the council's.
+    colour: Mapped[str | None] = mapped_column(String(24), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="bin_settings")
     bin_type: Mapped[BinType | None] = relationship()
