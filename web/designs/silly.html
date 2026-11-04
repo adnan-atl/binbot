@@ -540,6 +540,13 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .anext-b[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#FFFFFF}
 .anext-b[aria-pressed="true"] small{color:rgba(255,255,255,.75)}
 .anext-b:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.legal .updated{margin:-28px 0 32px;font-size:14px;color:#6E6E73;text-align:left}
+.legal p,.legal ul{margin:0 0 14px;font-size:16px;line-height:1.6;color:#4A4A4F;text-align:left}
+.legal ul{padding-left:20px}
+.legal li{margin:0 0 6px}
+.legal .h2{font-size:20px;margin:28px 0 10px}
+.legal .h1 + .updated + .h2{margin-top:0}
+@media (max-width:600px){.legal .updated{margin:-20px 0 24px}.legal p,.legal ul{font-size:15px}.legal .h2{font-size:18px}}
 </style>
 </head>
 <body>
@@ -630,6 +637,73 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <details class="faq"><summary>Who makes {{BRAND}}?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p><a href="{{PARENT_URL}}" target="_blank" rel="noopener">{{PARENT_NAME}}</a>.</p></div></div></details>
 </div>
 <a class="pill go page-cta" href="#postcode">Add to WhatsApp</a>
+</main>
+</div>
+</section>
+
+<!-- Privacy (linked from the footer, FAQs and the number step). DRAFT: have it checked before launch. -->
+<section class="screen" data-screen="privacy" hidden>
+<header class="brow"><div class="brow-in"><a class="badge" href="#home" aria-label="{{BRAND}} home"><span class="badge-name">{{BRAND}}<img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="#about">About</a><a href="#faqs">FAQs</a></nav></div></header>
+<div class="page-card">
+<main class="page-main legal">
+<h1 class="h1">Privacy</h1>
+<p class="updated">Last updated 4 November 2026</p>
+
+<h2 class="h2">Who we are</h2>
+<p>{{BRAND}} is run by Alfred Wholesale Limited (company number 16293586), 9 Thorney Leys Park, Witney, OX28 4GE. We decide how your information is used, which makes us the data controller. Questions about your data: <a href="mailto:privacy@alfred.co.uk">privacy@alfred.co.uk</a>.</p>
+
+<h2 class="h2">What we collect</h2>
+<ul>
+<li>Your postcode and address, including the property reference number (UPRN) councils use.</li>
+<li>Your WhatsApp number.</li>
+<li>Your bins, collection days and reminder time.</li>
+<li>The messages you send {{BRAND}}, and the reminders we send you.</li>
+<li>Whether you've asked us not to tell you about other {{PARENT_NAME}} services.</li>
+<li>Who invited you, if you joined from a friend's link.</li>
+<li>Your IP address when you use the website, to stop spam and abuse.</li>
+</ul>
+
+<h2 class="h2">How we use it</h2>
+<ul>
+<li>To find your bin days on your council's website, and keep checking them for changes.</li>
+<li>To send your reminders, and tell you when your dates move.</li>
+<li>To keep {{BRAND}} working: fixing errors and stopping spam.</li>
+<li>To tell you about other {{PARENT_NAME}} services, unless you ticked "Don't tell me about other {{PARENT_NAME}} services". You can opt out any time.</li>
+</ul>
+<p>We use your information to provide the service you signed up for, and for our legitimate interests in keeping it secure and telling you about similar {{PARENT_NAME}} services. We never sell your data or share it for third-party marketing.</p>
+
+<h2 class="h2">Who we share it with</h2>
+<p>Only the companies that help us run {{BRAND}}:</p>
+<ul>
+<li>Meta (WhatsApp), to send and receive your messages.</li>
+<li>Amazon Web Services, which hosts {{BRAND}} and its backups in London.</li>
+<li>Ordnance Survey, and Ideal Postcodes as a backup, to list the addresses at your postcode.</li>
+<li>Your council, whose website we check using your address.</li>
+<li>Cloudflare, to check website visitors are human.</li>
+<li>Sentry, for error reports, with phone numbers and addresses removed first.</li>
+<li>Google Fonts, which supplies the website's fonts and sees your IP address.</li>
+</ul>
+<p>If a provider handles your data outside the UK, it does so under approved safeguards, such as the UK's international data transfer agreements.</p>
+
+<h2 class="h2">How long we keep it</h2>
+<ul>
+<li>For as long as you use {{BRAND}}. If you don't use it for 2 years, we delete your account.</li>
+<li>Sign-ups that are never finished are deleted after 30 days.</li>
+<li>Backups are kept for up to 35 days, then deleted.</li>
+</ul>
+
+<h2 class="h2" id="delete">Deleting your data</h2>
+<p>Message {{BRAND}} DELETE on WhatsApp, then DELETE YES to confirm. We erase your account straight away, and it drops out of our backups within 35 days. You can also email <a href="mailto:privacy@alfred.co.uk">privacy@alfred.co.uk</a>.</p>
+<p>To just stop the messages, reply STOP.</p>
+
+<h2 class="h2">Your rights</h2>
+<p>You can ask to see the data we hold about you, correct it, delete it, or object to how we use it. If you're unhappy with how we've handled your data, you can complain to the Information Commissioner's Office at <a href="https://ico.org.uk" target="_blank" rel="noopener">ico.org.uk</a>.</p>
+
+<h2 class="h2">Cookies</h2>
+<p>The website doesn't use advertising or tracking cookies. Cloudflare's human check may store what it needs to work.</p>
+
+<h2 class="h2">Changes</h2>
+<p>If we change this policy, we'll update this page and the date at the top.</p>
 </main>
 </div>
 </section>
@@ -841,17 +915,17 @@ Share to WhatsApp
   var current = 'home';
   // Clean addresses: About and FAQs live at /about and /faqs (/d/<name>/about for a design);
   // the home page and every sign-up step stay on the plain address.
-  var BASE = location.pathname.replace(/\/(about|faqs)\/?$/, '').replace(/\/$/, '');
-  function urlFor(id) { return (id === 'about' || id === 'faqs') ? BASE + '/' + id : (BASE || '/') + location.search; }
+  var BASE = location.pathname.replace(/\/(about|faqs|privacy)\/?$/, '').replace(/\/$/, '');
+  function urlFor(id) { return (id === 'about' || id === 'faqs' || id === 'privacy') ? BASE + '/' + id : (BASE || '/') + location.search; }
   function screenFromUrl() {
-    var m = location.pathname.match(/\/(about|faqs)\/?$/) || location.hash.match(/^#(about|faqs)$/);
+    var m = location.pathname.match(/\/(about|faqs|privacy)\/?$/) || location.hash.match(/^#(about|faqs|privacy)$/);
     return m ? m[1] : 'home';
   }
   // About and FAQs get their own history entry so the browser's back button returns from them;
   // sign-up steps replace the entry as before.
   function go(id) {
     var from = current;
-    var push = (id === 'about' || id === 'faqs') && id !== current;
+    var push = (id === 'about' || id === 'faqs' || id === 'privacy') && id !== current;
     current = id;
     try { history[push ? 'pushState' : 'replaceState'](null, '', urlFor(id)); } catch (e) {}
     swap(from);
@@ -863,7 +937,7 @@ Share to WhatsApp
   });
   // Between home, About and FAQs: the old content fades out (View Transitions where the browser
   // has them) and the new content rises in. Elsewhere, or with reduced motion, screens just swap.
-  var PAGES = { home: 1, about: 1, faqs: 1 };
+  var PAGES = { home: 1, about: 1, faqs: 1, privacy: 1 };
   var REDUCE = false; try { REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   function swap(from) {
     var pageMove = from !== current && PAGES[from] && PAGES[current];
