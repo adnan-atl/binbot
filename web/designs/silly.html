@@ -981,18 +981,33 @@ Share to WhatsApp
     var m = location.pathname.match(/\/(about|faqs|privacy|terms)\/?$/) || location.hash.match(/^#(about|faqs|privacy|terms)$/);
     return m ? m[1] : 'home';
   }
-  // About and FAQs get their own history entry so the browser's back button returns from them;
-  // sign-up steps replace the entry as before.
-  function go(id) {
+  // Every screen gets its own history entry, so the browser's back button (and a swipe back on
+  // phones) steps back through our screens instead of leaving the site. The address stays clean:
+  // the screen lives in the entry's state, not the URL. Rules that keep it feeling effortless:
+  // - the loader never becomes a place to land on: whatever comes after it takes its entry;
+  // - entries from an earlier page load (after a refresh) can't be resumed half-way, so they
+  //   open the home page instead of a step with no data behind it.
+  var SID = Math.random().toString(36).slice(2);
+  function entry() { var st = history.state; return st && st.sid === SID ? st : null; }
+  function go(id, opts) {
     var from = current;
-    var push = (id === 'about' || id === 'faqs' || id === 'privacy' || id === 'terms') && id !== current;
+    var replace = id === from || from === 'parsing' || (opts && opts.replace);
+    var n = (entry() ? entry().n : 0) + (replace ? 0 : 1);
     current = id;
-    try { history[push ? 'pushState' : 'replaceState'](null, '', urlFor(id)); } catch (e) {}
+    try { history[replace ? 'replaceState' : 'pushState']({ s: id, sid: SID, n: n }, '', urlFor(id)); } catch (e) {}
     swap(from);
   }
-  window.addEventListener('popstate', function () {
-    var from = current;
-    current = screenFromUrl();
+  // In-page back arrow: same as the browser's back button while there's one of our screens to
+  // return to; otherwise (opened straight on a step) the previous step in order.
+  function goBack(fallback) {
+    var st = entry();
+    if (st && st.n > 0) history.back(); else go(fallback, { replace: true });
+  }
+  window.addEventListener('popstate', function (e) {
+    var from = current, st = e.state && e.state.sid === SID ? e.state : null;
+    var s = st ? st.s : screenFromUrl();
+    if (s === 'parsing' && !fetching) s = 'postcode';
+    current = document.querySelector('[data-screen="' + s + '"]') ? s : 'home';
     swap(from);
   });
   // Between home, About and FAQs: the old content fades out (View Transitions where the browser
@@ -1049,7 +1064,7 @@ Share to WhatsApp
     var prev = ORDER_SCREENS[Math.max(0, i - 1)];
     if (prev === 'hi' && !hiLink) prev = 'reminders';  // the say-hi step only exists when it's live
     if (prev === 'parsing') prev = 'postcode';  // the loading screen isn't a step to go back to
-    go(prev);
+    goBack(prev);
   });
 
   // ---- API layer. Falls back to the built-in demo data when the API isn't reachable.
@@ -1216,7 +1231,9 @@ Share to WhatsApp
       PSTEPS[3].subDone = [bins.map(function (b) { return b.name; }).join(', '), (dayNames.length === 7 ? 'Every day' : dayNames.map(function (d) { return LONG[d]; }).join(' and '))].filter(Boolean).join(' · ');
       if (current === 'parsing') runParsing(); else go('parsing');
     }).catch(function (e) {
-      fetching = false; go('postcode');
+      fetching = false;
+      // Back to the postcode entry the loader came from, rather than a second copy of it.
+      if (entry() && entry().n > 0) history.back(); else go('postcode');
       $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
     }).then(done);
   }
@@ -1225,7 +1242,7 @@ Share to WhatsApp
   // "These aren't my days": look this home up individually instead of reusing the street's round.
   document.addEventListener('click', function (e) {
     if (!e.target.closest('#c-own')) return;
-    ownLookup = 'start'; go('postcode'); setTimeout(submitPostcode, 60);
+    ownLookup = 'start'; go('postcode', { replace: true }); setTimeout(submitPostcode, 60);
   });
 
   // Phone
@@ -1683,7 +1700,7 @@ Share to WhatsApp
   $('#copy').addEventListener('click', function () { copyText('https://' + link, this, 'Copy link only', 'Link copied to clipboard'); });
   renderMsgs();
 
-  try { var h = screenFromUrl(); if (h !== 'home') { current = h; history.replaceState(null, '', urlFor(h)); } else if (location.hash) history.replaceState(null, '', urlFor('home')); } catch (e) {}
+  try { current = screenFromUrl(); history.replaceState({ s: current, sid: SID, n: 0 }, '', urlFor(current)); } catch (e) {}
   // FAQ answers open and close smoothly. <details> keeps working without JS; with JS the
   // close is held until the answer has folded away, so it animates too.
   document.documentElement.classList.add('js');
