@@ -1042,7 +1042,7 @@ Share to WhatsApp
   // already in (a neighbour's calendar comes back instantly): a beat per tick reads as work
   // being done, all ticks at once reads as a glitch. Slow councils keep the spinner on the
   // step that's really in progress (hold) until the answer arrives.
-  var fetching = false, shown = 0, hold = 1, STEP_MS = 550;
+  var fetching = false, shown = 0, hold = 1, STEP_MS = 700;
   function parseTarget() { return fetching ? hold : PSTEPS.length; }
   function runParsing() {
     clearInterval(timer);
