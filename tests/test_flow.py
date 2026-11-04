@@ -66,6 +66,11 @@ def test_full_flow(client, db):
     assert ref["level_name"] == "Bin rookie" and ref["referrals"] == 0 and ref["next_at"] == 1
     friend = signup(client, ref=ref["code"])
     assert friend["user_id"] != uid
+    # a friend counts once their reminders are on, not when they start signing up
+    assert client.get(f"/api/users/{uid}/referral").json()["referrals"] == 0
+    fid = friend["user_id"]
+    client.post(f"/api/users/{fid}/phone", json={"phone": "07700900456"})
+    client.post(f"/api/users/{fid}/reminders", json={"mode": "night_before", "time": "19:00"})
     ref = client.get(f"/api/users/{uid}/referral").json()
     assert ref["referrals"] == 1 and ref["level_name"] == "Kerbside regular"
 

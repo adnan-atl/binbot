@@ -30,7 +30,7 @@ from app.models import (
 )
 from app.services import geo, split
 from app.services.normalize import describe_rule
-from app.services.reminders import handle_inbound, rebuild_reminders, start_link, welcome_message
+from app.services.reminders import credit_referral, handle_inbound, rebuild_reminders, start_link, welcome_message
 from app.services.verify import rescue_round, verify_round
 from app.services.schedule import (
     get_or_create_council,
@@ -137,8 +137,6 @@ def signup_start(body: S.StartIn, request: Request, db: Session = Depends(get_db
             source = source if source == "demo" else "council"
     if not error:
         _seed_settings(db, user, prop)
-    if user.referred_by_id:
-        db.add(Referral(referrer_id=user.referred_by_id, referred_id=user.id))
     db.commit()
     if not error and not shared:  # neighbours reuse a round that was already checked
         _log_checks(db, prop)
@@ -384,6 +382,7 @@ def set_prefs(user_id: str, body: S.PrefsIn, db: Session = Depends(get_db)):
     user.status = UserStatus.active
     n = rebuild_reminders(db, user)
     if not was_active:
+        credit_referral(db, user)
         send_message(db, user.phone_e164, welcome_message(db, user), kind="welcome")
     db.commit()
     return {"status": "active", "scheduled": n}

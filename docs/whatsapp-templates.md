@@ -95,6 +95,48 @@ One message is sent for each bin that moved.
 
 ---
 
+## 3. Reminder with referral news (optional): `bin_reminder_news`
+
+The same reminder with one extra line when neighbours have joined with the resident's invite link.
+News is batched and only ever rides on a reminder, never a message of its own. Until this one is
+approved (leave `META_REMINDER_NEWS_TEMPLATE` empty), the news goes in the reply to Done / Snooze.
+
+| Field | Value |
+|---|---|
+| Category | **Utility** |
+| Name | `bin_reminder_news` |
+| Language | **English (UK)** |
+| Header | none |
+| Footer | none |
+
+**Body** (copy exactly):
+
+```
+Bin reminder: {{1}} out {{2}} ({{3}}).
+
+{{4}}
+
+Tap Done when that's sorted, Snooze for a nudge later, or Settings to change your bins or time.
+```
+
+**Sample values**:
+
+| Variable | Meaning | Sample |
+|---|---|---|
+| `{{1}}` | the bins going out | `Recycling and Food waste` |
+| `{{2}}` | when | `tomorrow` |
+| `{{3}}` | the collection date | `Wed 4 Nov` |
+| `{{4}}` | the referral news | `🎉 2 neighbours joined with your link. You're now a Kerbside regular. 1 more to Street captain.` |
+
+**Buttons**: the same three Quick reply buttons, same order: `Done`, `Snooze`, `Settings`.
+**Message validity period**: 3 hours.
+
+If Meta files it under **Marketing** instead of Utility, don't use it (marketing messages cost
+more and need marketing opt-in): leave `META_REMINDER_NEWS_TEMPLATE` empty and the news keeps
+riding on the Done / Snooze reply. Once approved, set `META_REMINDER_NEWS_TEMPLATE=bin_reminder_news`.
+
+---
+
 ## After approval
 
 Nothing to change in the app if you kept the default names. Check that a test reminder arrives

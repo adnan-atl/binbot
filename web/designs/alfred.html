@@ -868,6 +868,8 @@ Share to WhatsApp
   var current = 'home';
   // Clean addresses: About and FAQs live at /about and /faqs (/d/<name>/about for a design);
   // the home page and every sign-up step stay on the plain address.
+  // An invite link's ?ref= is kept in the browser, so it survives a visit to About or FAQs.
+  try { var inv = (location.search.match(/[?&]ref=([^&]+)/) || [])[1]; if (inv) localStorage.setItem('binjamin_ref', decodeURIComponent(inv)); } catch (e) {}
   var BASE = location.pathname.replace(/\/(about|faqs)\/?$/, '').replace(/\/$/, '');
   function urlFor(id) { return (id === 'about' || id === 'faqs') ? BASE + '/' + id : (BASE || '/') + location.search; }
   function screenFromUrl() {
@@ -1061,6 +1063,7 @@ Share to WhatsApp
       addr = JSON.parse(sel.dataset.list)[+sel.value];
     }
     var ref = (location.search.match(/[?&]ref=([^&]+)/) || [])[1] || null;
+    if (!ref) { try { ref = localStorage.getItem('binjamin_ref'); } catch (e) {} }
     var typed = $('#house').value.trim();
     var body = { uprn: addr && addr.uprn, house_number: (addr && addr.house_number) || typed || null, address_line: (addr && addr.line) || (typed ? typed + ', ' + v : null) };
     var picking = ownLookup === 'picking' && API.userId;

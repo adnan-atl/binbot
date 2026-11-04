@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     # (reminders, date changes). Empty = send free text instead (fine for stub and testing).
     meta_reminder_template: str = "bin_reminder"
     meta_change_template: str = "bin_day_changed"
+    # Optional: the reminder with a line of referral news in it (docs/whatsapp-templates.md).
+    # Empty = the news goes in the reply to Done / Snooze instead.
+    meta_reminder_news_template: str = ""
     meta_template_lang: str = "en_GB"
     # The business WhatsApp number in E.164 (+447...). When set, sign-up ends with the resident
     # sending us "hi" from their own WhatsApp, which proves the number is theirs and opens the

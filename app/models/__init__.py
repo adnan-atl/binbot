@@ -315,6 +315,8 @@ class Referral(Base):
     # Emptied when the friend's account is deleted, so the referrer keeps the credit.
     referred_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    # When the referrer was told (with their next reminder). Empty = news still to share.
+    announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 LEVELS = [

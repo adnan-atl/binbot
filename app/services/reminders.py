@@ -8,13 +8,15 @@ from datetime import date, datetime, time, timedelta
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.adapters.manual import expand_rule
 from app.core.config import get_settings
 from app.models import (
     LEVELS,
+    Referral,
+    level_for,
     ChangeLog,
     CollectionEvent,
     Reminder,
@@ -24,7 +26,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.providers.messaging import send_reply, send_template_batch
+from app.providers.messaging import send_reply, send_template_batch, uses_template
 
 _CATEGORY_NAMES = {
     "recycling": "Recycling", "general": "General waste", "food": "Food waste",
@@ -89,6 +91,45 @@ def rebuild_reminders(db: Session, user: User) -> int:
     return n
 
 
+# ---- referrals: credit on activation, news with the next reminder -------------------------------
+
+def credit_referral(db: Session, user: User) -> None:
+    """The friend now gets reminders, so they count for whoever invited them (once). Called when
+    reminders go on: a sign-up that never finishes doesn't count."""
+    ref_id = user.referred_by_id
+    if not ref_id or ref_id == user.id or not db.get(User, ref_id):
+        return
+    if db.scalar(select(Referral.id).where(Referral.referrer_id == ref_id,
+                                           Referral.referred_id == user.id)):
+        return
+    db.add(Referral(referrer_id=ref_id, referred_id=user.id))
+    db.flush()
+
+
+def referral_news(db: Session, user: User) -> tuple[str, list[Referral]] | None:
+    """One line about everyone who joined with the user's link since they were last told, or
+    None. Batched on purpose: it rides on the next reminder, never a message of its own."""
+    rows = db.scalars(select(Referral).where(Referral.referrer_id == user.id,
+                                             Referral.announced_at.is_(None))).all()
+    if not rows:
+        return None
+    total = db.scalar(select(func.count()).select_from(Referral)
+                      .where(Referral.referrer_id == user.id)) or 0
+    n = len(rows)
+    who = "A neighbour" if n == 1 else f"{n} neighbours"
+    level, name, nxt = level_for(total)
+    moved = level_for(total - n)[1] != name
+    line = f"\U0001F389 {who} joined with your link. You're {'now ' if moved else ''}a {name}."
+    if nxt is not None:
+        line += f" {nxt - total} more to {LEVELS[level][1]}."
+    return line, rows
+
+
+def _mark_announced(rows: list[Referral], when: datetime) -> None:
+    for row in rows:
+        row.announced_at = when
+
+
 def render_reminder(user: User, r: Reminder) -> str:
     names = [b["label"] for b in r.bins]
     when = "tomorrow" if user.reminder_mode == ReminderMode.night_before else "today"
@@ -104,27 +145,36 @@ def render_reminder(user: User, r: Reminder) -> str:
 def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
     """Send every reminder whose time has come. Run every minute by the worker. The sends go out
     in parallel (send_template_batch), so a few thousand people on the same time all get theirs
-    within a minute or two."""
+    within a minute or two. Referral news rides along when it can (referral_news)."""
     now_utc = now_utc or datetime.now(ZoneInfo("UTC"))
+    s = get_settings()
     due = db.scalars(
         select(Reminder).where(Reminder.status == ReminderStatus.scheduled,
                                Reminder.send_at <= now_utc)
     ).all()
-    batch, jobs = [], []
+    news_template = s.meta_reminder_news_template if uses_template(s.meta_reminder_news_template) else ""
+    free_text = not uses_template(s.meta_reminder_template)
+    plain, with_news = [], []  # (reminder, job, news rows)
     for r in due:
         user = db.get(User, r.user_id)
         if user.status != UserStatus.active:
             r.status = ReminderStatus.cancelled
             continue
         when = "tomorrow" if user.reminder_mode == ReminderMode.night_before else "today"
-        batch.append(r)
-        jobs.append((user.phone_e164,
-                     [_join([b["label"] for b in r.bins]), when, r.collection_date.strftime("%a %-d %b")],
-                     render_reminder(user, r)))
-    rows = send_template_batch(db, get_settings().meta_reminder_template, jobs,
+        params = [_join([b["label"] for b in r.bins]), when, r.collection_date.strftime("%a %-d %b")]
+        body = render_reminder(user, r)
+        news = referral_news(db, user) if (news_template or free_text) else None
+        if news:
+            with_news.append((r, (user.phone_e164, params + [news[0]], f"{body}\n\n{news[0]}"), news[1]))
+        else:
+            plain.append((r, (user.phone_e164, params, body), None))
+    rows = send_template_batch(db, s.meta_reminder_template, [j for _, j, _ in plain],
                                kind="reminder", buttons=True)
+    if with_news:
+        rows += send_template_batch(db, news_template or s.meta_reminder_template,
+                                    [j for _, j, _ in with_news], kind="reminder", buttons=True)
     sent = 0
-    for r, row in zip(batch, rows):
+    for (r, _, news_rows), row in zip(plain + with_news, rows):
         if row.error:
             r.status = ReminderStatus.failed
         else:
@@ -132,6 +182,8 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
             r.sent_at = now_utc
             r.provider_message_id = row.provider_message_id
             db.get(User, r.user_id).last_active_at = now_utc  # a reminder that reaches them is use
+            if news_rows:
+                _mark_announced(news_rows, now_utc)
             sent += 1
     db.commit()
     return sent
@@ -213,6 +265,7 @@ def _handle_hi(db: Session, phone: str, text: str) -> tuple[str, str] | None:
     user.start_code = None
     user.status = UserStatus.active
     rebuild_reminders(db, user)
+    credit_referral(db, user)
     return welcome_message(db, user), "welcome"
 
 
@@ -564,6 +617,12 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         db.add(ChangeLog(scope="user", scope_id=user.id, kind="unrecognised",
                          diff={"text": text.strip()[:1000]}))
         reply = Reply(FALLBACK, buttons=[SETTINGS_BUTTON])
+    if cmd in ("DONE", "SNOOZE") and last and len(words) == 1:
+        # The reminder's template couldn't carry the referral news: it rides on this reply.
+        news = referral_news(db, user)
+        if news:
+            reply.text = f"{reply.text}\n\n{news[0]}"
+            _mark_announced(news[1], datetime.now(ZoneInfo("UTC")))
     send_reply(db, phone, reply.text, kind="reply", buttons=reply.buttons,
                list_button=reply.list_button, sections=reply.sections)
     db.commit()
