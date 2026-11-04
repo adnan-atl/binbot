@@ -2,5 +2,16 @@
 # the DNS A record must point at this server and ports 80 and 443 must be open.
 {$DOMAIN} {
 	encode gzip
-	reverse_proxy api:8000
+	reverse_proxy api:8000 {
+		# A deploy restarts the api for a few seconds: hold requests until it's back instead of
+		# failing them, so visitors see a slower load rather than an error.
+		lb_try_duration 30s
+		lb_try_interval 500ms
+	}
+	# Still down after that: a friendly page that refreshes itself, never a blank one.
+	handle_errors 502 503 504 {
+		header Content-Type "text/html; charset=utf-8"
+		header Retry-After "5"
+		respond `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="5"><title>Back in a moment</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;background:#fff;color:#1a1a1a;text-align:center;padding:24px}h1{font-size:28px;margin:0 0 8px}p{margin:0;color:#6e6e73}</style></head><body><div><h1>Back in a moment</h1><p>We're updating Binjamin. This page will refresh by itself.</p></div></body></html>` 503
+	}
 }

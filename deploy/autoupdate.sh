@@ -34,6 +34,8 @@ echo "updating ${old:0:7} -> ${new:0:7}"
 git reset -q --hard "$new"
 $C up -d --build
 if healthy; then
+  # Pick up any Caddyfile change (it's mounted, so the container doesn't restart for it).
+  $C exec -T caddy caddy reload --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
   echo "live on ${new:0:7}"
   docker image prune -f >/dev/null
   exit 0
