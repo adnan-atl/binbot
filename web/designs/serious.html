@@ -441,6 +441,14 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .acolour[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
 .acolour:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 #c-save:disabled{background:var(--line);color:var(--grey);cursor:not-allowed;opacity:1}
+/* Every 2/3/4 weeks: pick which week is next */
+.anext{display:grid;gap:6px}
+.anext-b{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.anext-b b{font-size:15px;font-weight:700}
+.anext-b small{font-size:13px;color:var(--grey)}
+.anext-b[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#FFFFFF}
+.anext-b[aria-pressed="true"] small{color:rgba(255,255,255,.75)}
+.anext-b:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -863,7 +871,7 @@ Share to WhatsApp
   function binToApi(b) {
     var o = { setting_id: b.id && b.id.indexOf('new') !== 0 ? b.id : null, label: b.name, category: b.cat || 'other', enabled: b.on !== false };
     // Only send a rule for bins the user changed or added; untouched bins keep council dates.
-    if (b.dirty || !o.setting_id) { o.days = b.days.map(function (d) { return DAY_OUT[d]; }); o.frequency = FREQ_OUT[b.freq] || 'weekly'; }
+    if (b.dirty || !o.setting_id) { o.days = b.days.map(function (d) { return DAY_OUT[d]; }); o.frequency = FREQ_OUT[b.freq] || 'weekly'; if (CYCLE[b.freq]) o.anchor = binAnchor(b); }
     if (b.colour && !o.setting_id) o.colour = b.colour;  // the colour they picked for a bin they added
     return o;
   }
@@ -1125,7 +1133,8 @@ Share to WhatsApp
         var chosen = DAYS.filter(function (d) { return b.days.indexOf(d) > -1; });
         if (!chosen.length) return '<span class="e-miss">Day not set</span>';
         var f = (FREQ.filter(function (x) { return x.id === b.freq; })[0] || {}).label;
-        return (chosen.length === 7 ? 'Every day' : chosen.join(' & ')) + (f && chosen.length < 7 ? ' · ' + f : '');
+        var nx = CYCLE[b.freq] ? (cycleOptions(b.days, b.freq).filter(function (o) { return o.anchor === binAnchor(b); })[0] || {}).label : '';
+        return (chosen.length === 7 ? 'Every day' : chosen.join(' & ')) + (f && chosen.length < 7 ? ' · ' + f : '') + (nx ? ' · next ' + nx : '');
       }
       $('#c-cards').innerHTML = '<div class="elist">' + bins.map(function (b) {
         var off = b.on === false;
@@ -1146,7 +1155,8 @@ Share to WhatsApp
           '<div role="group" class="edays" aria-labelledby="d-' + b.id + '">' + days + '</div>' +
           '<span class="e-hint">Collected twice a week? Tap both days.</span></div>' +
           '<div class="efield"><span class="sublabel" id="f-' + b.id + '">How often</span>' +
-          '<div role="group" class="eseg" aria-labelledby="f-' + b.id + '">' + freqs + '</div></div>') +
+          '<div role="group" class="eseg" aria-labelledby="f-' + b.id + '">' + freqs + '</div></div>' +
+          (CYCLE[b.freq] && b.days.length ? cyclePicker(cycleOptions(b.days, b.freq), binAnchor(b), function (o) { return 'data-anchor="' + b.id + ':' + o.anchor + '"'; }, 'n-l-' + b.id, 'When\'s the next one?') : '')) +
           '<div class="eopen-f"><button type="button" class="e-remove" data-remove="' + b.id + '">Remove bin</button>' +
           '<button type="button" class="e-done" data-close="' + b.id + '">Done</button></div></div>';
       }).join('') + '</div>';
@@ -1169,7 +1179,9 @@ Share to WhatsApp
       var p = t.dataset.day.split(':'), b = find(p[0]), i = b.days.indexOf(p[1]);
       if (i > -1) b.days.splice(i, 1); else b.days.push(p[1]);
       b.dirty = true;
-      t.setAttribute('aria-pressed', i === -1);
+      renderConfirm();
+    } else if (t.dataset.anchor) {
+      var an = t.dataset.anchor.split(':'); find(an[0]).anchor = an[1]; find(an[0]).dirty = true; renderConfirm();
     } else if (t.dataset.onoff) {
       var ob = find(t.dataset.onoff); ob.on = ob.on === false; renderConfirm();
     } else if (t.dataset.freq) {
@@ -1207,6 +1219,42 @@ Share to WhatsApp
     return '<svg viewBox="0 0 60 60" width="' + size + '" height="' + size + '" aria-hidden="true"><ellipse cx="30" cy="55" rx="22" ry="2.5" fill="#E5E5EA"></ellipse><rect x="10" y="8" width="40" height="7" rx="3" fill="' + t.color + '"></rect><rect x="25" y="4" width="10" height="5" rx="2" fill="' + t.color + '"></rect><path d="M13 15h34l-3 38H16z" fill="' + t.color + '"></path><path d="M19 22h22" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"></path><circle cx="41" cy="53" r="3.5" fill="#1A1A1A"></circle></svg>';
   }
   var adding = null;
+  // Bins collected every 2, 3 or 4 weeks: which week is "on"? Offer the next few collection
+  // weeks as choices; the chosen week's Monday is sent as the rule's anchor (adapters/manual.py).
+  var CYCLE = { fortnightly: 2, three: 3, monthly: 4 };
+  function isoDate(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function cycleOptions(days, freq) {
+    var n = CYCLE[freq]; if (!n || !days.length) return [];
+    var idx = days.map(function (d) { return DAYS.indexOf(d); }).filter(function (i) { return i > -1; }).sort();
+    var t = new Date(); t.setHours(12, 0, 0, 0);
+    var tomorrow = new Date(t); tomorrow.setDate(t.getDate() + 1);
+    var first = new Date(tomorrow);
+    while (idx.indexOf((first.getDay() + 6) % 7) < 0) first.setDate(first.getDate() + 1);
+    var mon0 = new Date(first); mon0.setDate(first.getDate() - (first.getDay() + 6) % 7);
+    var thisMon = new Date(t); thisMon.setDate(t.getDate() - (t.getDay() + 6) % 7);
+    var out = [];
+    for (var k = 0; k < n; k++) {
+      var mon = new Date(mon0); mon.setDate(mon0.getDate() + 7 * k);
+      var dates = idx.map(function (i) { var d = new Date(mon); d.setDate(mon.getDate() + i); return d; }).filter(function (d) { return d >= tomorrow; });
+      var wk = Math.round((mon - thisMon) / 604800000);
+      out.push({ anchor: isoDate(mon), first: isoDate(dates[0]),
+        label: dates.map(function (d) { return fmtDate(isoDate(d)); }).join(' & '),
+        when: wk === 0 ? 'This week' : wk === 1 ? 'Next week' : 'In ' + wk + ' weeks' });
+    }
+    return out;
+  }
+  function binAnchor(b) {  // the week a bin is on: its own pick, else the one its next date falls in
+    if (b.anchor) return b.anchor;
+    var opts = cycleOptions(b.days, b.freq), nxt = (b.upcoming || [])[0];
+    var hit = opts.filter(function (o) { return nxt && nxt >= o.anchor && nxt < isoDate(new Date(new Date(o.anchor + 'T12:00:00').getTime() + 6048e5)); })[0];
+    return hit ? hit.anchor : null;
+  }
+  function cyclePicker(opts, chosen, attr, labelId, title) {
+    return '<div class="efield"><span class="sublabel" id="' + labelId + '">' + title + '</span>' +
+      '<div class="anext" role="group" aria-labelledby="' + labelId + '" style="grid-template-columns:repeat(' + Math.min(opts.length, 2) + ',minmax(0,1fr))">' +
+      opts.map(function (o) { return '<button type="button" class="anext-b" ' + attr(o) + ' aria-pressed="' + (chosen === o.anchor) + '"><b>' + o.label + '</b><small>' + o.when + '</small></button>'; }).join('') +
+      '</div></div>';
+  }
   // Colours offered when adding a bin; each type starts on its usual colour.
   var BIN_COLOURS = [['blue', 'Blue'], ['black', 'Black'], ['green', 'Green'], ['brown', 'Brown'], ['grey', 'Grey'], ['purple', 'Purple'], ['red', 'Red'], ['yellow', 'Yellow']];
   var TYPE_COLOUR = { rec: 'blue', gen: 'black', gar: 'green', food: 'brown' };
@@ -1246,7 +1294,11 @@ Share to WhatsApp
         FREQ.map(function (f) { return '<button type="button" class="eseg-b" data-afreq="' + f.id + '" aria-pressed="' + (a.freq === f.id) + '">' + SHORTF[f.id] + '</button>'; }).join('') +
         '</div></div>';
     }
-    if (a.type && a.colour && a.days.length && a.freq) {
+    var aopts = cycleOptions(a.days, a.freq);
+    if (a.type && a.colour && a.days.length && aopts.length) {
+      html += '<div class="addsec">' + cyclePicker(aopts, a.anchor, function (o) { return 'data-aanchor="' + o.anchor + '"'; }, 'a-next', '5. When\'s the next one?') + '</div>';
+    }
+    if (a.type && a.colour && a.days.length && a.freq && (!aopts.length || a.anchor)) {
       var t = TYPES.filter(function (x) { return x.id === a.type; })[0];
       html += '<div class="addsec"><button type="button" class="pill solid" data-acommit="1" style="width:100%">Add ' + addName(a, t).toLowerCase() + '</button></div>';
     }
@@ -1263,12 +1315,13 @@ Share to WhatsApp
     if (d.acancel) { adding = null; renderAdder(); $('#c-add').focus(); return; }
     if (d.atype) { adding.type = d.atype; adding.cat = null; adding.name = null; adding.colour = TYPE_COLOUR[d.atype] || null; }
     if (d.acolour) adding.colour = d.acolour;
-    if (d.aday) { var i = adding.days.indexOf(d.aday); if (i > -1) adding.days.splice(i, 1); else adding.days.push(d.aday); if (!adding.days.length) adding.freq = null; }
-    if (d.afreq) adding.freq = d.afreq;
+    if (d.aday) { var i = adding.days.indexOf(d.aday); if (i > -1) adding.days.splice(i, 1); else adding.days.push(d.aday); if (!adding.days.length) adding.freq = null; adding.anchor = null; }
+    if (d.afreq) { adding.freq = d.afreq; adding.anchor = null; }
+    if (d.aanchor) adding.anchor = d.aanchor;
     if (d.acommit) {
       var t = TYPES.filter(function (x) { return x.id === adding.type; })[0];
       var cn = (BIN_COLOURS.filter(function (c) { return c[0] === adding.colour; })[0] || [])[1];
-      bins.push({ id: 'new' + seq++, name: addName(adding, t), kind: cn ? cn + (t.shape === 'caddy' ? ' caddy' : ' bin') : '', days: adding.days.slice(), freq: adding.freq, next0: '', color: COLOUR_HEX[adding.colour] || t.color, colour: adding.colour, shape: t.shape, cat: adding.cat || ({rec:'recycling',gen:'general',gar:'garden',food:'food',other:'other'})[t.id], on: true });
+      bins.push({ id: 'new' + seq++, name: addName(adding, t), kind: cn ? cn + (t.shape === 'caddy' ? ' caddy' : ' bin') : '', days: adding.days.slice(), freq: adding.freq, anchor: adding.anchor || null, next0: '', color: COLOUR_HEX[adding.colour] || t.color, colour: adding.colour, shape: t.shape, cat: adding.cat || ({rec:'recycling',gen:'general',gar:'garden',food:'food',other:'other'})[t.id], on: true });
       adding = null; renderConfirm(); return;
     }
     var sel = d.atype ? '[data-atype="' + d.atype + '"]' : d.aday ? '[data-aday="' + d.aday + '"]' : d.afreq ? '[data-afreq="' + d.afreq + '"]' : null;
