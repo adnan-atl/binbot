@@ -406,7 +406,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 /* Phones: leave room above the mockup for Binji and his bubble, so they never sit on the intro text */
 @media (max-width:600px){.phone-col{margin-top:clamp(132px,19vh,168px)}}
 @media (max-width:600px){.brow-nav{flex:none;width:auto;justify-content:flex-end;gap:18px}.brow-nav a:first-child{position:static;transform:none}}  /* name + links side by side on phones */
-/* Every sign-up step sits like "Here's your week": anchored under the header (not floating
+/* Every sign-up step sits like "Your calendar is ready": anchored under the header (not floating
    mid-screen), in the same column width, with full-width buttons to move on. */
 .flow-main{align-items:flex-start;padding:64px 24px 80px}
 .col{max-width:560px}
@@ -1257,8 +1257,7 @@ Share to WhatsApp
     step('Spot your bins', 'Spotting your bins', 'Spotted 4 bins', '', 'Recycling, general, food, garden')
   ];
   function drawParsing(at) {
-    var finished = at >= PSTEPS.length;
-    $('#p-title').textContent = finished ? 'Your calendar is ready' : "Reading your council's calendar";
+    $('#p-title').textContent = "Reading your council's calendar";  // one title throughout; the next screen says it's ready
     $('#psteps').innerHTML = PSTEPS.map(function (st, i) {
       var s = i < at ? { label: st.done, sub: st.subDone }
         : i === at ? { label: st.doing, sub: st.sub } : { label: st.todo, sub: '' };
@@ -1287,7 +1286,7 @@ Share to WhatsApp
   // Nothing for the resident to do on this screen: once every step is ticked, give the last
   // tick a moment to register, then show their dates.
   function parsingDone() {
-    setTimeout(function () { if (current === 'parsing' && !fetching) go('confirm'); }, 900);
+    setTimeout(function () { if (current === 'parsing' && !fetching) go('confirm'); }, API.live ? STEP_MS : 900);
   }
 
   // Confirm
@@ -1359,7 +1358,7 @@ Share to WhatsApp
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
     var empty = !bins.length;
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
-      : editing ? 'Edit your bins' : "Here's your week<br><span>Looks right?</span>";
+      : editing ? 'Edit your bins' : "Your calendar is ready<br><span>Looks right?</span>";
     $('#c-lede').textContent = empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
       : editing ? 'Tap a bin to change its day or how often.'
       : note ? note : '';  // a council problem still shows here
