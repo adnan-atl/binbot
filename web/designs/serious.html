@@ -1084,11 +1084,28 @@ Share to WhatsApp
   // Grey line under each bin: what goes in it, how often, and the next date it goes out.
   // Phones drop how often so the line stays short: just the next date.
   var narrowMq = null; try { narrowMq = matchMedia('(max-width:420px)'); } catch (e) {}
+  // Every row reads the same way: how often, then the next date ("Every 2 weeks · next Thu 12 Nov").
   var subline = function (b) {
-    var nx = b.upcoming && b.upcoming.length ? fmtDate(b.upcoming[0]) : b.next0;
-    var narrow = !!(narrowMq && narrowMq.matches);
-    return [purposeText(b), narrow && nx ? '' : freqText(b), nx ? 'next ' + nx : ''].filter(Boolean).join(' · ');
+    var nx = nextDate(b);
+    // the date never splits over two lines (non-breaking spaces)
+    return [purposeText(b), freqText(b), nx ? ('next ' + fmtDate(nx)).replace(/ /g, '\u00A0') : ''].filter(Boolean).join(' · ');
   };
+  // The next collection: the council's own date for untouched bins, otherwise worked out from the
+  // days, how often and (for 2/3/4-weekly bins) the week the resident picked.
+  function nextDate(b) {
+    var t = new Date(); t.setHours(12, 0, 0, 0);
+    var tomorrow = new Date(t); tomorrow.setDate(t.getDate() + 1);
+    var fromIso = isoDate(tomorrow);
+    if (!b.dirty && b.upcoming) { var u = b.upcoming.filter(function (d) { return d >= fromIso; })[0]; if (u) return u; }
+    if (!b.days || !b.days.length) return null;
+    if (CYCLE[b.freq]) {
+      var opts = cycleOptions(b.days, b.freq), o = opts.filter(function (x) { return x.anchor === binAnchor(b); })[0] || opts[0];
+      return o ? o.first : null;
+    }
+    var d = new Date(tomorrow);
+    for (var i = 0; i < 7; i++) { if (b.days.indexOf(DAYS[(d.getDay() + 6) % 7]) > -1) return isoDate(d); d.setDate(d.getDate() + 1); }
+    return null;
+  }
   // Re-draw the rows when the screen crosses the phone width (rotating a phone, resizing).
   if (narrowMq) { var onMq = function () { if (current === 'confirm' && !editing) renderConfirm(); };
     if (narrowMq.addEventListener) narrowMq.addEventListener('change', onMq); else if (narrowMq.addListener) narrowMq.addListener(onMq); }
@@ -1133,7 +1150,7 @@ Share to WhatsApp
         var chosen = DAYS.filter(function (d) { return b.days.indexOf(d) > -1; });
         if (!chosen.length) return '<span class="e-miss">Day not set</span>';
         var f = (FREQ.filter(function (x) { return x.id === b.freq; })[0] || {}).label;
-        var nx = CYCLE[b.freq] ? (cycleOptions(b.days, b.freq).filter(function (o) { return o.anchor === binAnchor(b); })[0] || {}).label : '';
+        var nd = nextDate(b), nx = nd ? fmtDate(nd) : '';  // same next date as the week screen
         return (chosen.length === 7 ? 'Every day' : chosen.join(' & ')) + (f && chosen.length < 7 ? ' · ' + f : '') + (nx ? ' · next ' + nx : '');
       }
       $('#c-cards').innerHTML = '<div class="elist">' + bins.map(function (b) {
