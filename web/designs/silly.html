@@ -956,10 +956,7 @@ Share to WhatsApp
     document.querySelectorAll('[data-screen]').forEach(function (s) { s.hidden = s.dataset.screen !== target; });
     if (enter) animateIn(document.querySelector('[data-screen="' + target + '"]'));
     document.body.style.background = '#FFFFFF';
-    // Phones land on the white card with the black notch tucked just above it; scrolling up
-    // reveals the notch (logo and menu).
-    var tuck = target === 'home' && window.matchMedia('(max-width:600px)').matches;
-    window.scrollTo(0, tuck ? document.querySelector('#home .brow').offsetHeight : 0);
+    window.scrollTo(0, 0);
     clearInterval(timer);
     if (target === 'parsing') runParsing();
     if (target === 'confirm') renderConfirm();
