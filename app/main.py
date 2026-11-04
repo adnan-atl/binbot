@@ -50,6 +50,8 @@ def render_index(page: Path | None = None) -> str:
 if WEB.exists():
     @app.get("/", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/static/index.html", include_in_schema=False, response_class=HTMLResponse)
+    @app.get("/about", include_in_schema=False, response_class=HTMLResponse)
+    @app.get("/faqs", include_in_schema=False, response_class=HTMLResponse)
     def index():
         name = get_settings().home_design
         page = WEB / "designs" / f"{name}.html"
@@ -58,6 +60,8 @@ if WEB.exists():
         return HTMLResponse(render_index())
 
     @app.get("/d/{name}", include_in_schema=False, response_class=HTMLResponse)
+    @app.get("/d/{name}/about", include_in_schema=False, response_class=HTMLResponse)
+    @app.get("/d/{name}/faqs", include_in_schema=False, response_class=HTMLResponse)
     def design(name: str):
         """Design variants side by side: web/designs/<name>.html at /d/<name> (e.g. /d/silly)."""
         page = WEB / "designs" / f"{name}.html"

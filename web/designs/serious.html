@@ -569,7 +569,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </section>
 
 <!-- 3 · Parsing -->
-<section class="screen" data-screen="parsing" data-step="2" hidden>
+<section class="screen" data-screen="parsing" data-step="1" hidden>
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
@@ -580,7 +580,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </section>
 
 <!-- 4 · Confirm -->
-<section class="screen" data-screen="confirm" data-step="3" hidden>
+<section class="screen" data-screen="confirm" data-step="2" hidden>
 <div data-bar></div>
 <main class="wide-main">
 <div class="center">
@@ -608,7 +608,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </section>
 
 <!-- 5 · Phone -->
-<section class="screen" data-screen="phone" data-step="4" hidden>
+<section class="screen" data-screen="phone" data-step="3" hidden>
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
@@ -632,7 +632,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </section>
 
 <!-- 6 · Reminders -->
-<section class="screen" data-screen="reminders" data-step="5" hidden>
+<section class="screen" data-screen="reminders" data-step="4" hidden>
 <div data-bar></div>
 <main class="flow-main">
 <div class="col" style="gap:44px">
@@ -650,7 +650,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </section>
 
 <!-- 6b · Say hi: the resident messages us first, which proves the number is theirs (live only) -->
-<section class="screen" data-screen="hi" data-step="5" hidden>
+<section class="screen" data-screen="hi" data-step="4" hidden>
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
@@ -666,7 +666,7 @@ Say hi on WhatsApp
 </section>
 
 <!-- 7 · Binfluencer -->
-<section class="screen" data-screen="binfluencer" data-step="6" hidden>
+<section class="screen" data-screen="binfluencer" data-step="5" hidden>
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
@@ -706,7 +706,7 @@ Share to WhatsApp
 </div>
 <span class="step-of"></span>
 </header>
-<div class="progress" aria-hidden="true"><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
+<div class="progress" aria-hidden="true"><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
 </template>
 
 <script>
@@ -720,7 +720,7 @@ Share to WhatsApp
   document.querySelectorAll('[data-bar]').forEach(function (slot) {
     var step = +slot.closest('[data-step]').dataset.step;
     slot.appendChild($('#bar-tpl').content.cloneNode(true));
-    slot.querySelector('.step-of').textContent = 'Step ' + step + ' of 6';
+    slot.querySelector('.step-of').textContent = 'Step ' + step + ' of 5';
     slot.querySelectorAll('.progress .seg').forEach(function (s, i) { if (i < step) s.classList.add('on'); });
   });
 
@@ -742,18 +742,26 @@ Share to WhatsApp
     if (target === 'phone') setTimeout(function () { $('#tel').focus(); }, 50);
   }
   var current = 'home';
+  // Clean addresses: About and FAQs live at /about and /faqs (/d/<name>/about for a design);
+  // the home page and every sign-up step stay on the plain address.
+  var BASE = location.pathname.replace(/\/(about|faqs)\/?$/, '').replace(/\/$/, '');
+  function urlFor(id) { return (id === 'about' || id === 'faqs') ? BASE + '/' + id : (BASE || '/') + location.search; }
+  function screenFromUrl() {
+    var m = location.pathname.match(/\/(about|faqs)\/?$/) || location.hash.match(/^#(about|faqs)$/);
+    return m ? m[1] : 'home';
+  }
   // About and FAQs get their own history entry so the browser's back button returns from them;
   // sign-up steps replace the entry as before.
   function go(id) {
     var from = current;
     var push = (id === 'about' || id === 'faqs') && id !== current;
     current = id;
-    try { history[push ? 'pushState' : 'replaceState'](null, '', id === 'home' ? location.pathname + location.search : '#' + id); } catch (e) {}
+    try { history[push ? 'pushState' : 'replaceState'](null, '', urlFor(id)); } catch (e) {}
     swap(from);
   }
   window.addEventListener('popstate', function () {
-    var from = current, h = location.hash.slice(1) || 'home';
-    current = document.querySelector('[data-screen="' + h + '"]') ? h : 'home';
+    var from = current;
+    current = screenFromUrl();
     swap(from);
   });
   // Between home, About and FAQs: the old content fades out (View Transitions where the browser
@@ -1439,7 +1447,7 @@ Share to WhatsApp
   $('#copy').addEventListener('click', function () { copyText('https://' + link, this, 'Copy link only', 'Link copied to clipboard'); });
   renderMsgs();
 
-  try { var h = location.hash.slice(1); if (h && document.querySelector('[data-screen="' + h + '"]')) current = h; } catch (e) {}
+  try { var h = screenFromUrl(); if (h !== 'home') { current = h; history.replaceState(null, '', urlFor(h)); } else if (location.hash) history.replaceState(null, '', urlFor('home')); } catch (e) {}
   // FAQ answers open and close smoothly. <details> keeps working without JS; with JS the
   // close is held until the answer has folded away, so it animates too.
   document.documentElement.classList.add('js');

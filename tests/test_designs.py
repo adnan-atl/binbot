@@ -42,3 +42,9 @@ def test_home_page_can_show_a_design(client, monkeypatch):
     finally:
         monkeypatch.delenv("HOME_DESIGN")
         get_settings.cache_clear()
+
+
+def test_about_and_faqs_have_their_own_addresses(client):
+    for path in ("/about", "/faqs", "/d/silly/about", "/d/silly/faqs"):
+        assert client.get(path).status_code == 200, path
+    assert client.get("/d/nope/about").status_code == 404
