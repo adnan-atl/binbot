@@ -15,6 +15,9 @@ git fetch -q origin live
 new=$(git rev-parse origin/live)
 old=$(git rev-parse HEAD)
 [ "$new" = "$old" ] && exit 0
+# Forward only: if this server is already ahead of live (started by hand from a newer main),
+# wait for live to catch up rather than going back to an older version.
+if git merge-base --is-ancestor "$new" "$old"; then exit 0; fi
 
 C="docker compose -f deploy/docker-compose.prod.yml"
 healthy() {
