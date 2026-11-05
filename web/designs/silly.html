@@ -555,6 +555,9 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .pc-wrap .field{width:100%;box-sizing:border-box}
 .pc-binji{position:absolute;right:18px;bottom:calc(100% - 5px);width:84px;height:auto;pointer-events:none;z-index:1}
 @media (min-width:601px){.pc-head .h1{padding-right:130px}.pc-binji{width:112px;right:28px}}
+.p-head{display:flow-root}  /* "Binjamin's on it" keeps the full width; Binji floats beside the grey line below it */
+.p-binji{float:right;width:136px;height:auto;margin:6px -6px 0 12px}
+@media (min-width:601px){.p-binji{width:180px;margin:4px 0 0 20px}}
 </style>
 </head>
 <body>
@@ -801,7 +804,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">{{BRAND}}'s on it<br><span id="p-title">Reading your council's calendar</span></h1>
+<h1 class="h1 p-head">{{BRAND}}'s on it<br><img class="p-binji" src="/static/binji-board.webp" alt="" width="640" height="517"><span id="p-title">Reading your council's calendar</span></h1>
 <div id="psteps" aria-live="polite"></div>
 </div>
 </main>
