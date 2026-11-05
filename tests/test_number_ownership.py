@@ -211,3 +211,25 @@ def test_no_share_message_for_people_who_opted_out(client, db, live):
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     assert "Binfluencer" not in _say(client, "+447700900123", "Hey Binny, I'M BIN")
+
+
+def test_signing_up_after_tomorrows_reminder_time_gets_a_reminder_in_the_welcome(db):
+    from datetime import date, datetime, timedelta
+    from zoneinfo import ZoneInfo
+    from app.models import ReminderMode
+    from app.services import reminders
+
+    u = User(referral_code="abcd1234", reminder_mode=ReminderMode.night_before, reminder_time="20:00",
+             timezone="Europe/London")
+    tomorrow = date(2026, 11, 10)
+    bins = [{"label": "Recycling", "category": "recycling"}, {"label": "Waste", "category": "general"}]
+    orig = reminders.effective_collections
+    reminders.effective_collections = lambda db, user: {tomorrow: bins}
+    try:
+        late = datetime(2026, 11, 9, 23, 12, tzinfo=ZoneInfo("Europe/London"))
+        assert reminders.tomorrow_note(db, u, now=late) == (
+            "And don't forget your ♻️ Recycling and \U0001F5D1️ Waste tomorrow!")
+        early = datetime(2026, 11, 9, 19, 0, tzinfo=ZoneInfo("Europe/London"))
+        assert reminders.tomorrow_note(db, u, now=early) is None  # the reminder will still come
+    finally:
+        reminders.effective_collections = orig

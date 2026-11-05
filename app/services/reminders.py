@@ -401,9 +401,22 @@ def binjamin_card() -> dict:
             "urls": [{"url": s.public_base_url.rstrip("/"), "type": "WORK"}]}
 
 
+def tomorrow_note(db: Session, user: User, now: datetime | None = None) -> str | None:
+    """Signing up after tomorrow's reminder time: that reminder won't come, so the welcome ends
+    with it instead ("And don't forget your … tomorrow!")."""
+    tz = ZoneInfo(user.timezone or "Europe/London")
+    now = now or datetime.now(tz)
+    tomorrow = now.astimezone(tz).date() + timedelta(days=1)
+    bins = effective_collections(db, user).get(tomorrow)
+    if not bins or send_at_for(user, tomorrow) > now:
+        return None
+    return f"And don't forget your {_join([bin_tag(b) for b in bins])} tomorrow!"
+
+
 def welcome_message(db: Session, user: User) -> str:
     """The whole welcome as one text (what the API and tests return)."""
-    return "\n\n".join(welcome_parts(db, user))
+    note = tomorrow_note(db, user)
+    return "\n\n".join(welcome_parts(db, user) + ([note] if note else []))
 
 
 def send_welcome(db: Session, phone: str, user: User) -> str:
@@ -424,6 +437,11 @@ def send_welcome(db: Session, phone: str, user: User) -> str:
             if real:
                 time.sleep(0.7)
             send_contact(db, phone, binjamin_card(), kind="welcome_card")
+    note = tomorrow_note(db, user)
+    if note:  # tomorrow's reminder time has already gone: say it now, last
+        if real:
+            time.sleep(0.7)
+        send_message(db, phone, note, kind="welcome_more")
     return welcome_message(db, user)
 
 
