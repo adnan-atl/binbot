@@ -341,27 +341,26 @@ def invite_short_link(code: str) -> str:
 
 
 def _already_invited(user: User, code: str) -> str:
-    """Reply when someone already signed up sends an invite message: point them to their own."""
-    link = invite_short_link(user.referral_code)
-    if code.lower() == (user.referral_code or "").lower():
-        return ("That's your own invite link \U0001F604 Share it with friends and neighbours, or "
-                f"pop it in your street's group chat: {link}")
-    return ("You're already signed up, so no need for an invite \U0001F44D Here's your own to "
-            f"share with friends and neighbours, or your street's group chat: {link}")
+    """Reply when someone already signed up sends an invite message (an old /w/ link)."""
+    digits = re.sub(r"\D", "", get_settings().meta_display_number)
+    return ("You're already signed up, so no need for an invite \U0001F44D Share me with friends "
+            f"and neighbours, or pop me in your street's group chat: wa.me/{digits}")
 
 
 def welcome_share(user: User) -> str | None:
     """The fourth welcome message: share Binjamin with neighbours or the street group. Written
-    to be forwarded as it is: the link is the person's own WhatsApp invite, so anyone who signs
-    up through it counts towards their Binfluencer total. Only for people who didn't opt out of
+    to be forwarded as it is. Only for people who didn't opt out of
     hearing from us, and only once there's a business number. It counts as their one share
     nudge (share_nudges)."""
     s = get_settings()
-    if not re.sub(r"\D", "", s.meta_display_number) or user.marketing_consent_at is None:
+    digits = re.sub(r"\D", "", s.meta_display_number)
+    if not digits or user.marketing_consent_at is None:
         return None
+    # WhatsApp's own link, so it opens the chat straight away (no tracking: any message there
+    # starts sign-up)
     return (f"Want to be a certified Binfluencer? Pop me in your street's group chat or send me "
             f"to a friend. All they need to do is say hi to {s.brand_name} on WhatsApp: "
-            f"{invite_short_link(user.referral_code)}")
+            f"wa.me/{digits}")
 
 
 def welcome_message(db: Session, user: User) -> str:

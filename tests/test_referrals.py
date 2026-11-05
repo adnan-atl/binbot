@@ -158,19 +158,6 @@ def test_whatsapp_invite_link_credits_the_sharer(client, db, monkeypatch):
     get_settings.cache_clear()
 
 
-def test_welcome_binfluencer_message_uses_the_personal_invite(client, db, monkeypatch):
-    from app.core.config import get_settings
-    from app.models import User
-    from app.services.reminders import welcome_share
-
-    monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
-    get_settings.cache_clear()
-    u = User(referral_code="ab12cd34", marketing_consent_at=datetime.now(timezone.utc))
-    assert welcome_share(u).endswith("say hi to Binny on WhatsApp: localhost:8000/w/ab12cd34")
-    monkeypatch.delenv("META_DISPLAY_NUMBER")
-    get_settings.cache_clear()
-
-
 def test_signed_up_person_tapping_an_invite_gets_their_own_link(client, db):
     from app.services.reminders import invite_text
 
@@ -178,8 +165,5 @@ def test_signed_up_person_tapping_an_invite_gets_their_own_link(client, db):
     _activate(client, uid, "07700900123")
     code = client.get(f"/api/users/{uid}/referral").json()["code"]
     say = lambda t: client.post("/api/inbound", json={"phone": "+447700900123", "text": t}).json()["reply"]
-    assert say(invite_text(code)) == (
-        "That's your own invite link \U0001F604 Share it with friends and neighbours, or pop it "
-        f"in your street's group chat: localhost:8000/w/{code}")
-    assert say(invite_text("zzzz9999")).startswith(
-        "You're already signed up, so no need for an invite \U0001F44D Here's your own")
+    assert say(invite_text(code)).startswith(
+        "You're already signed up, so no need for an invite \U0001F44D Share me with friends")
