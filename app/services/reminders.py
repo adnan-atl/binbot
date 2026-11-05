@@ -340,6 +340,16 @@ def invite_short_link(code: str) -> str:
     return f"{host}/w/{code}"
 
 
+def _already_invited(user: User, code: str) -> str:
+    """Reply when someone already signed up sends an invite message: point them to their own."""
+    link = invite_short_link(user.referral_code)
+    if code.lower() == (user.referral_code or "").lower():
+        return ("That's your own invite link \U0001F604 Share it with friends and neighbours, or "
+                f"pop it in your street's group chat: {link}")
+    return ("You're already signed up, so no need for an invite \U0001F44D Here's your own to "
+            f"share with friends and neighbours, or your street's group chat: {link}")
+
+
 def welcome_share(user: User) -> str | None:
     """The fourth welcome message: share Binjamin with neighbours or the street group. Written
     to be forwarded as it is: the link is the person's own WhatsApp invite, so anyone who signs
@@ -915,6 +925,12 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
 
     if wa_signup.wants(user):  # not signed up yet: sign up right here in WhatsApp
         return wa_signup.handle(db, phone, text, user) or ""
+    if wa_signup.REF_RE.search(text) and "invited by a neighbour" in text.lower():
+        # Someone already signed up tapped an invite (their own, or a friend's)
+        msg = _already_invited(user, wa_signup.REF_RE.search(text).group(1))
+        send_reply(db, phone, msg, kind="reply")
+        db.commit()
+        return msg
     if is_hi(text) and user.status == UserStatus.stopped:  # the sign-up hi from a paused account
         reply = _resume(db, user)
         send_reply(db, phone, reply.text, kind="reply")

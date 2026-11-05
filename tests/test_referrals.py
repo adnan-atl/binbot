@@ -169,3 +169,17 @@ def test_welcome_binfluencer_message_uses_the_personal_invite(client, db, monkey
     assert welcome_share(u).endswith("say hi to Binny on WhatsApp: localhost:8000/w/ab12cd34")
     monkeypatch.delenv("META_DISPLAY_NUMBER")
     get_settings.cache_clear()
+
+
+def test_signed_up_person_tapping_an_invite_gets_their_own_link(client, db):
+    from app.services.reminders import invite_text
+
+    uid = signup(client)["user_id"]
+    _activate(client, uid, "07700900123")
+    code = client.get(f"/api/users/{uid}/referral").json()["code"]
+    say = lambda t: client.post("/api/inbound", json={"phone": "+447700900123", "text": t}).json()["reply"]
+    assert say(invite_text(code)) == (
+        "That's your own invite link \U0001F604 Share it with friends and neighbours, or pop it "
+        f"in your street's group chat: localhost:8000/w/{code}")
+    assert say(invite_text("zzzz9999")).startswith(
+        "You're already signed up, so no need for an invite \U0001F44D Here's your own")
