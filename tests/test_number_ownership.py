@@ -183,9 +183,9 @@ def test_fourth_welcome_message_asks_them_to_share(client, db, live):
                                                  "marketing_consent": True})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
-    assert reply.endswith("Know a neighbour who always forgets bin day? Share me with them or your "
-                          "street group. They can check me out by saying hi to Binny on WhatsApp: "
-                          "https://wa.me/447700900999")
+    assert reply.endswith("Want to be a certified Binfluencer? Pop me in your street's group chat "
+                          "or send me to a friend. All they need to do is say hi to Binny on "
+                          "WhatsApp: wa.me/447700900999")
     db.expire_all()
     assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()) == 3
     assert db.get(User, uid).share_nudged_at  # no second share nudge later
@@ -195,4 +195,4 @@ def test_no_share_message_for_people_who_opted_out(client, db, live):
     uid = signup(client)["user_id"]
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
-    assert "street group" not in _say(client, "+447700900123", "Hey Binny, I'M BIN")
+    assert "Binfluencer" not in _say(client, "+447700900123", "Hey Binny, I'M BIN")

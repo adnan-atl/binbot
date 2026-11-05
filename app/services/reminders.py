@@ -331,9 +331,9 @@ def welcome_share(user: User) -> str | None:
     digits = re.sub(r"\D", "", s.meta_display_number)
     if not digits or user.marketing_consent_at is None:
         return None
-    return (f"Know a neighbour who always forgets bin day? Share me with them or your street "
-            f"group. They can check me out by saying hi to {s.brand_name} on WhatsApp: "
-            f"https://wa.me/{digits}")
+    return (f"Want to be a certified Binfluencer? Pop me in your street's group chat or send me "
+            f"to a friend. All they need to do is say hi to {s.brand_name} on WhatsApp: "
+            f"wa.me/{digits}")
 
 
 def welcome_message(db: Session, user: User) -> str:
