@@ -8,7 +8,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.adapters.registry import coverage, spec_for
-from app.providers.messaging import send_message
 from app.api import schemas as S
 from app.core.config import get_settings
 from app.core.db import get_db
@@ -25,7 +24,7 @@ from app.models import (
     now,
 )
 from app.services import geo, signup, split
-from app.services.reminders import handle_inbound, rebuild_reminders, start_link, welcome_message
+from app.services.reminders import handle_inbound, rebuild_reminders, send_welcome, start_link
 from app.services.schedule import (
     get_or_create_council,
     own_round,
@@ -273,7 +272,7 @@ def set_prefs(user_id: str, body: S.PrefsIn, db: Session = Depends(get_db)):
         n = rebuild_reminders(db, user)
     else:
         n = signup.activate(db, user)
-        send_message(db, user.phone_e164, welcome_message(db, user), kind="welcome")
+        send_welcome(db, user.phone_e164, user)
     db.commit()
     return {"status": "active", "scheduled": n}
 

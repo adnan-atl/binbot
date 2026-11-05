@@ -166,7 +166,8 @@ def test_turning_reminders_on_sends_a_welcome(client, db, monkeypatch):
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123"})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     w = db.scalar(select(Outbox).where(Outbox.kind == "welcome"))
-    assert "at 7pm" in w.body and "First up: Recycling on" in w.body
+    more = [o.body for o in db.scalars(select(Outbox).where(Outbox.kind == "welcome_more"))]
+    assert "at 7pm" in w.body and any(b.startswith("First up: Recycling on") for b in more)
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "20:00"})
     assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome")).all()) == 1
 

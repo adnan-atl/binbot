@@ -26,7 +26,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.providers.messaging import send_reply, send_template_batch, uses_template
+from app.providers.messaging import send_message, send_reply, send_template_batch, uses_template
 
 _CATEGORY_NAMES = {
     "recycling": "Recycling", "general": "General waste", "food": "Food waste",
@@ -204,32 +204,52 @@ def purge_unrecognised(db: Session, now_utc: datetime | None = None) -> int:
     return len(old)
 
 
-def welcome_message(db: Session, user: User) -> str:
-    """First message, sent the moment reminders go on, so the resident sees the service works
-    (and, on WhatsApp, it opens the 24-hour window for free-form replies)."""
+def welcome_parts(db: Session, user: User) -> list[str]:
+    """The welcome, sent the moment reminders go on as separate short messages: set up, first
+    collection, how to stop, the invite. Shows the service works and (on WhatsApp) opens the
+    24-hour window for free-form replies."""
     first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
                       .order_by(Reminder.send_at))
+    clock = _clock(user.reminder_time)
     # "night_before" is the day before at any time the resident picks (4pm is an option).
-    when = ("the day before each collection" if user.reminder_mode == ReminderMode.night_before
-            else "on the morning of each collection")
-    hh, mm = (int(x) for x in user.reminder_time.split(":"))
-    clock = f"{hh % 12 or 12}{f':{mm:02d}' if mm else ''}{'pm' if hh >= 12 else 'am'}"
-    msg = f"{get_settings().brand_name} here. You're set up: I'll message you {when}, at {clock}."
+    when = ("the day before collection" if user.reminder_mode == ReminderMode.night_before
+            else "on the morning of collection")
+    parts = [f"{get_settings().brand_name} here. You're all set. I'll message you at {clock} {when}."]
     if first:
         names = [b["label"] for b in first.bins]
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
-        msg += f"\nFirst up: {bins} on {first.collection_date.strftime('%a %-d %b')}."
-    msg += "\nReply STOP any time to turn reminders off."
+        parts.append(f"First up: {bins} on {first.collection_date.strftime('%a %-d %b')}.")
+    parts.append("Want to bin me off? Reply STOP anytime.")
     # Invite link, same format as the referral API: people forward it to neighbours. The level
     # names and the top threshold come from LEVELS, so the copy follows any change there.
     link = f"{get_settings().public_base_url}/?ref={user.referral_code}"
     top_at, top_name = LEVELS[-1]
     words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
              8: "eight", 9: "nine", 10: "ten"}
-    msg += (f"\n\nYou're a {LEVELS[0][1]} for now. Every neighbour who signs up with your link "
-            f"levels you up, and {words.get(top_at, str(top_at))} makes you a certified "
-            f"{top_name.lower()}: {link}")
-    return msg[:4096]  # WhatsApp's text limit; the welcome is far shorter in practice
+    parts.append(f"You're a {LEVELS[0][1]} for now. Every neighbour who signs up with your link "
+                 f"levels you up, and {words.get(top_at, str(top_at))} makes you a certified "
+                 f"{top_name.lower()}: {link}")
+    return [p[:4096] for p in parts]  # WhatsApp's text limit; each is far shorter in practice
+
+
+def welcome_message(db: Session, user: User) -> str:
+    """The whole welcome as one text (what the API and tests return)."""
+    return "\n\n".join(welcome_parts(db, user))
+
+
+def send_welcome(db: Session, phone: str, user: User) -> str:
+    """Send the welcome as its separate messages. The first is recorded as kind "welcome" (one
+    per sign-up), the rest as "welcome_more". Returns the whole text."""
+    import time
+
+    from app.providers.messaging import get_provider
+
+    real = get_provider().name == "meta"
+    for i, part in enumerate(welcome_parts(db, user)):
+        if i and real:
+            time.sleep(0.7)  # WhatsApp doesn't promise order: a beat apart keeps them in sequence
+        send_message(db, phone, part, kind="welcome" if i == 0 else "welcome_more")
+    return welcome_message(db, user)
 
 
 def start_link(code: str) -> str:
@@ -266,7 +286,7 @@ def _handle_hi(db: Session, phone: str, text: str) -> tuple[str, str] | None:
     user.status = UserStatus.active
     rebuild_reminders(db, user)
     credit_referral(db, user)
-    return welcome_message(db, user), "welcome"
+    return send_welcome(db, phone, user), "welcome"
 
 
 # ---- WhatsApp commands: change reminder time and bins -------------------------------------------
@@ -559,7 +579,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     (TIME 4pm, MORNING, DAY BEFORE, "turn off garden"). Returns the reply text."""
     hi = _handle_hi(db, phone, text)
     if hi:
-        send_reply(db, phone, hi[0], kind=hi[1])
+        if hi[1] != "welcome":  # the welcome went out already, as its separate messages
+            send_reply(db, phone, hi[0], kind=hi[1])
         u = db.scalar(select(User).where(User.phone_e164 == phone))
         if u:
             u.last_active_at = datetime.now(ZoneInfo("UTC"))

@@ -24,7 +24,7 @@ from app.core.guard import allow
 from app.models import ChangeLog, ReminderMode, User, UserStatus, now
 from app.providers.messaging import send_reply
 from app.services import geo, signup
-from app.services.reminders import DAY_BEFORE_TIMES, Reply, _clock, parse_time, welcome_message
+from app.services.reminders import DAY_BEFORE_TIMES, Reply, _clock, parse_time, send_welcome
 
 log = logging.getLogger(__name__)
 
@@ -129,9 +129,9 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
     if step is None:
         return _send(db, phone, _restart(user))
     reply = step(db, user, t)
-    if reply is None:
-        return None
-    return _send(db, phone, reply, kind=getattr(reply, "kind", "reply"))
+    if reply is None or isinstance(reply, str):  # None: sent separately; str: the welcome, sent
+        return reply
+    return _send(db, phone, reply)
 
 
 def _send(db: Session, phone: str, reply: Reply, kind: str = "reply") -> str:
@@ -398,7 +398,7 @@ def _on_time(db: Session, user: User, t: str) -> Reply:
     return Reply(_consent_text(), buttons=CONSENT_BUTTONS)
 
 
-def _on_consent(db: Session, user: User, t: str) -> Reply | None:
+def _on_consent(db: Session, user: User, t: str) -> Reply | str:
     if t not in (P + "go:yes", P + "go:nomkt"):
         return Reply(_consent_text(), buttons=CONSENT_BUTTONS)
     user.consent_at = now()
@@ -407,7 +407,7 @@ def _on_consent(db: Session, user: User, t: str) -> Reply | None:
     return _switch_on(db, user)
 
 
-def _on_web(db: Session, user: User, t: str) -> Reply | None:
+def _on_web(db: Session, user: User, t: str) -> Reply | str:
     if t == P + "web:yes" or t.upper() in ("YES", "Y", "START", "START REMINDERS"):
         return _switch_on(db, user)
     if t == P + "web:over":
@@ -416,12 +416,12 @@ def _on_web(db: Session, user: User, t: str) -> Reply | None:
                  buttons=[(P + "web:yes", "Start reminders"), (P + "web:over", "Start over")])
 
 
-def _switch_on(db: Session, user: User) -> Reply:
+def _switch_on(db: Session, user: User) -> str:
     holder = db.scalar(select(User).where(User.phone_e164 == user.phone_e164, User.id != user.id))
     if holder is not None:  # can't happen (numbers are unique), but never two on one number
         holder.phone_e164 = None
     user.wa_step, user.wa_data = None, None
     signup.activate(db, user)
-    reply = Reply(welcome_message(db, user))
-    reply.kind = "welcome"
-    return reply
+    text = send_welcome(db, user.phone_e164, user)  # its separate messages go out here
+    db.commit()
+    return text

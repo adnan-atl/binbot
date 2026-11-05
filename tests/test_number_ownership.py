@@ -57,13 +57,18 @@ def test_turning_on_waits_for_hi_and_sends_nothing(client, db, live):
 def test_hi_from_the_typed_number_starts_reminders_and_sends_the_welcome(client, db, live):
     uid, res = _turn_on(client)
     reply = _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}")
-    assert reply.startswith("Binny here. You're set up: I'll message you the day before each collection, at 7pm.")
+    assert reply.startswith("Binny here. You're all set. I'll message you at 7pm the day before collection.")
     db.expire_all()
     user = db.get(User, uid)
     assert user.status == UserStatus.active and user.start_code is None
     assert _scheduled(db, uid)
     welcome = db.scalar(select(Outbox).where(Outbox.kind == "welcome"))
-    assert welcome.to_phone == "+447700900123" and welcome.body == reply
+    assert welcome.to_phone == "+447700900123" and reply.startswith(welcome.body)
+    # Sent as separate messages: set up, first collection, how to stop, the invite
+    more = [o.body for o in db.scalars(select(Outbox).where(Outbox.kind == "welcome_more"))]
+    assert len(more) == 3 and reply == "\n\n".join([welcome.body] + sorted(
+        more, key=lambda b: (not b.startswith("First up"), b.startswith("You're a "))))
+    assert "Want to bin me off? Reply STOP anytime." in more
     # A second tap just says it's already on
     assert _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}") == \
         'Your reminders are already on. Message "settings" to change them.'
