@@ -895,7 +895,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <main class="flow-main">
 <div class="col">
 <h1 class="h1" id="hi-h">Say hi to {{BRAND}}</h1>
-<p class="lede" id="hi-lede">Tap the button and send the message. {{BRAND}} will reply straight away.</p>
+<p class="lede" id="hi-lede">Tap the button to open WhatsApp with your message ready. Send it, and {{BRAND}} replies straight away to start your reminders.</p>
 <div id="hi-desk" class="hi-desk" hidden>
 <div class="hi-row"><img class="hi-binji" src="/static/binji-phone.webp" alt="" width="453" height="560"><img id="hi-qr" alt="QR code that opens WhatsApp with your message ready" width="232" height="232"></div>
 <a id="hi-web" class="hi-web" href="https://wa.me/" target="_blank" rel="noopener">Or open WhatsApp on this computer</a>
@@ -1656,7 +1656,7 @@ Share to WhatsApp
   function setupHi(preview) {
     if (!ON_COMPUTER || (!API.userId && !preview)) return;
     $('#hi-h').textContent = 'Scan with your phone';
-    $('#hi-lede').textContent = "Scan the code with your phone's camera and send the message. " + BRAND + ' will reply straight away.';
+    $('#hi-lede').textContent = "Scan the code with your phone's camera, then send the message in WhatsApp.";
     $('#hi-qr').src = preview ? API.base + '/preview-qr.svg' : API.base + '/users/' + API.userId + '/start-qr.svg';
     $('#hi-desk').hidden = false; $('#hi-go').style.display = 'none'; $('#hi-note').style.display = 'none';
     clearInterval(hiPoll);
