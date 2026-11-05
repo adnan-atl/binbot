@@ -66,7 +66,7 @@ def test_hi_from_the_typed_number_starts_reminders_and_sends_the_welcome(client,
     assert welcome.to_phone == "+447700900123" and reply.startswith(welcome.body)
     # Sent as separate messages: set up, then first collection (no "bin me off" line)
     more = [o.body for o in db.scalars(select(Outbox).where(Outbox.kind == "welcome_more"))]
-    assert len(more) == 1 and more[0].startswith("First up") and reply == f"{welcome.body}\n\n{more[0]}"
+    assert len(more) == 1 and more[0].startswith("Next up") and reply == f"{welcome.body}\n\n{more[0]}"
     assert "STOP" not in reply
     # A second tap just says it's already on
     assert _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}") == \
