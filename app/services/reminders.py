@@ -760,6 +760,59 @@ FALLBACK_TAIL = "Tap Settings to change your bins or reminder time."
 FALLBACK = f"{NOT_UNDERSTOOD[0]} {FALLBACK_TAIL}"
 
 
+# Things people ask that Binjamin can't do, each with a reply that says so and points them the
+# right way. (pattern, reply, tell the team?) The first match wins; {council} is their council.
+_TOPICS = [
+    (r"^(no thanks|no thank you|no ta)\b", "No problem!", False),
+    (r"^(?!no\b).*\b(thanks|thank you|thank u|cheers|ta|nice one|great|perfect|brilliant|lovely)\b",
+     "You're welcome! \U0001F44B", False),
+    (r"^(hi|hello|hey|hiya|morning|evening|afternoon|yo)\b[\s!.]*$",
+     "Hi! I'll message you the evening before your next collection. Ask me \"when's my next "
+     "collection?\" any time.", False),
+    (r"\b(who are you|what are you|what is this|what's this|who is this|are you (a )?(bot|real|human))\b",
+     "I'm {brand}, by {parent}. I message you the evening before bin day with which bins to "
+     "put out.", False),
+    (r"\b(missed|wasn'?t (collected|emptied|picked up)|weren'?t (collected|emptied)|"
+     r"not (been )?(collected|emptied)|didn'?t (collect|empty|come)|never came|left my bin)\b",
+     "Sorry about that. I can't report missed collections, but {council} can: search "
+     "\"{council} missed bin collection\". I'll keep reminding you as normal.", True),
+    (r"\b(bulky|sofa|couch|mattress|fridge|freezer|furniture|wardrobe|washing machine|"
+     r"old (bed|table|chairs?)|large items?)\b",
+     "Bulky items are collected by {council}, usually for a fee. I can't book that for you, but "
+     "search \"{council} bulky waste\" to arrange it.", True),
+    (r"\b(new bin|replacement bin|broken bin|stolen|lost (my |the )?bin|damaged bin|bin (is )?"
+     r"(broken|cracked|missing)|extra bin|another bin|bigger bin)\b",
+     "New and replacement bins come from {council}. Search \"{council} new bin\" to request one.",
+     True),
+    (r"\b(christmas|xmas|easter|bank holidays?|new year|boxing day)\b",
+     "When {council} moves collections for a bank holiday, I'll message you the new day.", True),
+    (r"\b(tip|dump|recycling cent(re|er)|household waste (site|cent(re|er)))\b",
+     "Tips and recycling centres are run by {council}. Search \"{council} recycling centre\" for "
+     "opening times.", True),
+    (r"\b(can i (recycle|put)|what (goes|can go) in|which bin (does|do|for)|where does .+ go|"
+     r"is .+ recyclable|recycle (this|it)|goes in which bin)\b",
+     "I don't know {council}'s rules for every item, sorry. Search \"{council} what goes in my "
+     "bin\" for the full list.", True),
+    (r"\b(weather|forecast|rain|raining|sunny|temperature)\b",
+     "I'm a bin butler, not a weatherman! I can only help with your bins.", False),
+    (r"\b(council tax|energy|electricity|gas bill|broadband|insurance|mortgage|water bill|bills?)\b",
+     "That's beyond my bin grade, sorry. I can only help with your bin collections.", True),
+]
+
+
+def topic_reply(user: User, text: str) -> tuple[str, bool] | None:
+    """A tailored "can't help with that, but…" for things people commonly ask, or None.
+    Returns (reply, whether the team inbox should see it)."""
+    s = get_settings()
+    council = (user.property.council.name if user.property and user.property.council else
+               "your council")
+    low = text.strip().lower()
+    for rx, reply, tell in _TOPICS:
+        if re.search(rx, low):
+            return reply.format(council=council, brand=s.brand_name, parent=s.parent_name), tell
+    return None
+
+
 def fallback_text(db: Session, user: User) -> str:
     """The not-understood reply, alternating between the two lines for each person."""
     n = db.scalar(select(func.count()).select_from(ChangeLog).where(
@@ -886,9 +939,14 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             db.commit()
             inbox.post(db, phone, text, "unrecognised")
             return ""
-        db.flush()
-        reply = Reply(fallback_text(db, user), buttons=[SETTINGS_BUTTON])
-        to_inbox = "unrecognised"
+        topic = topic_reply(user, text)
+        if topic is not None:  # something we can't do, but can point them the right way
+            reply = Reply(topic[0])
+            to_inbox = "unrecognised" if topic[1] else None
+        else:
+            db.flush()
+            reply = Reply(fallback_text(db, user), buttons=[SETTINGS_BUTTON])
+            to_inbox = "unrecognised"
     if cmd in ("DONE", "SNOOZE") and last and len(words) == 1:
         # The reminder's template couldn't carry the referral news: it rides on this reply.
         news = referral_news(db, user)

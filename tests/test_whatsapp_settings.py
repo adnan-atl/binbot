@@ -198,7 +198,7 @@ def test_phrase_matching_several_bins_shows_the_list(client, db, uid):
 
 
 def test_other_no_or_stop_phrases_are_not_about_bins(client, db, uid):
-    assert say(client, "no thanks").startswith("I'm afraid that's beyond my bin grade.")
+    assert say(client, "no thanks") == "No problem!"
     assert say(client, "stop please").startswith("Reminders are off.")
 
 
@@ -218,12 +218,12 @@ def test_pause_and_resume_by_tapping(client, db, uid):
 # ---- fallback, copy -----------------------------------------------------------------------------
 
 def test_fallback_offers_the_settings_button(client, db, uid):
-    assert say(client, "hello") == ("I'm afraid that's beyond my bin grade. I'm just here for the "
+    assert say(client, "blah blah") == ("I'm afraid that's beyond my bin grade. I'm just here for the "
                                     "rubbish! Tap Settings to change your bins or reminder time.")
     assert last_sent(db).endswith("\n[Settings]")
     # the two lines take turns
     assert say(client, "done").startswith("I'm just a humble bin butler. Rubbish is my speciality!")
-    assert say(client, "what's the weather").startswith("I'm afraid that's beyond my bin grade.")
+    assert say(client, "asdfgh").startswith("I'm afraid that's beyond my bin grade.")
 
 
 def test_no_old_off_on_copy_anywhere(client, db, uid):

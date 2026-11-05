@@ -67,3 +67,24 @@ def test_not_questions_still_go_where_they_did(client, db, uid):
     assert not say(client, "do you do bulky waste?").startswith("Next up")
     db.expire_all()
     assert len(db.scalars(select(ChangeLog).where(ChangeLog.kind == "unrecognised")).all()) == 3
+
+
+@pytest.mark.parametrize("q,starts,team", [
+    ("do you do bulky waste? got an old sofa", "Bulky items are collected by Hackney", True),
+    ("my bin wasn't collected today", "Sorry about that. I can't report missed collections, but Hackney can", True),
+    ("can I recycle pizza boxes?", "I don't know Hackney's rules for every item", True),
+    ("when is the christmas collection?", "When Hackney moves collections for a bank holiday", True),
+    ("my bin is broken", "New and replacement bins come from Hackney", True),
+    ("where's the nearest tip", "Tips and recycling centres are run by Hackney", True),
+    ("what's the forecast for tomorrow?", "I'm a bin butler, not a weatherman!", False),
+    ("can you help with my energy bills", "That's beyond my bin grade, sorry.", True),
+    ("thanks!", "You're welcome!", False),
+    ("hello", "Hi! I'll message you the evening before", False),
+    ("who are you?", "I'm Binny, by Alfred.", False),
+])
+def test_tailored_cant_help_replies(client, db, uid, q, starts, team):
+    assert say(client, q).startswith(starts)
+    db.expire_all()
+    from app.models import ChangeLog
+    seen = db.scalars(select(ChangeLog).where(ChangeLog.kind == "unrecognised")).all()
+    assert bool(seen)  # always kept for review; the Slack inbox only gets the ones marked team
