@@ -106,8 +106,9 @@ def test_a_typed_number_no_one_proved_can_be_typed_again(client, db, live):
 
 
 def test_unknown_code_from_unknown_number_gets_the_sign_up_reply(client, live):
-    assert _say(client, "+447700900777", "Hi Binny, start my reminders ZZZZZZ") == \
-        "Hi! Sign up at localhost:8000 to get bin reminders."
+    # A code we don't know: they start signing up in WhatsApp instead
+    assert _say(client, "+447700900777", "Hi Binny, start my reminders ZZZZZZ").endswith(
+        "What's your postcode?")
 
 
 def test_without_a_business_number_reminders_start_straight_away(client, db):

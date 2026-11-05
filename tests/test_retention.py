@@ -135,7 +135,7 @@ def test_delete_asks_first_then_wipes_the_account(client, db, uid):  # noqa: F81
     assert not db.scalars(select(Outbox).where(Outbox.to_phone == PHONE)).all()
     assert not db.scalars(select(Reminder).where(Reminder.user_id == uid)).all()
     # Afterwards they're a stranger again
-    assert "Sign up at" in say(client, "hello")
+    assert "What's your postcode?" in say(client, "hello")
 
 
 def test_delete_from_the_settings_menu_and_typed_yes(client, db, uid):  # noqa: F811

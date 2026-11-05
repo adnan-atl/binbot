@@ -38,9 +38,9 @@ def test_brand_name_setting(client, db, brand):
     assert client.get("/static/index.html").text == page
 
 
-def test_unknown_number_gets_the_site_not_an_old_domain(client):
+def test_unknown_number_gets_the_brand_and_a_sign_up(client):
     reply = client.post("/api/inbound", json={"phone": "+447700900999", "text": "hi"}).json()["reply"]
-    assert reply == "Hi! Sign up at localhost:8000 to get bin reminders."
+    assert reply.startswith("Hi, I'm Binny.") and reply.endswith("What's your postcode?")
 
 
 def test_footer_links_and_parent_name(client, monkeypatch):

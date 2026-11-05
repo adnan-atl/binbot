@@ -1,24 +1,20 @@
 import logging
 import re
 import secrets
-from datetime import date, datetime, time, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.adapters.manual import expand_rule
 from app.adapters.registry import coverage, spec_for
 from app.providers.messaging import send_message
 from app.api import schemas as S
 from app.core.config import get_settings
-from app.core.db import get_db, session_factory
+from app.core.db import get_db
 from app.core.guard import client_ip, human_check_on, issue_pass, rate_limit, require_human, verify_turnstile
 from app.models import (
     BinCategory,
-    ChangeLog,
-    CouncilStatus,
     Referral,
     Reminder,
     ReminderMode,
@@ -28,19 +24,14 @@ from app.models import (
     level_for,
     now,
 )
-from app.services import geo, split
-from app.services.normalize import describe_rule
-from app.services.reminders import credit_referral, handle_inbound, rebuild_reminders, start_link, welcome_message
-from app.services.verify import rescue_round, verify_round
+from app.services import geo, signup, split
+from app.services.reminders import handle_inbound, rebuild_reminders, start_link, welcome_message
 from app.services.schedule import (
     get_or_create_council,
     own_round,
     postcode_round_key,
     refresh_round,
-    representative_for,
-    resolve_property,
     round_has_calendar,
-    schedule_for,
 )
 
 log = logging.getLogger(__name__)
@@ -108,64 +99,22 @@ def signup_start(body: S.StartIn, request: Request, db: Session = Depends(get_db
     require_human(request)
     rate_limit(request, "signup", 8, 600)  # each sign-up can mean a council lookup
     try:
-        prop = resolve_property(db, body.postcode, body.uprn, body.house_number, body.address_line)
+        res = signup.start_signup(db, body.postcode, body.uprn, body.house_number,
+                                  body.address_line, referral_code=body.referral_code)
     except geo.BadPostcode:
         raise HTTPException(400, "That doesn't look like a UK postcode")
-    council = prop.council
-
-    user = User(property_id=prop.id, referral_code=secrets.token_urlsafe(6)[:8].lower())
-    if body.referral_code:
-        ref = db.scalar(select(User).where(User.referral_code == body.referral_code))
-        if ref:
-            user.referred_by_id = ref.id
-    db.add(user)
-    db.flush()
-
-    source, error, shared = "manual", None, False
-    if get_settings().demo_mode:
-        source = "demo"
-    if round_has_calendar(db, prop.round_key):
-        # A neighbour already fetched this postcode's round: reuse it, no lookup at all.
-        source, shared = "neighbours", True
-    elif council.status != CouncilStatus.unsupported:
-        res = refresh_round(db, prop, source="demo" if source == "demo" else "council")
-        if res.error and rescue_round(db, prop):
-            source = "neighbours"  # this address failed; a neighbour's calendar worked
-        elif res.error:
-            error = res.error
-        else:
-            source = source if source == "demo" else "council"
-    if not error:
-        _seed_settings(db, user, prop)
-    db.commit()
-    if not error and not shared:  # neighbours reuse a round that was already checked
-        _log_checks(db, prop)
-    db.commit()
-    return S.StartOut(user_id=user.id, property_id=prop.id, council=council.name,
-                      source=source if not error else "manual", error=error, shared=shared,
+    user = res.user
+    return S.StartOut(user_id=user.id, property_id=res.prop.id, council=res.prop.council.name,
+                      source=res.source, error=res.error, shared=res.shared,
                       bins=_bins_out(db, user))
 
 
-def _log_checks(db: Session, prop) -> None:
-    """Checker results are for ops, never shown to the resident: log them for review."""
-    _, found = schedule_for(db, prop, with_checks=True)
-    for c in found:
-        db.add(ChangeLog(scope="round", scope_id=prop.round_key,
-                         kind="data_conflict" if c["kind"] == "conflict" else "missing_stream",
-                         diff=c))
-
-
-def _seed_settings(db: Session, user: User, prop) -> None:
-    """One UserBinSetting per council bin on the property's round."""
-    for s in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id,
-                                                      UserBinSetting.bin_type_id.is_not(None),
-                                                      UserBinSetting.override_rule.is_(None))):
-        db.delete(s)
-    db.flush()
-    for b in schedule_for(db, prop):
-        db.add(UserBinSetting(user_id=user.id, bin_type_id=b["bin_type_id"],
-                              label=b["label"], category=BinCategory(b["category"])))
-    db.flush()
+# Shared with the WhatsApp sign-up: see services/signup.py
+_log_checks = signup.log_checks
+_seed_settings = signup.seed_settings
+_bins_out = signup.bins_out
+_first_showable_day = signup.first_showable_day
+SAME_DAY_CUTOFF = signup.SAME_DAY_CUTOFF
 
 
 @router.post("/users/{user_id}/own-calendar", response_model=S.StartOut)
@@ -214,70 +163,11 @@ def verify(user_id: str, background: BackgroundTasks, db: Session = Depends(get_
     response and the resident never waits for it.
     """
     user = _user(db, user_id)
-    if user.property and verify_round(db, user.property, confirm=False)["filled"]:
-        _seed_settings(db, user, user.property)
+    signup.fill_gaps(db, user)
     db.commit()
     out = _bins_out(db, user)
     if user.property:
-        background.add_task(_confirm_round, user.property.id)
-    return out
-
-
-def _confirm_round(property_id: str) -> None:
-    """Background: confirm the round with a neighbour (at most once a week per round)."""
-    from app.models import Property
-
-    db = session_factory()()
-    try:
-        prop = db.get(Property, property_id)
-        if prop is not None:
-            verify_round(db, prop)
-            db.commit()
-    except Exception:  # never surfaces to the resident; ops see it in the logs
-        log.exception("confirm_round failed for %s", property_id)
-        db.rollback()
-    finally:
-        db.close()
-
-
-# Councils ask for bins out by about 7am, so after that today's collection has as good as gone:
-# from then on "next" means the next one after today.
-SAME_DAY_CUTOFF = time(7, 0)
-
-
-def _first_showable_day(now: datetime | None = None) -> date:
-    """Today until SAME_DAY_CUTOFF (London time), then tomorrow."""
-    now = now or datetime.now(ZoneInfo(get_settings().timezone))
-    return now.date() if now.time() < SAME_DAY_CUTOFF else now.date() + timedelta(days=1)
-
-
-def _bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.BinOut]:
-    first = _first_showable_day(now).isoformat()
-    council_bins = {b["bin_type_id"]: b for b in schedule_for(db, user.property)} if user.property else {}
-    out = []
-    for s in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id)):
-        if s.override_rule:
-            dates = expand_rule(s.override_rule, date.today(), 60)
-            rule = describe_rule(dates)
-            rule["days"] = s.override_rule.get("days", rule["days"])
-            rule["frequency"] = s.override_rule.get("frequency", rule["frequency"])
-            upcoming = [d.isoformat() for d in dates if d.isoformat() >= first][:4]
-            colour, manual = None, True
-        elif s.bin_type_id in council_bins:
-            cb = council_bins[s.bin_type_id]
-            rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"],
-                    "purpose": cb["purpose"], "frequency_source": cb.get("frequency_source", "")}
-            # The round's real dates (bank holiday moves included), as schedule_for has them
-            upcoming = [d for d in cb["dates"] if d >= first][:4]
-            colour, manual = cb["colour"], False
-        else:
-            rule, colour, manual = {"days": [], "frequency": "irregular", "next": None}, None, True
-            upcoming = []
-        if upcoming:  # today's collection after the cutoff isn't "next" any more
-            rule["next"] = upcoming[0]
-        out.append(S.BinOut(setting_id=s.id, bin_type_id=s.bin_type_id, label=s.label,
-                            category=s.category.value, colour=s.colour or colour, enabled=s.enabled,
-                            manual=manual, upcoming=upcoming, **rule))
+        background.add_task(signup.confirm_round, user.property.id)
     return out
 
 
@@ -379,10 +269,10 @@ def set_prefs(user_id: str, body: S.PrefsIn, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "awaiting_hi", "scheduled": 0, "start_code": user.start_code,
                 "start_link": start_link(user.start_code)}
-    user.status = UserStatus.active
-    n = rebuild_reminders(db, user)
-    if not was_active:
-        credit_referral(db, user)
+    if was_active:
+        n = rebuild_reminders(db, user)
+    else:
+        n = signup.activate(db, user)
         send_message(db, user.phone_e164, welcome_message(db, user), kind="welcome")
     db.commit()
     return {"status": "active", "scheduled": n}

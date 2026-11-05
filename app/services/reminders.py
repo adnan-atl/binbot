@@ -566,9 +566,10 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         db.commit()
         return hi[0]
     user = db.scalar(select(User).where(User.phone_e164 == phone))
-    if not user:
-        site = re.sub(r"^https?://", "", get_settings().public_base_url).rstrip("/")
-        return f"Hi! Sign up at {site} to get bin reminders."
+    from app.services import wa_signup
+
+    if wa_signup.wants(user):  # not signed up yet: sign up right here in WhatsApp
+        return wa_signup.handle(db, phone, text, user) or ""
     user.last_active_at = datetime.now(ZoneInfo("UTC"))
     if text.strip() == "menu:wrong":  # "Wrong collection day" in the settings menu
         text = "WRONG"

@@ -224,6 +224,10 @@ class User(Base):
     # Code in the "Hi, start my reminders <code>" message the resident sends us to finish sign-up
     # (META_DISPLAY_NUMBER set). Cleared once used.
     start_code: Mapped[str | None] = mapped_column(String(8), unique=True, index=True)
+    # Signing up inside WhatsApp (services/wa_signup.py): the step they're on and what they've
+    # told us so far. Both cleared once reminders are on.
+    wa_step: Mapped[str | None] = mapped_column(String(20))
+    wa_data: Mapped[dict | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     # Last time they used the service: a message or tap on WhatsApp, the site, or a reminder
     # that reached them. Accounts idle for 2 years are deleted (services/retention.py).

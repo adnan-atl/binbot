@@ -61,6 +61,22 @@ def rate_limit(request: Request, bucket: str, max_hits: int, per_seconds: int) -
         q.append(now)
 
 
+def allow(bucket: str, key: str, max_hits: int, per_seconds: int) -> bool:
+    """Same sliding window as rate_limit, keyed by anything (a phone number on WhatsApp).
+    Returns False once the limit is hit instead of raising."""
+    if not get_settings().rate_limits:
+        return True
+    k, now = (bucket, key), time.monotonic()
+    with _lock:
+        q = _hits[k]
+        while q and q[0] <= now - per_seconds:
+            q.popleft()
+        if len(q) >= max_hits:
+            return False
+        q.append(now)
+        return True
+
+
 def reset_limits() -> None:
     with _lock:
         _hits.clear()
