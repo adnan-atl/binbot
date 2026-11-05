@@ -56,3 +56,18 @@ def test_missing_pages_get_the_404_page_and_the_api_keeps_json(client):
     r = client.get("/api/no-such-thing", headers={"accept": "text/html"})
     assert r.status_code == 404 and r.headers["content-type"].startswith("application/json")
     assert client.get("/no-such-page").status_code == 404
+
+
+def test_silly_time_step_says_hello_and_there_is_no_say_hi_screen(client, monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("HOME_DESIGN", "silly")
+    monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
+    get_settings.cache_clear()
+    page = client.get("/").text
+    assert 'data-screen="hi"' not in page and "{{" not in page
+    assert ('id="t-go" href="https://wa.me/447700900999?text=Hey%20Binny%2C%20I%27M%20BIN"' in page)
+    assert 'aria-disabled="true"' in page and "Say hello to Binny!" in page
+    monkeypatch.delenv("META_DISPLAY_NUMBER")
+    get_settings.cache_clear()
+    assert 'id="t-go" href=""' in client.get("/").text  # local: no WhatsApp link

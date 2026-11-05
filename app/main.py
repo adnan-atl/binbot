@@ -35,14 +35,19 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 def render_index(page: Path | None = None) -> str:
     """The page with the brand and links filled in. Read on every request, so edits to web/
     (mounted into the container) show on refresh. {{BRAND}}, {{PARENT_NAME}}, {{PARENT_URL}},
-    {{PRIVACY_URL}} and {{TERMS_URL}} are for HTML text and attributes; {{BRAND_JSON}} is a JS
+    {{PRIVACY_URL}}, {{TERMS_URL}} and {{WA_HI_LINK}} are for HTML text and attributes; {{BRAND_JSON}} is a JS
     string literal, safe inside <script>."""
     s = get_settings()
     page = (page or WEB / "index.html").read_text(encoding="utf-8")
     brand_json = json.dumps(s.brand_name).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     page = page.replace("{{BRAND_JSON}}", brand_json)
     page = page.replace("{{TURNSTILE_SITE_KEY_JSON}}", json.dumps(s.turnstile_site_key).replace("<", "\\u003c"))
-    for token, value in (("BRAND", s.brand_name), ("PARENT_NAME", s.parent_name),
+    from app.services.reminders import start_link
+
+    # The "Say hello" button's WhatsApp link (same for everyone: no code in it). Empty without a
+    # business number (local, demo): the page then turns reminders on directly.
+    wa_hi = start_link() if s.meta_display_number else ""
+    for token, value in (("WA_HI_LINK", wa_hi), ("BRAND", s.brand_name), ("PARENT_NAME", s.parent_name),
                          ("PARENT_URL", s.parent_url), ("PRIVACY_URL", s.privacy_url),
                          ("TERMS_URL", s.terms_url)):
         page = page.replace("{{" + token + "}}", html.escape(value))
