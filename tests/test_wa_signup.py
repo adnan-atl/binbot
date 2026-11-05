@@ -52,6 +52,8 @@ def test_full_sign_up_in_whatsapp(client, db):
     assert "4pm" in last_sent(db) and "9pm" in last_sent(db)
     consent = say(client, "su:time:18:00")
     assert consent.startswith("Last step.") and "terms (" in consent and "privacy policy (" in consent
+    assert ("new Binny features and other household services within the Alfred family" in consent
+            and "offers from" not in consent)
     assert "[Start reminders] [No feature updates]" in last_sent(db)
     welcome = say(client, "su:go:yes")
     assert welcome.startswith("Binny here. You're all set. I'll message you at 6pm the evening before collection.")

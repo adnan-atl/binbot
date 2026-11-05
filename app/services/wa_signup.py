@@ -71,8 +71,9 @@ def _consent_text() -> str:
     s = get_settings()
     return (f"Last step. Starting means you agree to our terms ({s.terms_url}) and privacy "
             f"policy ({s.privacy_url}).\n\n"
-            f"Now and then I'll also tell you about new {s.brand_name} features and offers from "
-            f"{s.parent_name}. Tap No feature updates if you'd rather not hear about those. "
+            f"Now and then I'll also tell you about new {s.brand_name} features and other household "
+            f"services within the {s.parent_name} family. Tap No feature updates if you'd rather "
+            "not hear about those. "
             "Either button starts your reminders.")
 
 
