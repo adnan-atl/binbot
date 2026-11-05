@@ -46,10 +46,20 @@ def categorise(label: str, gss_code: str | None = None) -> BinCategory:
         c = colour_of(l)
         if c and c in COUNCIL_COLOURS[gss_code]:
             return COUNCIL_COLOURS[gss_code][c]
+    # "Non-Recyclable Refuse" (Bromley) contains "recycl": it's general waste, not recycling.
+    if _NOT_RECYCLING.search(l):
+        return BinCategory.general
+    # "Mixed Recycling (Cans, Plastics & Glass)": a recycling bin that takes glass, not a glass box.
+    if _MIXED.search(l) and not any(n in l for n in ("food", "garden", "compost")):
+        return BinCategory.recycling
     for cat, needles in _RULES:
         if any(n in l for n in needles):
             return cat
     return BinCategory.other
+
+
+_NOT_RECYCLING = re.compile(r"\b(non|not|un)[\s-]?recycl")
+_MIXED = re.compile(r"\b(mixed|co-?mingled)\b.*\brecycl")
 
 
 # Short "what goes in it" line for the UI when the council label is just a colour.
