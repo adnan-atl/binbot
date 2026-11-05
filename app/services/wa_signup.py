@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 P = "su:"  # every tap id in this flow starts with this, so it never clashes with Settings taps
 MAX_LISTED = 9  # a WhatsApp list holds 10 rows: 9 addresses and "Not listed"
 
+REF_RE = re.compile(r"\bref\s+([A-Za-z0-9_-]{4,12})\b", re.IGNORECASE)  # reminders.invite_text
 RESTART_WORDS = {"RESTART", "START OVER", "STARTOVER", "RESET"}
 QUIT_WORDS = {"STOP", "CANCEL", "QUIT", "UNSUBSCRIBE"}
 
@@ -106,6 +107,13 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
         user = User(phone_e164=phone, referral_code=signup.new_referral_code())
         db.add(user)
         db.flush()
+        ref = REF_RE.search(t)  # came from someone's personal invite: they get the credit
+        if ref:
+            referrer = db.scalar(select(User).where(User.referral_code == ref.group(1).lower()))
+            if referrer is not None and referrer.id != user.id:
+                user.referred_by_id = referrer.id
+            user.wa_step = "postcode"
+            return _send(db, phone, Reply(greeting()))
         if is_hi(t):  # the website's hi, but from a number nobody typed there
             user.wa_step = "claim"
             return _send(db, phone, Reply(CLAIM))

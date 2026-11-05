@@ -1,6 +1,6 @@
 """Referrals count when the friend's reminders go on, and the referrer hears about them on their
 next reminder (batched), never in a message of its own."""
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -127,3 +127,45 @@ def test_news_wording_up_to_and_past_ten(db):
     assert join(8).endswith("8 neighbours joined with your link. 1 more and you're officially a Binfluencer.")
     assert join(2).endswith("2 neighbours joined with your link. That's 10: you're officially a Binfluencer!")
     assert join(1).endswith("A neighbour joined with your link. That's 12 neighbours so far.")
+
+
+def test_whatsapp_invite_link_credits_the_sharer(client, db, monkeypatch):
+    from app.core.config import get_settings
+    from app.models import Referral
+    from app.services.reminders import invite_text
+
+    monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
+    get_settings.cache_clear()
+    sharer = signup(client)["user_id"]
+    _activate(client, sharer, "07700900123")
+    code = client.get(f"/api/users/{sharer}/referral").json()["code"]
+    # binjamin.uk/w/<code> opens WhatsApp with the invite ready to send
+    r = client.get(f"/w/{code}", follow_redirects=False)
+    assert r.status_code == 302 and r.headers["location"].startswith("https://wa.me/447700900999?text=")
+    assert code in r.headers["location"]
+    # the friend sends it, then signs up in the chat
+    friend = "+447700900555"
+    say = lambda t: client.post("/api/inbound", json={"phone": friend, "text": t}).json()["reply"]
+    assert say(invite_text(code)).endswith("What's your postcode?")
+    say("E8 1AA")
+    say("su:addr:2")
+    say("su:bins:ok")
+    say("su:time:19:00")
+    assert say("su:go:yes").startswith("Binny here. You're all set.")
+    db.expire_all()
+    assert db.scalar(select(Referral).where(Referral.referrer_id == sharer)) is not None
+    monkeypatch.delenv("META_DISPLAY_NUMBER")
+    get_settings.cache_clear()
+
+
+def test_welcome_binfluencer_message_uses_the_personal_invite(client, db, monkeypatch):
+    from app.core.config import get_settings
+    from app.models import User
+    from app.services.reminders import welcome_share
+
+    monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
+    get_settings.cache_clear()
+    u = User(referral_code="ab12cd34", marketing_consent_at=datetime.now(timezone.utc))
+    assert welcome_share(u).endswith("say hi to Binny on WhatsApp: localhost:8000/w/ab12cd34")
+    monkeypatch.delenv("META_DISPLAY_NUMBER")
+    get_settings.cache_clear()

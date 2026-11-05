@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -67,6 +67,19 @@ if WEB.exists():
         if name and re.fullmatch(r"[a-z0-9-]{1,40}", name) and page.is_file():
             return HTMLResponse(render_index(page))
         return HTMLResponse(render_index())
+
+    @app.get("/w/{code}", include_in_schema=False)
+    def whatsapp_invite(code: str):
+        """Someone's personal WhatsApp invite (binjamin.uk/w/<code>): opens a chat with Binjamin
+        with "Hey Binjamin 👋 (invited by a neighbour, ref <code>)" ready to send. Without a
+        business number (local), the website invite instead."""
+        from app.services.reminders import invite_wa_link
+
+        if not re.fullmatch(r"[A-Za-z0-9_-]{4,12}", code):
+            return RedirectResponse("/", status_code=302)
+        if not get_settings().meta_display_number:
+            return RedirectResponse(f"/?ref={code}", status_code=302)
+        return RedirectResponse(invite_wa_link(code), status_code=302)
 
     @app.get("/d/{name}", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/d/{name}/about", include_in_schema=False, response_class=HTMLResponse)

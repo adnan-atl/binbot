@@ -322,18 +322,36 @@ def welcome_parts(db: Session, user: User) -> list[str]:
     return [p[:4096] for p in parts]  # WhatsApp's text limit; each is far shorter in practice
 
 
+def invite_text(code: str) -> str:
+    """What a personal WhatsApp invite pre-fills: the reference lets Binjamin credit whoever
+    shared it when their friend finishes signing up (wa_signup.REF_RE reads it)."""
+    return f"Hey {get_settings().brand_name} \U0001F44B (invited by a neighbour, ref {code})"
+
+
+def invite_wa_link(code: str) -> str:
+    """wa.me link with invite_text() ready to send. Long, so messages use invite_short_link."""
+    digits = re.sub(r"\D", "", get_settings().meta_display_number)
+    return f"https://wa.me/{digits}?text={quote(invite_text(code))}"
+
+
+def invite_short_link(code: str) -> str:
+    """binjamin.uk/w/<code>: redirects to invite_wa_link (app/main.py). Tidy enough to send."""
+    host = re.sub(r"^https?://", "", get_settings().public_base_url).rstrip("/")
+    return f"{host}/w/{code}"
+
+
 def welcome_share(user: User) -> str | None:
     """The fourth welcome message: share Binjamin with neighbours or the street group. Written
-    to be forwarded as it is, so the link opens a chat with Binjamin (any message there starts
-    sign-up). Only for people who didn't opt out of hearing from us, and only once there's a
-    business number to link to. It counts as their one share nudge (share_nudges)."""
+    to be forwarded as it is: the link is the person's own WhatsApp invite, so anyone who signs
+    up through it counts towards their Binfluencer total. Only for people who didn't opt out of
+    hearing from us, and only once there's a business number. It counts as their one share
+    nudge (share_nudges)."""
     s = get_settings()
-    digits = re.sub(r"\D", "", s.meta_display_number)
-    if not digits or user.marketing_consent_at is None:
+    if not re.sub(r"\D", "", s.meta_display_number) or user.marketing_consent_at is None:
         return None
     return (f"Want to be a certified Binfluencer? Pop me in your street's group chat or send me "
             f"to a friend. All they need to do is say hi to {s.brand_name} on WhatsApp: "
-            f"wa.me/{digits}")
+            f"{invite_short_link(user.referral_code)}")
 
 
 def welcome_message(db: Session, user: User) -> str:

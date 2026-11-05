@@ -1718,14 +1718,17 @@ Share to WhatsApp
   if (!$('#link').value) $('#link').value = location.host + '/?ref=[CODE]';
   var link = $('#link').value;
   // The share message, shown as the WhatsApp bubble neighbours will see. Share opens WhatsApp
-  // with it; tapping the bubble copies it. The sign-up link carries their invite code; the
-  // second link opens a chat with Binjamin to sign up right there (only when it's live).
+  // with it; tapping the bubble copies it. Both links carry their invite code: the website one,
+  // and a WhatsApp one to sign up right there in the chat (only when it's live).
   var WA_NUMBER = (($('#t-go').getAttribute('href') || '').match(/^https:\/\/wa\.me\/(\d+)/) || [])[1] || '';
   var copiedT = null;
   function shareParts() {
     var parts = ['\u{1F916} Thought I\'d share this little gem! ' + BRAND + ' is a free personal assistant on WhatsApp that tells you which bin to put out the evening before collection.',
                  '', 'Takes less than a minute to set up: https://' + link];
-    if (WA_NUMBER) parts.push('Or WhatsApp ' + BRAND + ' directly: https://wa.me/' + WA_NUMBER);  // any message starts sign-up
+    // Their own WhatsApp invite: opens a chat with Binjamin with "(…ref <code>)" ready to send, so
+    // a friend who signs up there counts towards their Binfluencer total too
+    var code = (link.match(/[?&]ref=([^&]+)/) || [])[1];
+    if (WA_NUMBER && code) parts.push('Or WhatsApp ' + BRAND + ' directly: https://' + link.split('/')[0] + '/w/' + code);
     return parts;
   }
   function shareText() { return shareParts().join('\n'); }
