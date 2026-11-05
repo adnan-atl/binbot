@@ -544,6 +544,7 @@ class Reply:
     buttons: list = field(default_factory=list)
     list_button: str = ""
     sections: list = field(default_factory=list)
+    card: bool = False  # follow it with Binjamin's contact card (to forward on)
 
 
 SETTINGS_BUTTON = ("menu:settings", "Settings")
@@ -588,6 +589,11 @@ _OFF_NOTE = " Reminders are paused at the moment. Reply START to turn them back 
 
 # ---- menus -------------------------------------------------------------------------------------
 
+def share_reply() -> Reply:
+    """Settings → Share Binjamin (or typed "share"): Binjamin's card follows, to forward."""
+    return Reply("Forward my card below to your street's group chat or a friend \U0001F447", card=True)
+
+
 def settings_menu(db: Session, user: User) -> Reply:
     on = [b.label for b in _user_bins(db, user) if b.enabled]
     paused = user.status != UserStatus.active
@@ -599,6 +605,7 @@ def settings_menu(db: Session, user: User) -> Reply:
     rows = [("menu:time", "Reminder time", "When I message you the evening before"),
             ("menu:bins", "My bins", "Turn bins on or off"),
             ("menu:wrong", "Wrong collection day", "Tell us your days don't match"),
+            ("menu:share", f"Share {get_settings().brand_name}"[:24], "Send my card to neighbours"),
             last,
             ("menu:delete", "Delete my data", "Remove your account for good")]
     return Reply(text, list_button="Settings", sections=[("Settings", rows)])
@@ -691,6 +698,7 @@ def _tap(db: Session, user: User, tap: str) -> Reply | None:
         return {"settings": lambda: settings_menu(db, user), "time": lambda: time_menu(user),
                 "bins": lambda: bins_menu(db, user), "pause": lambda: _pause(db, user),
                 "resume": lambda: _resume(db, user),
+                "share": lambda: share_reply(),
                 "done": lambda: Reply("All set.")}.get(arg, lambda: settings_menu(db, user))()
     if kind == "time_m":  # a morning time tapped on an old menu: evening only now
         return _evening_only(user)
@@ -844,6 +852,8 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
     if not words:
         return None
     head, rest = words[0], " ".join(words[1:])
+    if head in ("SHARE",) and len(words) == 1:
+        return share_reply()
     if head in ("SETTINGS", "MENU", "HELP", "CHANGE") and len(words) == 1:
         return settings_menu(db, user)
     if head == "BINS" and len(words) == 1:  # hidden alias
@@ -1107,6 +1117,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             _mark_announced(news[1], datetime.now(ZoneInfo("UTC")))
     send_reply(db, phone, reply.text, kind="reply", buttons=reply.buttons,
                list_button=reply.list_button, sections=reply.sections)
+    if reply.card and re.sub(r"\D", "", get_settings().meta_display_number):
+        send_contact(db, phone, binjamin_card(), kind="share_card")
     if cmd == "DONE" and last and len(words) == 1:
         share_after_done(db, user, phone)
     db.commit()

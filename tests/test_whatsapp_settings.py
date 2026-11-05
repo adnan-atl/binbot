@@ -76,7 +76,7 @@ def test_parse_time_rejects_nonsense(raw):
 
 
 MENU = ("\nSettings:\n- Reminder time (When I message you the evening before)\n- My bins (Turn bins on or off)\n"
-        "- Wrong collection day (Tell us your days don't match)\n- {}\n"
+        "- Wrong collection day (Tell us your days don't match)\n- Share Binny (Send my card to neighbours)\n- {}\n"
         "- Delete my data (Remove your account for good)")
 
 
@@ -262,7 +262,7 @@ def test_menu_goes_out_as_an_interactive_list(client, db, uid, meta):
     i = meta[-1]["interactive"]
     assert i["type"] == "list" and i["action"]["button"] == "Settings"
     assert [r["id"] for r in i["action"]["sections"][0]["rows"]] == [
-        "menu:time", "menu:bins", "menu:wrong", "menu:pause", "menu:delete"]
+        "menu:time", "menu:bins", "menu:wrong", "menu:share", "menu:pause", "menu:delete"]
 
 
 def test_wrong_collection_day_in_the_menu_is_a_wrong_vote(client, db, uid):
@@ -317,3 +317,15 @@ def test_webhook_routes_button_and_list_taps(client, db, uid):
     assert db.get(User, uid).status.value == "stopped"
     _hook(client, {"type": "button", "button": {"text": "Settings", "payload": "menu:settings"}})
     assert last_sent(db).startswith("Your reminders: the evening before at 8pm (paused).")
+
+
+def test_share_from_settings_sends_the_card(client, db, uid, monkeypatch):
+    from app.core.config import get_settings
+    from app.models import Outbox
+    monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
+    get_settings.cache_clear()
+    assert say(client, "menu:share") == "Forward my card below to your street's group chat or a friend \U0001F447"
+    db.expire_all()
+    assert db.scalar(select(Outbox).where(Outbox.kind == "share_card")).body.startswith("[Contact card: Binny")
+    assert say(client, "share").startswith("Forward my card below")
+    get_settings.cache_clear()
