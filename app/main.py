@@ -6,8 +6,10 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import router as api_router
 from app.api.webhooks import router as webhook_router
@@ -74,3 +76,15 @@ if WEB.exists():
         return HTMLResponse(render_index(page))
 
     app.mount("/static", StaticFiles(directory=WEB), name="static")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def not_found_page(request, exc):
+    """Pages that don't exist get the 404 page (Binji's already collected it); the API and anything
+    that isn't a browser asking for a page keep the usual JSON error."""
+    wants_page = "text/html" in request.headers.get("accept", "")
+    if exc.status_code == 404 and wants_page and not request.url.path.startswith(("/api", "/webhooks")):
+        page = WEB / "404.html"
+        if page.is_file():
+            return HTMLResponse(render_index(page), status_code=404)
+    return await http_exception_handler(request, exc)

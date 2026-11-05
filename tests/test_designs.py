@@ -48,3 +48,11 @@ def test_about_and_faqs_have_their_own_addresses(client):
     for path in ("/about", "/faqs", "/privacy", "/terms", "/d/silly/about", "/d/silly/faqs", "/d/silly/terms"):
         assert client.get(path).status_code == 200, path
     assert client.get("/d/nope/about").status_code == 404
+
+
+def test_missing_pages_get_the_404_page_and_the_api_keeps_json(client):
+    r = client.get("/no-such-page", headers={"accept": "text/html"})
+    assert r.status_code == 404 and "already been collected" in r.text and "Return to the home page" in r.text
+    r = client.get("/api/no-such-thing", headers={"accept": "text/html"})
+    assert r.status_code == 404 and r.headers["content-type"].startswith("application/json")
+    assert client.get("/no-such-page").status_code == 404
