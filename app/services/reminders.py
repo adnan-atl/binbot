@@ -267,8 +267,9 @@ def welcome_parts(db: Session, user: User) -> list[str]:
     first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
                       .order_by(Reminder.send_at))
     clock = _clock(user.reminder_time)
-    # "night_before" is the day before at any time the resident picks (4pm is an option).
-    when = ("the day before collection" if user.reminder_mode == ReminderMode.night_before
+    # "night_before" is the evening before, at any time the resident picks (4pm is an option).
+    # Copy always says "the evening before", never "the day before" or "the night before".
+    when = ("the evening before collection" if user.reminder_mode == ReminderMode.night_before
             else "on the morning of collection")
     parts = [f"{get_settings().brand_name} here. You're all set. I'll message you at {clock} {when}."]
     if first:
@@ -349,7 +350,7 @@ def _clock(hhmm: str) -> str:
 
 def parse_time(raw: str, mode: ReminderMode) -> str | None:
     """'4pm', '16:00', '6.30am', '7' -> 'HH:MM', or None if it isn't a time.
-    A bare hour follows the reminder mode: 7 is 7pm the day before, 7am on the morning.
+    A bare hour follows the reminder mode: 7 is 7pm the evening before, 7am on the morning.
     A zero-padded or 24-hour time (07:00, 16:00) is taken as written."""
     m = _TIME_RE.match(raw.strip().upper().replace(" ", ""))
     if not m:
@@ -370,7 +371,7 @@ def parse_time(raw: str, mode: ReminderMode) -> str | None:
 
 
 def _when(user: User) -> str:
-    return ("the day before" if user.reminder_mode == ReminderMode.night_before
+    return ("the evening before" if user.reminder_mode == ReminderMode.night_before
             else "on the morning of collection")
 
 
@@ -425,7 +426,7 @@ def settings_menu(db: Session, user: User) -> Reply:
             + f"Bins on: {', '.join(on) if on else 'none'}.\n"
             + "What would you like to change?")
     last = ("menu:resume", "Turn reminders on", "") if paused else ("menu:pause", "Pause reminders", "")
-    rows = [("menu:time", "Reminder time", "When I message you the day before"),
+    rows = [("menu:time", "Reminder time", "When I message you the evening before"),
             ("menu:bins", "My bins", "Turn bins on or off"),
             ("menu:wrong", "Wrong collection day", "Tell us your days don't match"),
             last,
@@ -438,10 +439,10 @@ def time_menu(user: User) -> Reply:
         return [(f"{prefix}:{hhmm}", title,
                  "Current" if user.reminder_mode == mode and user.reminder_time == hhmm else "")
                 for hhmm, title in times]
-    # Day before only: a morning-of reminder lands after many councils' 6-7am pickups. Morning
+    # Evening before only: a morning-of reminder lands after many councils' 6-7am pickups. Morning
     # times still work if typed (MORNING 6:30am) or tapped from an old menu.
     return Reply("Pick a time for your reminders.", list_button="Pick a time", sections=[
-        ("Day before", rows(DAY_BEFORE_TIMES, "time", ReminderMode.night_before))])
+        ("Evening before", rows(DAY_BEFORE_TIMES, "time", ReminderMode.night_before))])
 
 
 def bins_menu(db: Session, user: User) -> Reply:
@@ -582,7 +583,7 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
         arg = " ".join(words[2:]) if words[:2] == ["DAY", "BEFORE"] else rest
         hhmm = parse_time(arg, mode) if arg else _DEFAULT_TIME[mode]
         if not hhmm:
-            example = "MORNING 6:30am" if mode == ReminderMode.morning_of else "DAY BEFORE 7pm"
+            example = "MORNING 6:30am" if mode == ReminderMode.morning_of else "EVENING 7pm"
             return Reply(f"I didn't catch that time. Try {example}.")
         return _set_time(db, user, mode, hhmm)
     return _bin_phrase(db, user, t)
@@ -621,7 +622,7 @@ def _erase(db: Session, user: User, phone: str, text: str) -> str | None:
 def handle_inbound(db: Session, phone: str, text: str) -> str:
     """Replies to a user's message or tap: the sign-up hi ("start my reminders <code>"), DONE /
     SNOOZE / WRONG / STOP / START, the settings menus (taps, or "settings"), and typed shortcuts
-    (TIME 4pm, MORNING, DAY BEFORE, "turn off garden"). Returns the reply text."""
+    (TIME 4pm, EVENING 7pm, MORNING, "turn off garden"). Returns the reply text."""
     hi = _handle_hi(db, phone, text)
     if hi:
         if hi[1] != "welcome":  # the welcome went out already, as its separate messages
@@ -636,6 +637,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
 
     if wa_signup.wants(user):  # not signed up yet: sign up right here in WhatsApp
         return wa_signup.handle(db, phone, text, user) or ""
+    if text.startswith(wa_signup.REACT):  # an emoji reaction from someone signed up: no reply
+        return ""
     user.last_active_at = datetime.now(ZoneInfo("UTC"))
     if text.strip() == "menu:wrong":  # "Wrong collection day" in the settings menu
         text = "WRONG"

@@ -42,7 +42,7 @@ def to_bins(client, db):
 
 def test_full_sign_up_in_whatsapp(client, db):
     msgs = to_bins(client, db)
-    assert any(m.startswith("On it. Reading Hackney's bin calendar") for m in msgs)
+    assert any(m == "On it, checking…" for m in msgs)
     bins = msgs[-1]
     assert bins.startswith("Here's your bin calendar for 12, Elm Road:")
     assert "*Blue recycling bin*: Every 2 weeks on Tuesday. Next: Tue" in bins and "[Looks right] [Something's off]" in bins
@@ -54,7 +54,7 @@ def test_full_sign_up_in_whatsapp(client, db):
     assert consent.startswith("Last step.") and "terms (" in consent and "privacy policy (" in consent
     assert "[Start reminders] [No feature updates]" in last_sent(db)
     welcome = say(client, "su:go:yes")
-    assert welcome.startswith("Binny here. You're all set. I'll message you at 6pm the day before collection.")
+    assert welcome.startswith("Binny here. You're all set. I'll message you at 6pm the evening before collection.")
     u = me(db)
     assert u.status == UserStatus.active and u.reminder_time == "18:00"
     assert u.consent_at and u.marketing_consent_at
@@ -63,7 +63,7 @@ def test_full_sign_up_in_whatsapp(client, db):
     db.expire_all()
     assert db.scalar(select(Outbox).where(Outbox.kind == "welcome", Outbox.to_phone == PHONE))
     # Signed up: from now on it's the usual commands
-    assert say(client, "settings").startswith("Your reminders: the day before at 6pm")
+    assert say(client, "settings").startswith("Your reminders: the evening before at 6pm")
 
 
 def test_no_feature_updates_still_starts_reminders_without_marketing(client, db):
@@ -154,3 +154,38 @@ def test_website_and_whatsapp_share_the_same_bins(client, db):
     wa_bins = client.get(f"/api/users/{wa.id}/bins").json()
     assert [(b["label"], b["days"], b["next"]) for b in web_bins] == \
         [(b["label"], b["days"], b["next"]) for b in wa_bins]
+
+
+def test_thumbs_up_reaction_or_typed_yes_means_looks_right(client, db):
+    to_bins(client, db)
+    assert say(client, "react:\U0001F44D\U0001F3FD").startswith(  # 👍🏽 on the calendar message
+        "When should I nudge you? I'll message you the evening before each collection.")
+    for yes in ("Looks right!", "yep", "looks good", "👍", "That's right"):
+        say(client, "restart")
+        say(client, "E8 1AA")
+        say(client, "su:addr:1")
+        assert say(client, yes).startswith("When should I nudge you?"), yes
+
+
+def test_typed_no_means_something_is_off(client, db):
+    for no in ("Something's off", "somethings off", "nope", "not right", "👎"):
+        say(client, "restart")
+        say(client, "E8 1AA")
+        say(client, "su:addr:1")
+        assert say(client, no).startswith("No problem."), no
+
+
+def test_other_reactions_get_no_reply(client, db):
+    assert say(client, "react:\U0001F44D") == ""  # a stranger's reaction: nothing, no account
+    assert me(db) is None
+    say(client, "E8 1AA")
+    n = len(sent(db))
+    assert say(client, "react:\U0001F44D") == ""  # nothing to say yes to at the address step
+    assert say(client, "react:\U0001F602") == ""
+    assert len(sent(db)) == n
+
+
+def test_webhook_turns_reactions_into_react_text():
+    from app.api.webhooks import message_text
+    assert message_text({"type": "reaction", "reaction": {"emoji": "👍", "message_id": "x"}}) == "react:👍"
+    assert message_text({"type": "reaction", "reaction": {"message_id": "x"}}) is None

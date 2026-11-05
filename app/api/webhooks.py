@@ -55,13 +55,17 @@ async def meta(req: Request, db: Session = Depends(get_db)):
 def message_text(m: dict) -> str | None:
     """What the resident said: typed text, a quick-reply tap on a reminder template (our DONE /
     SNOOZE / WRONG / menu:settings payload), or a tap on a menu button or list row (its id, like
-    "menu:time" or "bin:<id>"; reminders.handle_inbound routes those)."""
+    "menu:time" or "bin:<id>"; reminders.handle_inbound routes those), or an emoji reaction as
+    "react:<emoji>" (the WhatsApp sign-up reads a 👍 as "Looks right")."""
     kind = m.get("type")
     if kind == "text":
         return m.get("text", {}).get("body")
     if kind == "button":
         b = m.get("button", {})
         return b.get("payload") or b.get("text")
+    if kind == "reaction":  # an emoji on one of our messages; empty when they take it back
+        emoji = m.get("reaction", {}).get("emoji")
+        return f"react:{emoji}" if emoji else None
     if kind == "interactive":
         i = m.get("interactive", {})
         reply = i.get("button_reply") or i.get("list_reply") or {}

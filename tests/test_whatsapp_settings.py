@@ -75,7 +75,7 @@ def test_parse_time_rejects_nonsense(raw):
     assert parse_time(raw, ReminderMode.night_before) is None
 
 
-MENU = ("\nSettings:\n- Reminder time (When I message you the day before)\n- My bins (Turn bins on or off)\n"
+MENU = ("\nSettings:\n- Reminder time (When I message you the evening before)\n- My bins (Turn bins on or off)\n"
         "- Wrong collection day (Tell us your days don't match)\n- {}\n"
         "- Delete my data (Remove your account for good)")
 
@@ -85,14 +85,14 @@ MENU = ("\nSettings:\n- Reminder time (When I message you the day before)\n- My 
 def test_settings_menu_from_a_word_or_the_reminder_button(client, db, uid):
     for word in ("SETTINGS", "settings", "  Menu ", "HELP", "change", "menu:settings"):
         reply = say(client, word)
-        assert reply == ("Your reminders: the day before at 7pm.\n"
+        assert reply == ("Your reminders: the evening before at 7pm.\n"
                          f"Bins on: {', '.join(BINS)}.\nWhat would you like to change?")
         assert last_sent(db).endswith(MENU.format("Pause reminders"))
 
 
 def test_menu_shows_turn_on_when_paused(client, db, uid):
     say(client, "STOP")
-    assert say(client, "settings").startswith("Your reminders: the day before at 7pm (paused).")
+    assert say(client, "settings").startswith("Your reminders: the evening before at 7pm (paused).")
     assert last_sent(db).endswith(MENU.format("Turn reminders on"))
 
 
@@ -100,13 +100,13 @@ def test_menu_shows_turn_on_when_paused(client, db, uid):
 
 def test_time_list_marks_the_current_time(client, db, uid):
     assert say(client, "menu:time") == "Pick a time for your reminders."
-    assert last_sent(db) == ("Pick a time for your reminders.\nDay before:\n- 4pm\n- 5pm\n- 6pm\n"
+    assert last_sent(db) == ("Pick a time for your reminders.\nEvening before:\n- 4pm\n- 5pm\n- 6pm\n"
                              "- 7pm (Current)\n- 8pm\n- 9pm")
 
 
 def test_tapping_a_time_saves_it_and_rebuilds_reminders(client, db, uid):
     reply = say(client, "time:16:00")
-    assert reply.startswith("Done. I'll remind you the day before at 4pm. Next: ")
+    assert reply.startswith("Done. I'll remind you the evening before at 4pm. Next: ")
     user = db.get(User, uid)
     assert user.reminder_time == "16:00" and user.reminder_mode == ReminderMode.night_before
     rows = scheduled(db, uid)
@@ -131,13 +131,13 @@ def test_a_time_that_isnt_offered_shows_the_list_again(client, db, uid):
 
 
 def test_typed_time_shortcuts_still_work(client, db, uid):
-    assert say(client, "TIME   4pm").startswith("Done. I'll remind you the day before at 4pm.")
-    assert say(client, "time 18:45").startswith("Done. I'll remind you the day before at 6:45pm.")
+    assert say(client, "TIME   4pm").startswith("Done. I'll remind you the evening before at 4pm.")
+    assert say(client, "time 18:45").startswith("Done. I'll remind you the evening before at 6:45pm.")
     assert say(client, "MORNING").startswith("Done. I'll remind you on the morning of collection at 6:30am.")
     assert say(client, "TIME 7").startswith("Done. I'll remind you on the morning of collection at 7am.")
-    assert say(client, "Day  Before").startswith("Done. I'll remind you the day before at 7pm.")
-    assert say(client, "evening 8.15pm").startswith("Done. I'll remind you the day before at 8:15pm.")
-    assert say(client, "night 25") == "I didn't catch that time. Try DAY BEFORE 7pm."
+    assert say(client, "Day  Before").startswith("Done. I'll remind you the evening before at 7pm.")
+    assert say(client, "evening 8.15pm").startswith("Done. I'll remind you the evening before at 8:15pm.")
+    assert say(client, "night 25") == "I didn't catch that time. Try EVENING 7pm."
     assert say(client, "TIME banana").startswith("I didn't catch that time.")
     assert "- 4pm" in last_sent(db)  # with the list to pick from
     db.expire_all()
@@ -277,7 +277,7 @@ def test_time_and_bins_go_out_as_interactive_lists(client, db, uid, meta):
     say(client, "menu:time")
     i = meta[-1]["interactive"]
     assert i["type"] == "list" and i["action"]["button"] == "Pick a time"
-    assert [s["title"] for s in i["action"]["sections"]] == ["Day before"]
+    assert [s["title"] for s in i["action"]["sections"]] == ["Evening before"]
     assert i["action"]["sections"][0]["rows"][3] == {"id": "time:19:00", "title": "7pm", "description": "Current"}
     say(client, "menu:bins")
     rows = meta[-1]["interactive"]["action"]["sections"][0]["rows"]
@@ -315,4 +315,4 @@ def test_webhook_routes_button_and_list_taps(client, db, uid):
     db.expire_all()
     assert db.get(User, uid).status.value == "stopped"
     _hook(client, {"type": "button", "button": {"text": "Settings", "payload": "menu:settings"}})
-    assert last_sent(db).startswith("Your reminders: the day before at 8pm (paused).")
+    assert last_sent(db).startswith("Your reminders: the evening before at 8pm (paused).")

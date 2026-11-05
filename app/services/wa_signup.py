@@ -46,7 +46,7 @@ def _site() -> str:
 # ---- copy -------------------------------------------------------------------------------------
 
 def greeting() -> str:
-    return (f"Hi, I'm {_brand()}. I'll message you the day before bin day with which bins to "
+    return (f"Hi, I'm {_brand()}. I'll message you the evening before bin day with which bins to "
             "put out.\n\nWhat's your postcode?")
 
 
@@ -87,6 +87,13 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
     """Reply to a message from someone not signed up yet. Sends the reply, commits, and
     returns its text (None when the message was ignored)."""
     t = text.strip()
+    reaction = t.startswith(REACT)
+    if reaction:
+        # An emoji reaction to one of our messages. Only a yes or no on a question means
+        # anything; anything else (or a reaction from a stranger) gets no reply.
+        t = t[len(REACT):].strip()
+        if user is None or user.wa_step not in ("bins", "off", "web") or not (_yes(t) or _no(t)):
+            return None
     upper = " ".join(t.upper().split())
     if user is None:
         if upper in QUIT_WORDS or upper.startswith("DELETE"):
@@ -119,7 +126,7 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
             when = _clock(user.reminder_time)
             return _send(db, phone, Reply(
                 "Looks like you started signing up on the website. Shall I start your "
-                f"reminders? I'll message you the day before each collection, at {when}.",
+                f"reminders? I'll message you the evening before each collection, at {when}.",
                 buttons=[(P + "web:yes", "Start reminders"), (P + "web:over", "Start over")]))
         return _send(db, phone, _restart(user, hello=True))
 
@@ -282,11 +289,9 @@ def _on_house(db: Session, user: User, t: str) -> Reply | None:
 def _check(db: Session, user: User, address: dict) -> Reply | None:
     if not allow("wa-check", user.phone_e164 or user.id, 4, 3600):
         return Reply(TOO_MANY.format(site=_site()))
-    d = _data(user)
     _save(user, address=address)
     user.wa_step = "checking"
-    council = d.get("council") or "your council"
-    send_reply(db, user.phone_e164, f"On it. Reading {council}'s bin calendar…", kind="reply")
+    send_reply(db, user.phone_e164, "On it, checking…", kind="reply")
     db.commit()
     if get_settings().demo_mode:
         _run_check(user.id)
@@ -363,17 +368,57 @@ def _bins_reply(where: str, bins) -> Reply:
 
 def _time_menu() -> Reply:
     rows = [(f"{P}time:{hhmm}", title, "") for hhmm, title in DAY_BEFORE_TIMES]
-    return Reply("When should I nudge you? I'll message you the day before each collection.",
-                 list_button="Pick a time", sections=[("Day before", rows)])
+    return Reply("When should I nudge you? I'll message you the evening before each collection.",
+                 list_button="Pick a time", sections=[("Evening before", rows)])
+
+
+REACT = "react:"  # webhooks.message_text marks emoji reactions with this
+
+_YES_EMOJI = {"\U0001F44D", "\U0001F44C", "\u2705", "\u2714"}  # thumbs up, OK hand, ticks
+_NO_EMOJI = {"\U0001F44E", "\u274C", "\u2716"}  # thumbs down, crosses
+_YES_WORDS = ("looks right", "looks good", "looks fine", "looks correct", "looks great",
+              "all good", "all correct", "thats right", "thats correct", "correct", "right",
+              "yes", "yeah", "yep", "yup", "ya", "y", "ok", "okay", "k", "perfect", "great",
+              "spot on", "sure", "fine", "good", "carry on", "continue")
+_NO_WORDS = ("somethings off", "something off", "something is off", "something wrong",
+             "somethings wrong", "something is wrong", "not right", "not correct", "incorrect",
+             "doesnt look right", "dont think so", "thats wrong", "wrong", "no", "nope", "nah",
+             "n", "off")
+
+
+def _emoji(t: str) -> str:
+    """An emoji without skin tone or presentation marks: 👍🏽 → 👍."""
+    return "".join(c for c in t.strip() if not ("\U0001F3FB" <= c <= "\U0001F3FF")
+                   and c not in "\uFE0F\u200D")
+
+
+def _words(t: str) -> str:
+    return " ".join(re.sub(r"[^a-z ]", "", t.lower().replace("’", "").replace("'", "")).split())
+
+
+def _starts(w: str, options) -> bool:
+    return any(w == o or w.startswith(o + " ") for o in options)
+
+
+def _no(t: str) -> bool:
+    """'Something's off', 'nope', 'not right', 👎…"""
+    return _emoji(t) in _NO_EMOJI or _starts(_words(t), _NO_WORDS)
+
+
+def _yes(t: str) -> bool:
+    """'Looks right', 'yep', 'looks good!', 👍 (any skin tone)…"""
+    return (_emoji(t) in _YES_EMOJI or _starts(_words(t), _YES_WORDS)) and not _no(t)
 
 
 def _on_bins(db: Session, user: User, t: str) -> Reply:
-    if t == P + "bins:ok" or t.upper() in ("YES", "Y", "OK", "LOOKS RIGHT", "CARRY ON"):
+    if t == P + "bins:ok" or (not t.startswith(P) and _yes(t)):
         user.wa_step = "time"
         return _time_menu()
     if t == P + "bins:redo":
         return _restart(user)
-    if t == P + "bins:off" or t.upper() in ("NO", "N"):
+    if user.wa_step == "off" and not t.startswith(P) and _no(t):
+        return _restart(user)  # a second no: they want a different address
+    if t == P + "bins:off" or (not t.startswith(P) and _no(t)):
         user.wa_step = "off"
         if user.property:  # for ops: which rounds people doubt at sign-up
             db.add(ChangeLog(scope="user", scope_id=user.id, kind="signup_off",
@@ -408,9 +453,9 @@ def _on_consent(db: Session, user: User, t: str) -> Reply | str:
 
 
 def _on_web(db: Session, user: User, t: str) -> Reply | str:
-    if t == P + "web:yes" or t.upper() in ("YES", "Y", "START", "START REMINDERS"):
+    if t == P + "web:yes" or (not t.startswith(P) and (_yes(t) or _words(t).startswith("start r"))):
         return _switch_on(db, user)
-    if t == P + "web:over":
+    if t == P + "web:over" or (not t.startswith(P) and _no(t)):
         return _restart(user)
     return Reply("Shall I start your reminders?",
                  buttons=[(P + "web:yes", "Start reminders"), (P + "web:over", "Start over")])
