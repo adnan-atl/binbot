@@ -579,8 +579,9 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 @media (max-width:600px){
   /* Phones: a small Binji in the space to the right of "When should", feet on that first line */
   .t-head{position:relative}
-  .t-binji-web{position:absolute;right:19%;top:-34px;width:50px;margin:0}  /* above the gap between "nudge" and "you?" */
-  @media (max-width:380px){.t-binji-web{width:42px;top:-24px;right:0}}
+  .t-head .h1{font-size:clamp(24px,8.6vw,40px)}  /* "When should Binjamin" fits on one line */
+  .t-binji-web{position:absolute;right:8px;top:calc(50% + 2px);width:62px;margin:0}  /* beside "nudge you?", below the first line */
+  @media (max-width:380px){.t-binji-web{width:50px}}
 }
 .share-foot{margin:28px 0 0;padding-top:20px;border-top:1px solid #E5E5EA;font-size:14px;line-height:1.5;color:#8A8A8E;text-align:center;text-wrap:balance}
 .share-foot a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
@@ -899,7 +900,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col" style="gap:44px">
-<div class="t-head"><h1 class="h1">When should<br>{{BRAND}} nudge you?</h1><img class="t-binji t-binji-web" src="/static/binji-watch.webp" alt="" width="382" height="560"></div>
+<div class="t-head"><h1 class="h1">When should {{BRAND}}<br>nudge you?</h1><img class="t-binji t-binji-web" src="/static/binji-watch.webp" alt="" width="382" height="560"></div>
 <div class="t-sec" style="display:flex;flex-direction:column;gap:10px">
 <span class="lbl" id="time-l">The day before, at</span>
 <div class="times-wrap"><div role="group" aria-labelledby="time-l" id="times" style="margin-top:4px"></div></div>
