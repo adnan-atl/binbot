@@ -423,6 +423,19 @@ def get_start_qr(user_id: str, db: Session = Depends(get_db)):
                     headers={"Cache-Control": "no-store"})
 
 
+@router.get("/preview-qr.svg", include_in_schema=False)
+def get_preview_qr():
+    """Sample QR for previewing the say-hi step (/?preview=hi): a link to the site, no account."""
+    import io
+
+    import segno
+
+    buf = io.BytesIO()
+    segno.make(get_settings().public_base_url, error="m").save(buf, kind="svg", scale=8, border=2,
+                                                              dark="#1A1A1A", xmldecl=False)
+    return Response(buf.getvalue(), media_type="image/svg+xml")
+
+
 @router.get("/users/{user_id}/schedule", response_model=list[S.ReminderOut])
 def get_schedule(user_id: str, db: Session = Depends(get_db)):
     user = _user(db, user_id)

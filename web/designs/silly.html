@@ -559,10 +559,12 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .p-head .h1{flex:1;min-width:0}
 .p-binji{flex:none;width:150px;height:auto;margin:0 -6px -4px 0}
 @media (min-width:601px){.p-head{gap:24px}.p-binji{width:190px;margin:0 0 -6px}}
-.hi-desk{display:flex;flex-direction:column;align-items:flex-start;gap:14px;margin-top:8px}
+.hi-desk{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:8px}
 .hi-desk[hidden]{display:none}
-.hi-row{display:flex;align-items:center;justify-content:space-between;gap:24px;width:100%}  /* Binji on the left, scanning towards the code */
-.hi-binji{width:212px;height:auto;flex:none}  /* about the same height as the code's card */
+/* The code stays in the middle; Binji stands to its left, smaller, scanning towards it. */
+.hi-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:20px;width:100%}
+.hi-binji{grid-column:1;justify-self:end;width:132px;height:auto}
+#hi-qr{grid-column:2}
 #hi-qr{width:232px;height:232px;padding:14px;background:#FFFFFF;border:1px solid #E5E5EA;border-radius:24px;box-sizing:content-box}
 .hi-web{font-size:15px;font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 </style>
@@ -1652,13 +1654,14 @@ Share to WhatsApp
   var ON_COMPUTER = false;
   try { ON_COMPUTER = matchMedia('(hover: hover) and (pointer: fine)').matches && innerWidth > 600; } catch (e) {}
   var hiPoll = null;
-  function setupHi() {
-    if (!ON_COMPUTER || !API.userId) return;
+  function setupHi(preview) {
+    if (!ON_COMPUTER || (!API.userId && !preview)) return;
     $('#hi-h').innerHTML = 'Last step:<br>scan with your phone';
     $('#hi-lede').textContent = "Point your phone's camera at the code. WhatsApp opens with your message ready: send it, and " + BRAND + ' replies straight away.';
-    $('#hi-qr').src = API.base + '/users/' + API.userId + '/start-qr.svg';
+    $('#hi-qr').src = preview ? API.base + '/preview-qr.svg' : API.base + '/users/' + API.userId + '/start-qr.svg';
     $('#hi-desk').hidden = false; $('#hi-go').style.display = 'none'; $('#hi-note').style.display = 'none';
     clearInterval(hiPoll);
+    if (preview) return;
     hiPoll = setInterval(function () {
       if (current !== 'hi') { if (current === 'binfluencer') clearInterval(hiPoll); return; }
       api('GET', '/users/' + API.userId + '/status').then(function (r) {
@@ -1734,6 +1737,15 @@ Share to WhatsApp
   renderMsgs();
 
   try { current = screenFromUrl(); history.replaceState({ s: current, sid: SID, n: 0 }, '', urlFor(current)); } catch (e) {}
+  // Design preview: ?preview=<screen> opens that step straight away with sample content, e.g.
+  // /?preview=hi for the say-hi step (the QR version on a computer). Nothing is saved.
+  try {
+    var pv = (location.search.match(/[?&]preview=([a-z]+)/) || [])[1];
+    if (pv && document.querySelector('[data-screen="' + pv + '"]')) {
+      current = pv;
+      if (pv === 'hi') { hiLink = 'https://wa.me/'; $('#hi-go').href = hiLink; $('#hi-web').href = hiLink; setupHi(true); }
+    }
+  } catch (e) {}
   // FAQ answers open and close smoothly. <details> keeps working without JS; with JS the
   // close is held until the answer has folded away, so it animates too.
   document.documentElement.classList.add('js');
