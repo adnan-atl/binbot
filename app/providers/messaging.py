@@ -46,6 +46,9 @@ class StubProvider:
     def send_link_button(self, to_phone: str, body: str, label: str, url: str) -> SendResult:
         return self.send(to_phone, readable(body, link=(label, url)))
 
+    def send_contact(self, to_phone: str, card: dict) -> SendResult:
+        return self.send(to_phone, contact_readable(card))
+
 
 class MetaProvider:
     name = "meta"
@@ -90,6 +93,11 @@ class MetaProvider:
             "action": {"buttons": [{"type": "reply", "reply": {"id": i, "title": t[:20]}}
                                    for i, t in buttons[:3]]}}})
 
+    def send_contact(self, to_phone: str, card: dict) -> SendResult:
+        """A contact card (WhatsApp shows Binjamin's business card, with Message). People can
+        forward it to anyone without leaving WhatsApp. Free-form: inside the 24-hour window."""
+        return self._post({"to": to_phone.lstrip("+"), "type": "contacts", "contacts": [card]})
+
     def send_link_button(self, to_phone: str, body: str, label: str, url: str) -> SendResult:
         """One button that opens a web link (label <= 20 chars). Free-form: inside the 24-hour
         window only."""
@@ -118,6 +126,22 @@ class MetaProvider:
 # button order. Taps come back through the webhook as these words. "Wrong collection day" lives
 # in the Settings menu.
 QUICK_REPLIES = ("DONE", "SNOOZE", "menu:settings")
+
+
+def contact_readable(card: dict) -> str:
+    phone = (card.get("phones") or [{}])[0].get("phone", "")
+    return f"[Contact card: {card.get('name', {}).get('formatted_name', '')} {phone}]"
+
+
+def send_contact(db: Session, to_phone: str, card: dict, kind: str) -> Outbox:
+    """Send a contact card and record it."""
+    p = get_provider()
+    res = p.send_contact(to_phone, card)
+    row = Outbox(to_phone=to_phone, body=contact_readable(card), kind=kind, provider=p.name,
+                 provider_message_id=res.message_id, error=res.error)
+    db.add(row)
+    db.flush()
+    return row
 
 
 def readable(body: str, buttons=(), sections=(), link=None) -> str:

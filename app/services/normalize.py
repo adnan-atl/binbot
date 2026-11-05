@@ -64,6 +64,26 @@ PURPOSE = {
 }
 
 
+# One emoji per bin in messages: a dot in the bin's colour when we know it (that's how people
+# think of their bins), otherwise one for the kind of bin. No grey dot exists, so grey is white.
+COLOUR_DOTS = {"blue": "\U0001F535", "black": "\u26AB", "green": "\U0001F7E2", "brown": "\U0001F7E4",
+               "grey": "\u26AA", "silver": "\u26AA", "white": "\u26AA", "purple": "\U0001F7E3",
+               "burgundy": "\U0001F7E3", "maroon": "\U0001F7E3", "red": "\U0001F534",
+               "yellow": "\U0001F7E1", "orange": "\U0001F7E0", "pink": "\U0001FA77"}
+KIND_EMOJI = {"recycling": "\u267B\uFE0F", "general": "\U0001F5D1\uFE0F", "food": "\U0001F34E",
+              "garden": "\U0001F342", "glass": "\U0001F37E", "paper": "\U0001F4E6"}
+
+
+def bin_emoji(label: str, category: str | None = None, colour: str | None = None) -> str:
+    c = (colour or colour_of(label) or "").lower()
+    return COLOUR_DOTS.get(c) or KIND_EMOJI.get(category or "", "\U0001F5D1\uFE0F")
+
+
+def bin_tag(b: dict) -> str:
+    """'🔵 Mixed dry recycling' from a bin dict (label, category, optional colour)."""
+    return f"{bin_emoji(b['label'], b.get('category'), b.get('colour'))} {b['label']}"
+
+
 def colour_of(label: str) -> str | None:
     l = label.lower()
     for c in _COLOURS:

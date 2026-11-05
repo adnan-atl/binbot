@@ -50,7 +50,8 @@ def test_reminder_goes_out_as_a_template_with_quick_replies(client, db, sent):
     assert dispatch_due(db, now_utc=first.send_at + timedelta(minutes=1)) == 1
     msg = sent[-1]
     assert msg["url"] == "https://graph.facebook.com/v20.0/123/messages"
-    names = [b["label"] for b in first.bins]
+    from app.services.normalize import bin_tag
+    names = [bin_tag(b) for b in first.bins]  # each bin with its colour dot
     bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
     assert msg["json"] == {
         "messaging_product": "whatsapp", "to": "447700900123", "type": "template",

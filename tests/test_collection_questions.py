@@ -42,7 +42,7 @@ def test_next_collection(client, db, uid):
 
 def test_a_particular_bin(client, db, uid):
     reply = say(client, "when is garden waste collected?")
-    assert reply.startswith("Green garden waste bin: next out on ")
+    assert reply.startswith("\U0001F7E2 Green garden waste bin: next out on ")
     assert say(client, "when's the glass going?").startswith("I don't have that bin on your calendar.")
 
 

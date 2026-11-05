@@ -25,8 +25,8 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.services.normalize import describe_rule, is_daily
-from app.providers.messaging import get_provider, send_message, send_reply, send_template_batch, uses_template
+from app.services.normalize import bin_tag, describe_rule, is_daily
+from app.providers.messaging import get_provider, send_contact, send_message, send_reply, send_template_batch, uses_template
 
 _CATEGORY_NAMES = {
     "recycling": "Recycling", "general": "General waste", "food": "Food waste",
@@ -43,7 +43,8 @@ def effective_collections(db: Session, user: User) -> dict[date, list[dict]]:
     for s in settings:
         if not s.enabled:
             continue
-        bin_info = {"label": s.label, "category": s.category.value, "setting_id": s.id}
+        bin_info = {"label": s.label, "category": s.category.value, "setting_id": s.id,
+                    "colour": s.colour}
         if s.override_rule:
             dates = expand_rule(s.override_rule, today, horizon)
         elif s.bin_type_id and user.property:
@@ -87,7 +88,8 @@ def rebuild_reminders(db: Session, user: User) -> int:
         if send_at < now_:
             continue
         db.add(Reminder(user_id=user.id, collection_date=d, send_at=send_at,
-                        bins=[{"label": b["label"], "category": b["category"]} for b in bins]))
+                        bins=[{"label": b["label"], "category": b["category"], "colour": b.get("colour")}
+                              for b in bins]))
         n += 1
     db.flush()
     return n
@@ -136,7 +138,7 @@ def _mark_announced(rows: list[Referral], when: datetime) -> None:
 
 
 def render_reminder(user: User, r: Reminder) -> str:
-    names = [b["label"] for b in r.bins]
+    names = [bin_tag(b) for b in r.bins]
     when = "tomorrow" if user.reminder_mode == ReminderMode.night_before else "today"
     if len(names) == 1:
         head = f"{names[0]} goes out {when}"
@@ -166,7 +168,7 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
             r.status = ReminderStatus.cancelled
             continue
         when = "tomorrow" if user.reminder_mode == ReminderMode.night_before else "today"
-        params = [_join([b["label"] for b in r.bins]), when, r.collection_date.strftime("%a %-d %b")]
+        params = [_join([bin_tag(b) for b in r.bins]), when, r.collection_date.strftime("%a %-d %b")]
         body = render_reminder(user, r)
         news = referral_news(db, user) if (news_template or free_text) else None
         if news:
@@ -312,7 +314,7 @@ def welcome_parts(db: Session, user: User) -> list[str]:
             else "on the morning of collection")
     parts = [f"{get_settings().brand_name} here. You're all set. I'll message you at {clock} {when}."]
     if first:
-        names = [b["label"] for b in first.bins]
+        names = [bin_tag(b) for b in first.bins]
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
         parts.append(f"First up: {bins} on {first.collection_date.strftime('%a %-d %b')}.")
     parts.append("Want to bin me off? Reply STOP anytime.")
@@ -384,8 +386,19 @@ def welcome_share(user: User) -> str | None:
     s = get_settings()
     if not re.sub(r"\D", "", s.meta_display_number) or user.marketing_consent_at is None:
         return None
-    return ("Help your community and become a certified Binfluencer \U0001F606 Pop me in your "
-            "street's group chat or send me to a friend.")
+    return ("Help your community and become a certified Binfluencer \U0001F606 Forward my card "
+            "below to your street's group chat or a friend.")
+
+
+def binjamin_card() -> dict:
+    """Binjamin's contact card, sent after the share nudge for people to forward. With wa_id set,
+    WhatsApp shows it as the business account, with a Message button."""
+    s = get_settings()
+    d = re.sub(r"\D", "", s.meta_display_number)
+    return {"name": {"formatted_name": s.brand_name, "first_name": s.brand_name},
+            "org": {"company": f"{s.brand_name} by {s.parent_name}"},
+            "phones": [{"phone": display_number(), "type": "WORK", "wa_id": d}],
+            "urls": [{"url": s.public_base_url.rstrip("/"), "type": "WORK"}]}
 
 
 def welcome_message(db: Session, user: User) -> str:
@@ -406,11 +419,11 @@ def send_welcome(db: Session, phone: str, user: User) -> str:
     for i, part in enumerate(parts):
         if i and real:
             time.sleep(0.7)  # WhatsApp doesn't promise order: a beat apart keeps them in sequence
-        if share and part == share:  # the share nudge carries its Share button
-            send_reply(db, phone, part, kind="welcome_more",
-                       link=(f"Share {get_settings().brand_name}"[:20], share_button_url(user)))
-        else:
-            send_message(db, phone, part, kind="welcome" if i == 0 else "welcome_more")
+        send_message(db, phone, part, kind="welcome" if i == 0 else "welcome_more")
+        if share and part == share:  # then Binjamin's card, to forward on
+            if real:
+                time.sleep(0.7)
+            send_contact(db, phone, binjamin_card(), kind="welcome_card")
     return welcome_message(db, user)
 
 
@@ -546,8 +559,8 @@ def _next_reminder(db: Session, user: User, label: str | None = None) -> str:
     for r in db.scalars(select(Reminder).where(Reminder.user_id == user.id,
                                                Reminder.status == ReminderStatus.scheduled)
                         .order_by(Reminder.send_at)):
-        names = [b["label"] for b in r.bins]
-        if label is None or label in names:
+        names = [bin_tag(b) for b in r.bins]
+        if label is None or label in [b["label"] for b in r.bins]:
             return f" Next: {_join(names)} on {r.collection_date.strftime('%a %-d %b')}."
     return ""
 
@@ -747,7 +760,7 @@ def collection_answer(db: Session, user: User, text: str) -> Reply | None:
         if not re.search(rf"\b({rx})\b", low):
             continue
         for d, bins in days:
-            hit = [b["label"] for b in bins
+            hit = [bin_tag(b) for b in bins
                    if b["category"] == cat or re.search(rf"\b({rx})\b", b["label"].lower())]
             if hit:
                 return Reply(f"{_join(hit)}: next out on {fmt(d)}.{tail}")
@@ -767,22 +780,22 @@ def collection_answer(db: Session, user: User, text: str) -> Reply | None:
         on = dict(days).get(today + timedelta(days=1))
         if on:
             return Reply(f"Tomorrow ({fmt(today + timedelta(days=1))}): "
-                         f"{_join([b['label'] for b in on])}.{tail}")
+                         f"{_join([bin_tag(b) for b in on])}.{tail}")
         d, bins = days[0]
-        return Reply(f"Nothing tomorrow. Next up: {_join([b['label'] for b in bins])} on {fmt(d)}.")
+        return Reply(f"Nothing tomorrow. Next up: {_join([bin_tag(b) for b in bins])} on {fmt(d)}.")
     if re.search(r"\bthis week\b", low):
         week = [(d, b) for d, b in days if d <= today + timedelta(days=6 - today.weekday())]
         if week:
             return Reply("This week: " + "; ".join(
-                f"{_join([b['label'] for b in bins])} on {fmt(d)}" for d, bins in week) + "." + tail)
+                f"{_join([bin_tag(b) for b in bins])} on {fmt(d)}" for d, bins in week) + "." + tail)
         d, bins = days[0]
-        return Reply(f"Nothing more this week. Next up: {_join([b['label'] for b in bins])} on "
+        return Reply(f"Nothing more this week. Next up: {_join([bin_tag(b) for b in bins])} on "
                      f"{fmt(d)}.")
     if _LIST_RE.search(low):  # "remind me of my dates", "what's my schedule?"
-        lines = [f"{fmt(d)}: {_join([b['label'] for b in bins])}" for d, bins in days[:4]]
+        lines = [f"{fmt(d)}: {_join([bin_tag(b) for b in bins])}" for d, bins in days[:4]]
         return Reply("Your next collections:\n" + "\n".join(lines) + ("\n" + tail.strip() if tail else ""))
     d, bins = days[0]
-    return Reply(f"Next up: {_join([b['label'] for b in bins])} on {fmt(d)}.{tail}")
+    return Reply(f"Next up: {_join([bin_tag(b) for b in bins])} on {fmt(d)}.{tail}")
 
 
 def _bin_phrase(db: Session, user: User, text: str) -> Reply | None:

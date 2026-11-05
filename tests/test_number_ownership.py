@@ -177,32 +177,33 @@ def test_claim_with_no_matching_sign_up_carries_on_as_a_whatsapp_sign_up(client,
 
 
 def test_fourth_welcome_message_asks_them_to_share(client, db, live):
-    from app.models import ChangeLog, Outbox
+    from app.models import Outbox
     uid = signup(client)["user_id"]
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True,
                                                  "marketing_consent": True})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
-    assert reply.endswith("Help your community and become a certified Binfluencer \U0001F606 Pop me "
-                          "in your street's group chat or send me to a friend.")
+    assert reply.endswith("Help your community and become a certified Binfluencer \U0001F606 Forward "
+                          "my card below to your street's group chat or a friend.")
     db.expire_all()
-    more = db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()
-    assert len(more) == 3
-    code = db.get(User, uid).referral_code
-    share = [o for o in more if "Binfluencer" in o.body][0]
-    assert share.body.endswith(f"[Share Binny -> http://localhost:8000/s/{code}]")
+    assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()) == 3
+    # then Binjamin's contact card, to forward
+    card = db.scalar(select(Outbox).where(Outbox.kind == "welcome_card"))
+    assert card.body == "[Contact card: Binny +44 7700 900999]"
     assert db.get(User, uid).share_nudged_at  # no second share nudge later
-    # Tapping the button: counted, then WhatsApp's "send to…" with the message ready
-    r = client.get(f"/s/{code}", follow_redirects=False)
-    assert r.status_code == 302 and r.headers["location"].startswith("https://wa.me/?text=")
-    from urllib.parse import unquote
-    text = unquote(r.headers["location"].split("text=", 1)[1])
-    assert text == ("Thought I'd share this little gem! Binny is a free personal assistant on "
-                    "WhatsApp that tells you which bin to put out the evening before collection. "
-                    "Just WhatsApp Binny on 07700 900999\n\nlocalhost:8000")
-    db.expire_all()
-    assert len(db.scalars(select(ChangeLog).where(ChangeLog.kind == "share_tap",
-                                                  ChangeLog.scope_id == uid)).all()) == 1
+
+
+def test_contact_card_payload(monkeypatch):
+    from app.core.config import get_settings
+    from app.services.reminders import binjamin_card
+    monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
+    get_settings.cache_clear()
+    assert binjamin_card() == {
+        "name": {"formatted_name": "Binny", "first_name": "Binny"},
+        "org": {"company": "Binny by Alfred"},
+        "phones": [{"phone": "+44 7700 900999", "type": "WORK", "wa_id": "447700900999"}],
+        "urls": [{"url": "http://localhost:8000", "type": "WORK"}]}
+    get_settings.cache_clear()
 
 
 def test_no_share_message_for_people_who_opted_out(client, db, live):
