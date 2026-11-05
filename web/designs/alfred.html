@@ -39,6 +39,7 @@ button{font:inherit}
 .home-h{margin:0;font-size:clamp(44px,calc(6.6vw + 21px),112px);line-height:.96;font-weight:800;letter-spacing:-0.045em;text-wrap:balance}
 .home-p{margin:0;max-width:640px;font-size:clamp(19px,2.1vw,26px);line-height:1.35;font-weight:500;color:#9A9A9E}
 .home-p svg{vertical-align:-3px}
+.wa-word{white-space:nowrap} /* the WhatsApp glyph never ends a line without its word */
 /* A touch more air above the mockup now the headline is smaller, so less of the phone shows */
 .phone-col{display:flex;justify-content:center;flex:none;margin-top:clamp(64px,13vh,136px)}
 .phone-wrap{position:relative}
@@ -582,7 +583,7 @@ button,input,select,textarea{font-family:inherit}
 <main class="home-main">
 <div class="home-copy">
 <h1 class="home-h">Never miss a bin day again</h1>
-<p class="home-p">A <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#45C654"></circle><path d="M8.6 7.4c.3-.3.8-.3 1 .1l1 1.7c.2.3.1.7-.1 1l-.6.6c.5 1.1 1.3 1.9 2.4 2.4l.6-.6c.3-.2.7-.3 1-.1l1.7 1c.4.2.4.7.1 1l-.7.7c-.6.6-1.5.7-2.3.3-2-1-3.6-2.6-4.6-4.6-.4-.8-.3-1.7.3-2.3z" fill="#FFFFFF"></path></svg> <span style="color:#FFFFFF">WhatsApp</span> bot that reminds you which bin to put out, the evening before collection.</p>
+<p class="home-p">A <span class="wa-word"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#45C654"></circle><path d="M8.6 7.4c.3-.3.8-.3 1 .1l1 1.7c.2.3.1.7-.1 1l-.6.6c.5 1.1 1.3 1.9 2.4 2.4l.6-.6c.3-.2.7-.3 1-.1l1.7 1c.4.2.4.7.1 1l-.7.7c-.6.6-1.5.7-2.3.3-2-1-3.6-2.6-4.6-4.6-.4-.8-.3-1.7.3-2.3z" fill="#FFFFFF"></path></svg> <span style="color:#FFFFFF">WhatsApp</span></span> bot that reminds you which bin to put out, the evening before collection.</p>
 <div class="home-cta" style="margin-top:18px"><a class="cta" href="#postcode">Add to WhatsApp</a></div>
 </div>
 <div class="phone-col" aria-hidden="true">
