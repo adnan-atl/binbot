@@ -559,8 +559,10 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .p-head .h1{flex:1;min-width:0}
 .p-binji{flex:none;width:150px;height:auto;margin:0 -6px -4px 0}
 @media (min-width:601px){.p-head{gap:24px}.p-binji{width:190px;margin:0 0 -6px}}
-.hi-desk{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:8px}
+.hi-desk{display:flex;flex-direction:column;align-items:flex-start;gap:14px;margin-top:8px}
 .hi-desk[hidden]{display:none}
+.hi-row{display:flex;align-items:center;justify-content:space-between;gap:24px;width:100%}  /* Binji on the left, scanning towards the code */
+.hi-binji{width:212px;height:auto;flex:none}  /* about the same height as the code's card */
 #hi-qr{width:232px;height:232px;padding:14px;background:#FFFFFF;border:1px solid #E5E5EA;border-radius:24px;box-sizing:content-box}
 .hi-web{font-size:15px;font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 </style>
@@ -893,7 +895,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <h1 class="h1" id="hi-h">Last step:<br>say hi to {{BRAND}}</h1>
 <p class="lede" id="hi-lede">Tap the button to open WhatsApp with your message ready. Send it, and {{BRAND}} replies straight away to start your reminders.</p>
 <div id="hi-desk" class="hi-desk" hidden>
-<img id="hi-qr" alt="QR code that opens WhatsApp with your message ready" width="232" height="232">
+<div class="hi-row"><img class="hi-binji" src="/static/binji-phone.webp" alt="" width="453" height="560"><img id="hi-qr" alt="QR code that opens WhatsApp with your message ready" width="232" height="232"></div>
 <span class="hint" id="hi-wait">Waiting for your hi. This page moves on by itself.</span>
 <a id="hi-web" class="hi-web" href="https://wa.me/" target="_blank" rel="noopener">Or open WhatsApp on this computer</a>
 </div>
