@@ -64,11 +64,10 @@ def test_hi_from_the_typed_number_starts_reminders_and_sends_the_welcome(client,
     assert _scheduled(db, uid)
     welcome = db.scalar(select(Outbox).where(Outbox.kind == "welcome"))
     assert welcome.to_phone == "+447700900123" and reply.startswith(welcome.body)
-    # Sent as separate messages: set up, first collection, how to stop, the invite
+    # Sent as separate messages: set up, then first collection (no "bin me off" line)
     more = [o.body for o in db.scalars(select(Outbox).where(Outbox.kind == "welcome_more"))]
-    assert len(more) == 2 and reply == "\n\n".join(
-        [welcome.body] + sorted(more, key=lambda b: not b.startswith("First up")))
-    assert "Want to bin me off? Reply STOP anytime." in more
+    assert len(more) == 1 and more[0].startswith("First up") and reply == f"{welcome.body}\n\n{more[0]}"
+    assert "STOP" not in reply
     # A second tap just says it's already on
     assert _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}") == \
         'Your reminders are already on. Message "settings" to change them.'
@@ -131,7 +130,7 @@ def test_page_has_the_say_hi_step(client):
 def test_welcome_has_no_invite_link(client, db, live):
     uid, res = _turn_on(client)
     reply = _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}")
-    assert reply.endswith("\n\nWant to bin me off? Reply STOP anytime.")
+    assert "bin me off" not in reply
     assert "/?ref=" not in reply and "rookie" not in reply
 
 
@@ -186,7 +185,7 @@ def test_fourth_welcome_message_asks_them_to_share(client, db, live):
     assert reply.endswith("Help your community and become a certified Binfluencer \U0001F606 Forward "
                           "my card below to your street's group chat or a friend.")
     db.expire_all()
-    assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()) == 3
+    assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()) == 2
     # then Binjamin's contact card, to forward
     card = db.scalar(select(Outbox).where(Outbox.kind == "welcome_card"))
     assert card.body == "[Contact card: Binny +44 7700 900999]"

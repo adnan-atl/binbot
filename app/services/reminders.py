@@ -303,7 +303,7 @@ def purge_unrecognised(db: Session, now_utc: datetime | None = None) -> int:
 
 def welcome_parts(db: Session, user: User) -> list[str]:
     """The welcome, sent the moment reminders go on as separate short messages: set up, first
-    collection, how to stop, and (welcome_share) a nudge to share it with neighbours. Shows the service works and (on WhatsApp) opens the
+    collection, and (welcome_share) a nudge to share it with neighbours. Shows the service works and (on WhatsApp) opens the
     24-hour window for free-form replies."""
     first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
                       .order_by(Reminder.send_at))
@@ -317,7 +317,6 @@ def welcome_parts(db: Session, user: User) -> list[str]:
         names = [bin_tag(b) for b in first.bins]
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
         parts.append(f"First up: {bins} on {first.collection_date.strftime('%a %-d %b')}.")
-    parts.append("Want to bin me off? Reply STOP anytime.")
     nudge = welcome_share(user)
     if nudge:
         parts.append(nudge)
