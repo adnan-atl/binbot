@@ -53,7 +53,7 @@ def test_news_is_batched_onto_the_next_reminder_and_sent_once(client, db):
     dispatch_due(db, now_utc=first.send_at + timedelta(minutes=1))
     msg = db.scalar(select(Outbox).where(Outbox.to_phone == "+447700900123", Outbox.kind == "reminder"))
     assert "2 neighbours joined with your link" in msg.body
-    assert "You're now a Kerbside regular. 1 more to Street captain." in msg.body
+    assert "2 neighbours joined with your link. 8 more and you're officially a Binfluencer." in msg.body
     assert all(r.announced_at for r in db.scalars(select(Referral)))
 
     second = _first_due(db, uid)
@@ -101,3 +101,29 @@ def test_news_template_carries_the_line_as_a_fourth_value(client, db, monkeypatc
     dispatch_due(db, now_utc=first.send_at + timedelta(minutes=1))
     name, params = next(x for x in sent if x[0] == "bin_reminder_news")
     assert len(params) == 4 and "A neighbour joined" in params[3]
+
+
+def test_news_wording_up_to_and_past_ten(db):
+    from app.models import Referral, User
+    from app.services.reminders import referral_news
+
+    me = User(referral_code="me")
+    db.add(me)
+    db.flush()
+
+    def join(k):
+        for _ in range(k):
+            f = User(referral_code=f"f{len(db.scalars(select(User)).all())}")
+            db.add(f)
+            db.flush()
+            db.add(Referral(referrer_id=me.id, referred_id=f.id))
+        db.flush()
+        line, rows = referral_news(db, me)
+        for r in rows:
+            r.announced_at = r.created_at
+        return line
+
+    assert join(1) == "\U0001F389 A neighbour joined with your link. 9 more and you're officially a Binfluencer."
+    assert join(8).endswith("8 neighbours joined with your link. 1 more and you're officially a Binfluencer.")
+    assert join(2).endswith("2 neighbours joined with your link. That's 10: you're officially a Binfluencer!")
+    assert join(1).endswith("A neighbour joined with your link. That's 12 neighbours so far.")

@@ -126,7 +126,7 @@ Tap Done when that's sorted, Snooze for a nudge later, or Settings to change you
 | `{{1}}` | the bins going out | `Recycling and Food waste` |
 | `{{2}}` | when | `tomorrow` |
 | `{{3}}` | the collection date | `Wed 4 Nov` |
-| `{{4}}` | the referral news | `🎉 2 neighbours joined with your link. You're now a Kerbside regular. 1 more to Street captain.` |
+| `{{4}}` | the referral news | `🎉 2 neighbours joined with your link. 8 more and you're officially a Binfluencer.` |
 
 **Buttons**: the same three Quick reply buttons, same order: `Done`, `Snooze`, `Settings`.
 **Message validity period**: 3 hours.

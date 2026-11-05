@@ -360,11 +360,12 @@ class Referral(Base):
     announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+# Kept simple on purpose: until BINFLUENCER_AT neighbours have joined with your link you're on
+# your way; at BINFLUENCER_AT you're officially a Binfluencer.
+BINFLUENCER_AT = 10
 LEVELS = [
-    (0, "Bin rookie"),
-    (1, "Kerbside regular"),
-    (3, "Street captain"),
-    (5, "Binfluencer"),
+    (0, "Binfluencer in the making"),
+    (BINFLUENCER_AT, "Binfluencer"),
 ]
 
 

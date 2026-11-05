@@ -63,7 +63,7 @@ def test_full_flow(client, db):
 
     # step 6: referral
     ref = client.get(f"/api/users/{uid}/referral").json()
-    assert ref["level_name"] == "Bin rookie" and ref["referrals"] == 0 and ref["next_at"] == 1
+    assert ref["level_name"] == "Binfluencer in the making" and ref["referrals"] == 0 and ref["next_at"] == 10
     friend = signup(client, ref=ref["code"])
     assert friend["user_id"] != uid
     # a friend counts once their reminders are on, not when they start signing up
@@ -72,7 +72,7 @@ def test_full_flow(client, db):
     client.post(f"/api/users/{fid}/phone", json={"phone": "07700900456"})
     client.post(f"/api/users/{fid}/reminders", json={"mode": "night_before", "time": "19:00"})
     ref = client.get(f"/api/users/{uid}/referral").json()
-    assert ref["referrals"] == 1 and ref["level_name"] == "Kerbside regular"
+    assert ref["referrals"] == 1 and ref["level_name"] == "Binfluencer in the making"
 
 
 def test_dispatch_and_inbound(client, db):

@@ -14,9 +14,8 @@ from sqlalchemy.orm import Session
 from app.adapters.manual import expand_rule
 from app.core.config import get_settings
 from app.models import (
-    LEVELS,
+    BINFLUENCER_AT,
     Referral,
-    level_for,
     ChangeLog,
     CollectionEvent,
     Reminder,
@@ -120,11 +119,14 @@ def referral_news(db: Session, user: User) -> tuple[str, list[Referral]] | None:
                       .where(Referral.referrer_id == user.id)) or 0
     n = len(rows)
     who = "A neighbour" if n == 1 else f"{n} neighbours"
-    level, name, nxt = level_for(total)
-    moved = level_for(total - n)[1] != name
-    line = f"\U0001F389 {who} joined with your link. You're {'now ' if moved else ''}a {name}."
-    if nxt is not None:
-        line += f" {nxt - total} more to {LEVELS[level][1]}."
+    line = f"\U0001F389 {who} joined with your link."
+    if total < BINFLUENCER_AT:
+        left = BINFLUENCER_AT - total
+        line += f" {left} more and you're officially a Binfluencer."
+    elif total - n < BINFLUENCER_AT:  # this batch took them to it
+        line += f" That's {BINFLUENCER_AT}: you're officially a Binfluencer!"
+    else:
+        line += f" That's {total} neighbours so far."
     return line, rows
 
 
