@@ -71,3 +71,16 @@ def test_silly_time_step_says_hello_and_computers_get_the_qr_step(client, monkey
     monkeypatch.delenv("META_DISPLAY_NUMBER")
     get_settings.cache_clear()
     assert 'id="t-go" href=""' in client.get("/").text  # local: no WhatsApp link
+
+
+def test_silly_phone_step_consent_wording(client, monkeypatch):
+    """Wording agreed with legal: one notice, and the box is an opt-out."""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("HOME_DESIGN", "silly")
+    get_settings.cache_clear()
+    page = client.get("/").text
+    assert ("Binny will message you on WhatsApp about your bins, as well as other household "
+            "services within the Alfred family.") in page
+    assert "Tick here to opt out of other Alfred household services" in page
+    assert 'id="no-offers" type="checkbox"' in page
