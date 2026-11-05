@@ -157,12 +157,10 @@ on the first morning after you set it.
 **Body** (copy exactly):
 
 ```
-Hope that made bin day easier. If you want to share {{1}} with neighbours or friends, send them this link: {{2}}
-
-It only takes them a minute to sign up.
+Hope that made bin day easier. If you want to share {{1}} with neighbours or friends, send them this link: {{2}} 🔗
 ```
 
-(Meta won't accept a template that ends with a variable, hence the last line.)
+(Meta won't accept a template that ends with a variable, hence the emoji after the link.)
 
 **Sample values**:
 
