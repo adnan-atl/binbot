@@ -412,7 +412,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
    mid-screen), in the same column width, with full-width buttons to move on. */
 .flow-main{align-items:flex-start;padding:64px 24px 80px}
 .col{max-width:560px}
-#pc-go,#tel-go,#t-go,#wa-share,a.pill.go[href="#binfluencer"]{width:100%}
+#pc-go,#tel-go,#t-go,#hi-go,#wa-share,a.pill.go[href="#binfluencer"]{width:100%}
 @media (max-width:600px){.flow-main{padding:40px 16px 56px}}
 .badge-name{flex-direction:row;align-items:baseline;gap:.3em;white-space:nowrap;line-height:1}  /* one line: Binjamin by [Alfred] */
 .badge-name small{display:inline-flex;align-items:baseline;gap:.3em;font:inherit;opacity:1;color:inherit;letter-spacing:inherit}  /* "by" set exactly like Binjamin */
@@ -593,6 +593,13 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 }
 .br-web{display:none}  /* line break on computers only; phones wrap naturally */
 @media (min-width:601px){.br-web{display:inline}}
+.hi-desk{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:8px}
+.hi-desk[hidden]{display:none}
+.hi-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:20px;width:100%}
+.hi-binji{grid-column:1;justify-self:end;width:132px;height:auto}
+#hi-qr{grid-column:2}
+#hi-qr{width:232px;height:232px;padding:14px;background:#FFFFFF;border:1px solid #E5E5EA;border-radius:24px;box-sizing:content-box}
+.hi-web{font-size:15px;font-weight:500;color:#8A8A8E;text-decoration:underline;text-underline-offset:3px}
 /* Time step: the button stays grey until a time is picked */
 #t-go[aria-disabled="true"]{background:#E5E5EA;color:#AEAEB2;box-shadow:none;pointer-events:none;cursor:default}
 </style>
@@ -916,6 +923,21 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 </main>
 </section>
 
+<!-- 6b · Scan to say hi (computers only): phones go straight to WhatsApp from the time step -->
+<section class="screen" data-screen="hi" data-step="4" hidden>
+<div data-bar></div>
+<main class="flow-main">
+<div class="col">
+<h1 class="h1" id="hi-h">Scan with your phone</h1>
+<p class="lede" id="hi-lede">Point your phone's camera at the code. WhatsApp opens with your message ready: send it, and {{BRAND}} replies straight away.</p>
+<div id="hi-desk" class="hi-desk">
+<div class="hi-row"><img class="hi-binji" src="/static/binji-phone.webp" alt="" width="453" height="560"><img id="hi-qr" alt="QR code that opens WhatsApp with your message ready" width="232" height="232"></div>
+<a id="hi-web" class="hi-web" href="https://wa.me/" target="_blank" rel="noopener">Or open WhatsApp on this computer</a>
+</div>
+</div>
+</main>
+</section>
+
 <!-- 7 · Binfluencer -->
 <section class="screen" data-screen="binfluencer" data-step="5" hidden>
 <div data-bar></div>
@@ -1080,7 +1102,7 @@ Share to WhatsApp
   });
 
   // Back
-  var ORDER_SCREENS = ['home', 'postcode', 'parsing', 'confirm', 'phone', 'reminders', 'binfluencer'];
+  var ORDER_SCREENS = ['home', 'postcode', 'parsing', 'confirm', 'phone', 'reminders', 'hi', 'binfluencer'];
   document.addEventListener('click', function (e) {
     if (!e.target.closest('[data-back]')) return;
     if (current === 'confirm' && editing && bins.length) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
@@ -1658,17 +1680,39 @@ Share to WhatsApp
   // WhatsApp opens. Without a business number (local, demo) it just turns reminders on.
   var WA_LIVE = /^https:\/\/wa\.me\//.test($('#t-go').getAttribute('href') || '');
   if (!WA_LIVE) { $('#t-go').setAttribute('href', '#binfluencer'); $('#t-go').removeAttribute('target'); }
+  // On a computer WhatsApp is usually on their phone, so instead of opening it here the button
+  // leads to a QR code of the same message to scan (the "hi" screen), which moves on by itself
+  // once their message arrives.
+  var ON_COMPUTER = false;
+  try { ON_COMPUTER = matchMedia('(hover: hover) and (pointer: fine)').matches && innerWidth > 600; } catch (e) {}
   $('#t-go').addEventListener('click', function (e) {
     if (!time) { e.preventDefault(); return; }
-    if (!WA_LIVE) e.preventDefault();  // no WhatsApp to open: stay on the page
+    if (!WA_LIVE || ON_COMPUTER) e.preventDefault();  // stay on the page
     var saved = (API.live && API.userId)
       ? api('POST', '/users/' + API.userId + '/reminders', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time) })
           .then(function () { return api('GET', '/users/' + API.userId + '/referral'); })
           .then(function (r) { link = r.link.replace(/^https?:\/\//, ''); $('#link').value = link; renderMsgs(); })
           .catch(function () {})
       : Promise.resolve();
-    saved.then(function () { setTimeout(function () { go('binfluencer'); }, WA_LIVE ? 400 : 0); });
+    saved.then(function () {
+      if (WA_LIVE && ON_COMPUTER) { setupHi(); go('hi'); return; }
+      setTimeout(function () { go('binfluencer'); }, WA_LIVE ? 400 : 0);
+    });
   });
+  var hiPoll = null;
+  function setupHi(preview) {
+    var href = $('#t-go').getAttribute('href');
+    $('#hi-web').href = href;
+    $('#hi-qr').src = preview ? API.base + '/preview-qr.svg' : API.base + '/users/' + API.userId + '/start-qr.svg';
+    clearInterval(hiPoll);
+    if (preview || !API.userId) return;
+    hiPoll = setInterval(function () {
+      if (current !== 'hi') { if (current === 'binfluencer') clearInterval(hiPoll); return; }
+      api('GET', '/users/' + API.userId + '/status').then(function (r) {
+        if (r && r.status === 'active' && current === 'hi') { clearInterval(hiPoll); go('binfluencer'); }
+      }).catch(function () {});
+    }, 3000);
+  }
 
   // Binfluencer
   function renderBadge() {
@@ -1737,11 +1781,12 @@ Share to WhatsApp
 
   try { current = screenFromUrl(); history.replaceState({ s: current, sid: SID, n: 0 }, '', urlFor(current)); } catch (e) {}
   // Design preview: ?preview=<screen> opens that step straight away with sample content, e.g.
-  // /?preview=hi for the say-hi step (the QR version on a computer). Nothing is saved.
+  // /?preview=hi for the scan-to-say-hi step computers get. Nothing is saved.
   try {
     var pv = (location.search.match(/[?&]preview=([a-z]+)/) || [])[1];
     if (pv && document.querySelector('[data-screen="' + pv + '"]')) {
       current = pv;
+      if (pv === 'hi') setupHi(true);
     }
   } catch (e) {}
   // FAQ answers open and close smoothly. <details> keeps working without JS; with JS the

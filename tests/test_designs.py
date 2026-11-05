@@ -58,14 +58,14 @@ def test_missing_pages_get_the_404_page_and_the_api_keeps_json(client):
     assert client.get("/no-such-page").status_code == 404
 
 
-def test_silly_time_step_says_hello_and_there_is_no_say_hi_screen(client, monkeypatch):
+def test_silly_time_step_says_hello_and_computers_get_the_qr_step(client, monkeypatch):
     from app.core.config import get_settings
 
     monkeypatch.setenv("HOME_DESIGN", "silly")
     monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
     get_settings.cache_clear()
     page = client.get("/").text
-    assert 'data-screen="hi"' not in page and "{{" not in page
+    assert "{{" not in page and "Scan with your phone" in page  # the QR step, for computers
     assert ('id="t-go" href="https://wa.me/447700900999?text=Hey%20Binny%2C%20I%27M%20BIN"' in page)
     assert 'aria-disabled="true"' in page and "Say hello to Binny!" in page
     monkeypatch.delenv("META_DISPLAY_NUMBER")
