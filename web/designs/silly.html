@@ -950,11 +950,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <p class="lede share-lede">Share with your neighbours and become a local bin&nbsp;hero.</p>
 <div class="wa-chat" id="wa-chat" aria-label="The message you'll send">
 <div class="wa-copied" id="wa-copied" aria-hidden="true">Copied to clipboard</div>
-<div class="wa-bubble" id="wa-bubble" role="button" tabindex="0" aria-label="Copy this message"><span id="bubble-text"></span> <span class="wa-link" id="bubble-link"></span><span class="wa-time" aria-hidden="true">19:04 &#10003;&#10003;</span></div>
-</div>
-<div class="bubble-nav">
-<span class="dots" id="msg-dots" aria-hidden="true"></span>
-<button type="button" class="msg-next" id="msg-next">Try another &rarr;</button>
+<div class="wa-bubble" id="wa-bubble" role="button" tabindex="0" aria-label="Copy this message" style="white-space:pre-line"><span id="bubble-text"></span><span class="wa-time" aria-hidden="true">19:04 &#10003;&#10003;</span></div>
 </div>
 <span id="msg-live" class="sr" aria-live="polite"></span>
 <input id="link" type="hidden" value="">
@@ -1721,34 +1717,25 @@ Share to WhatsApp
   // Placeholder until the real invite link comes back from the API (demo mode keeps it).
   if (!$('#link').value) $('#link').value = location.host + '/?ref=[CODE]';
   var link = $('#link').value;
-  // Ready-made share messages, shown as the WhatsApp bubble neighbours will see. "Try another"
-  // (or a swipe) changes it; Share opens WhatsApp with it and the invite link. Edit or add here.
-  var MSGS = [
-    'Where have you bin all my life? 😍 This little bot tells you which bin to put out, the evening before collection. Add it to your WhatsApp:',
-    'Never miss a bin day again 🗑️ ' + BRAND + ' tells you which bin to put out, the evening before collection. Add it to your WhatsApp:',
-    'Hi neighbours! 👋 Anyone else always forgetting which bin goes out? I\'ve started using ' + BRAND + ', it tells me which bin to put out the evening before collection. Add it to your WhatsApp:'
-  ];
-  var msgAt = 0, copiedT = null;
-  function shareText() { return MSGS[msgAt] + ' https://' + link; }
+  // The share message, shown as the WhatsApp bubble neighbours will see. Share opens WhatsApp
+  // with it; tapping the bubble copies it. The sign-up link carries their invite code; the
+  // second link opens a chat with Binjamin to sign up right there (only when it's live).
+  var WA_NUMBER = (($('#t-go').getAttribute('href') || '').match(/^https:\/\/wa\.me\/(\d+)/) || [])[1] || '';
+  var copiedT = null;
+  function shareParts() {
+    var parts = ['\u{1F916} Thought I\'d share this little gem! ' + BRAND + ' is a free personal assistant on WhatsApp that tells you which bin to put out the evening before collection.',
+                 '', 'Takes less than a minute to set up: https://' + link];
+    if (WA_NUMBER) parts.push('Or WhatsApp ' + BRAND + ' directly: https://wa.me/' + WA_NUMBER);  // any message starts sign-up
+    return parts;
+  }
+  function shareText() { return shareParts().join('\n'); }
   function renderMsgs() {
-    $('#bubble-text').textContent = MSGS[msgAt];
-    $('#bubble-link').textContent = 'https://' + link;
-    $('#msg-dots').innerHTML = MSGS.map(function (m, i) { return '<span' + (i === msgAt ? ' class="on"' : '') + '></span>'; }).join('');
+    // links styled like WhatsApp's; everything else is plain text
+    $('#bubble-text').innerHTML = shareParts().map(function (line) {
+      return esc(line).replace(/(https:\/\/\S+)/g, '<span class="wa-link">$1</span>');
+    }).join('\n');
     $('#wa-share').href = 'https://wa.me/?text=' + encodeURIComponent(shareText());
   }
-  function stepMsg(d) {
-    msgAt = (msgAt + d + MSGS.length) % MSGS.length; renderMsgs();
-    $('#msg-live').textContent = 'Message ' + (msgAt + 1) + ' of ' + MSGS.length + ': ' + MSGS[msgAt];
-  }
-  $('#msg-next').addEventListener('click', function () { stepMsg(1); });
-  (function () {  // swipe the bubble for the next or previous message
-    var x0 = null, chat = $('#wa-chat');
-    chat.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
-    chat.addEventListener('touchend', function (e) {
-      if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0; x0 = null;
-      if (Math.abs(dx) > 40) { swiped = true; setTimeout(function () { swiped = false; }, 350); stepMsg(dx < 0 ? 1 : -1); }
-    });
-  })();
   var swiped = false, popT = null;
   // Tap the message to copy it, link included; a "Copied to clipboard" pop-up confirms it.
   function copyBubble() {
