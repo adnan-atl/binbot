@@ -358,8 +358,8 @@ def welcome_share(user: User) -> str | None:
         return None
     # WhatsApp's own link, so it opens the chat straight away (no tracking: any message there
     # starts sign-up)
-    return (f"Want to be a certified Binfluencer? Pop me in your street's group chat or send me "
-            f"to a friend. All they need to do is say hi to {s.brand_name} on WhatsApp: "
+    return (f"Help your community and become a certified Binfluencer! Pop me in your street's "
+            f"group chat or send me to a friend. All they need to do is say hi to {s.brand_name} on WhatsApp: "
             f"wa.me/{digits}")
 
 

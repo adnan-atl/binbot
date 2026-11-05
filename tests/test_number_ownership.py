@@ -183,8 +183,8 @@ def test_fourth_welcome_message_asks_them_to_share(client, db, live):
                                                  "marketing_consent": True})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
-    assert reply.endswith("Want to be a certified Binfluencer? Pop me in your street's group chat "
-                          "or send me to a friend. All they need to do is say hi to Binny on "
+    assert reply.endswith("Help your community and become a certified Binfluencer! Pop me in your "
+                          "street's group chat or send me to a friend. All they need to do is say hi to Binny on "
                           "WhatsApp: wa.me/447700900999")
     db.expire_all()
     assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()) == 3
