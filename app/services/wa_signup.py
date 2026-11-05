@@ -345,6 +345,17 @@ _DAYS = {"MON": "Monday", "TUE": "Tuesday", "WED": "Wednesday", "THU": "Thursday
          "FRI": "Friday", "SAT": "Saturday", "SUN": "Sunday"}
 
 
+def _daily_words(days: list[str]) -> str:
+    d = [x.upper()[:3] for x in days]
+    if len(set(d)) == 7:
+        return "Collected every day"
+    if set(d) == {"MON", "TUE", "WED", "THU", "FRI"}:
+        return "Collected every weekday"
+    if set(d) == {"MON", "TUE", "WED", "THU", "FRI", "SAT"}:
+        return "Collected Monday to Saturday"
+    return "Collected most days"
+
+
 def _bins_reply(where: str, bins) -> Reply:
     from datetime import date
 
@@ -359,6 +370,9 @@ def _bins_reply(where: str, bins) -> Reply:
         freq = _FREQ.get(b.frequency, "")
         when = f"{freq} on {days}" if freq and days else (freq or (f"on {days}" if days else ""))
         when = when[:1].upper() + when[1:]
+        if b.daily:  # never reminded about: say so, or they'll wonder where it went
+            lines.append(f"{name}: {_daily_words(b.days)}, so no reminders for this one")
+            continue
         nxt = date.fromisoformat(b.next).strftime("%a %-d %b") if b.next else ""
         lines.append(f"{name}: {when}" + (f". Next: {nxt}" if nxt else ""))
     head = f"Here's your bin calendar for {where}:" if where else "Here's your bin calendar:"

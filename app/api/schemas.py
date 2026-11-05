@@ -41,6 +41,8 @@ class BinOut(BaseModel):
     upcoming: list[str] = Field(default_factory=list)
     enabled: bool = True
     manual: bool = False
+    # Collected (nearly) every day: shown, but never reminded about (normalize.is_daily)
+    daily: bool = False
 
 
 class StartOut(BaseModel):

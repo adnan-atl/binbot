@@ -74,6 +74,15 @@ def colour_of(label: str) -> str | None:
 
 _WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 
+# A bin collected this many days a week or more (Westminster's daily rubbish, say) goes out
+# every day: it's shown with a note but never reminded about, or there'd be a message every
+# evening. The site's confirm step uses the same number (DAILY_MIN in the designs).
+DAILY_MIN_DAYS = 5
+
+
+def is_daily(days: list[str]) -> bool:
+    return len(set(days)) >= DAILY_MIN_DAYS
+
 
 def describe_rule(dates: list[date]) -> dict:
     """

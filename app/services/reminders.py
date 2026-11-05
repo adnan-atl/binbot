@@ -26,6 +26,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
+from app.services.normalize import describe_rule, is_daily
 from app.providers.messaging import get_provider, send_message, send_reply, send_template_batch, uses_template
 
 _CATEGORY_NAMES = {
@@ -56,6 +57,8 @@ def effective_collections(db: Session, user: User) -> dict[date, list[dict]]:
             ).all()
         else:
             dates = []
+        if is_daily(describe_rule(list(dates))["days"]):
+            continue  # collected (nearly) every day: a reminder every evening would be noise
         for d in dates:
             out.setdefault(d, []).append(bin_info)
     return dict(sorted(out.items()))
@@ -445,11 +448,20 @@ def time_menu(user: User) -> Reply:
         ("Evening before", rows(DAY_BEFORE_TIMES, "time", ReminderMode.night_before))])
 
 
+def _daily_bins(db: Session, user: User) -> list:
+    from app.services.signup import bins_out
+
+    return [b for b in bins_out(db, user) if b.daily]
+
+
 def bins_menu(db: Session, user: User) -> Reply:
     bins = _user_bins(db, user)
     if not bins:
         return Reply("You don't have any bins set up yet.", buttons=[SETTINGS_BUTTON])
-    rows = [(f"bin:{b.id}", b.label[:24], "On, tap to turn off" if b.enabled else "Off, tap to turn on")
+    daily = {b.label for b in _daily_bins(db, user)}
+    rows = [(f"bin:{b.id}", b.label[:24],
+             "Collected daily, no reminders" if b.label in daily and b.enabled
+             else "On, tap to turn off" if b.enabled else "Off, tap to turn on")
             for b in bins[:10]]
     return Reply("Tap a bin to turn its reminders on or off.", list_button="Your bins",
                  sections=[("Your bins", rows)])

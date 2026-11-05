@@ -1377,6 +1377,14 @@ Share to WhatsApp
     if (b.next0) return b.next0;
     return NEXT[ORDER.find(function (d) { return b.days.indexOf(d) > -1; })];
   };
+  // Collected (nearly) every day: shown, never reminded about, or it'd be a message every
+  // evening. Same rule as the server (DAILY_MIN_DAYS in app/services/normalize.py).
+  var DAILY_MIN = 5;
+  var isDaily = function (b) { return b.freq === 'weekly' && DAYS.filter(function (d) { return b.days.indexOf(d) > -1; }).length >= DAILY_MIN; };
+  var dailyChip = function (chosen) {
+    var k = chosen.join(',');
+    return chosen.length === 7 ? 'Daily' : k === 'Mon,Tue,Wed,Thu,Fri' ? 'Weekdays' : k === 'Mon,Tue,Wed,Thu,Fri,Sat' ? 'Mon–Sat' : 'Most days';
+  };
   var freqText = function (b) {
     var n = b.days.length;
     if (b.freq === 'unknown') return '';  // never show doubt; the row just shows the day
@@ -1441,12 +1449,13 @@ Share to WhatsApp
     if (!editing) {
       $('#c-rows').innerHTML = bins.map(function (b) {
         var chosen = DAYS.filter(function (d) { return b.days.indexOf(d) > -1; });
-        var chips = b.on === false ? '<span class="daychip" style="background:var(--line);color:var(--grey)">Off</span>' : !chosen.length ? '<span class="hint">Not set</span>' : chosen.length === 7 ? '<span class="daychip">Daily</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
+        var daily = b.on !== false && isDaily(b);
+        var chips = b.on === false ? '<span class="daychip" style="background:var(--line);color:var(--grey)">Off</span>' : !chosen.length ? '<span class="hint">Not set</span>' : daily ? '<span class="daychip">' + dailyChip(chosen) + '</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
         return '<div class="cols binrow' + (b.on === false ? ' off' : '') + '">' +
           '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span>' +
-          '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : esc(subline(b))) + '</span></span></span>' +
+          '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : daily ? 'Daily, so no reminders' : esc(subline(b))) + '</span></span></span>' +
           '<span class="c-days">' + chips + '</span>' +
-          '<span class="c-freq">' + freqText(b) + '</span>' +
+          '<span class="c-freq">' + (daily ? 'No reminders' : freqText(b)) + '</span>' +
           '</div>';
       }).join('');
     } else {
