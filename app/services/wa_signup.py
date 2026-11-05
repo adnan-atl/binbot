@@ -31,7 +31,8 @@ log = logging.getLogger(__name__)
 P = "su:"  # every tap id in this flow starts with this, so it never clashes with Settings taps
 MAX_LISTED = 9  # a WhatsApp list holds 10 rows: 9 addresses and "Not listed"
 
-REF_RE = re.compile(r"\bref\s+([A-Za-z0-9_-]{4,12})\b", re.IGNORECASE)  # reminders.invite_text
+# Codes can start or end with "-" (token_urlsafe), so no \b around them
+REF_RE = re.compile(r"\bref\s+([A-Za-z0-9_-]{4,12})(?![A-Za-z0-9_-])", re.IGNORECASE)  # reminders.invite_text
 RESTART_WORDS = {"RESTART", "START OVER", "STARTOVER", "RESET"}
 QUIT_WORDS = {"STOP", "CANCEL", "QUIT", "UNSUBSCRIBE"}
 

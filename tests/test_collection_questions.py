@@ -88,3 +88,11 @@ def test_tailored_cant_help_replies(client, db, uid, q, starts, team):
     from app.models import ChangeLog
     seen = db.scalars(select(ChangeLog).where(ChangeLog.kind == "unrecognised")).all()
     assert bool(seen)  # always kept for review; the Slack inbox only gets the ones marked team
+
+
+@pytest.mark.parametrize("q", ["Remind me of my dates?", "what's my schedule", "my bin dates please",
+                               "what's coming up?", "which days are my collections"])
+def test_asking_for_the_dates_lists_the_next_few(client, db, uid, q):
+    reply = say(client, q)
+    assert reply.startswith("Your next collections:\n"), q
+    assert reply.count("\n") >= 3 and reply.endswith("I'll remind you at 7pm the evening before."), q

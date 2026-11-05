@@ -657,11 +657,17 @@ _PHRASE_RES = [
 
 # A question about timing: when / next / which bin / tomorrow / this week (plus a bin word below).
 # "Do you do bulky waste?" or "can you remind me about glass?" aren't: they go to the team.
-_ASK_RE = re.compile(r"\b(when|whens|when's|what day|which day|next|which bins?|what bins?|"
-                     r"tomorrow|today|tonight|this week|bin day)\b", re.IGNORECASE)
+_ASK_RE = re.compile(r"\b(when|whens|when's|what day|which day|what days|which days|next|"
+                     r"which bins?|what bins?|tomorrow|today|tonight|this week|bin day|"
+                     r"my dates|dates|schedule|calendar|upcoming|coming up)\b",
+                     re.IGNORECASE)
+# Asking for the list rather than just the next one
+_LIST_RE = re.compile(r"\b(dates|schedule|calendar|upcoming|coming up|what days|which days|all)\b",
+                      re.IGNORECASE)
 _TOPIC_RE = re.compile(r"\b(collections?|collected|collecting|bins?|bin day|pick ?ups?|picked up|"
                        r"rubbish|recycling|waste|garbage|trash|refuse|garden|food|caddy|glass|"
-                       r"bottles|paper|cardboard|landfill|general|going out|goes out|go out|put out)\b",
+                       r"bottles|paper|cardboard|landfill|general|going out|goes out|go out|put out|"
+                       r"dates?|schedule|calendar|days|upcoming|coming up)\b",
                        re.IGNORECASE)
 # Requests and complaints, not questions: settings changes, missed or wrong collections, and
 # holiday questions we can't answer from the calendar alone (those go to the team inbox)
@@ -741,6 +747,9 @@ def collection_answer(db: Session, user: User, text: str) -> Reply | None:
         d, bins = days[0]
         return Reply(f"Nothing more this week. Next up: {_join([b['label'] for b in bins])} on "
                      f"{fmt(d)}.")
+    if _LIST_RE.search(low):  # "remind me of my dates", "what's my schedule?"
+        lines = [f"{fmt(d)}: {_join([b['label'] for b in bins])}" for d, bins in days[:4]]
+        return Reply("Your next collections:\n" + "\n".join(lines) + ("\n" + tail.strip() if tail else ""))
     d, bins = days[0]
     return Reply(f"Next up: {_join([b['label'] for b in bins])} on {fmt(d)}.{tail}")
 
