@@ -4,7 +4,7 @@ import secrets
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -396,6 +396,31 @@ def _new_start_code(db: Session) -> str:
         code = "".join(secrets.choice(_CODE_CHARS) for _ in range(6))
         if not db.scalar(select(User.id).where(User.start_code == code)):
             return code
+
+
+@router.get("/users/{user_id}/status")
+def get_status(user_id: str, db: Session = Depends(get_db)):
+    """Whether reminders are on yet: the say-hi page on a computer waits on this while the
+    resident sends their hi from their phone."""
+    return {"status": _user(db, user_id).status.value}
+
+
+@router.get("/users/{user_id}/start-qr.svg", include_in_schema=False)
+def get_start_qr(user_id: str, db: Session = Depends(get_db)):
+    """QR code of the say-hi link, for signing up on a computer: scan it with the phone that
+    has WhatsApp and the message is ready to send."""
+    import io
+
+    import segno
+
+    user = _user(db, user_id)
+    if not user.start_code:
+        raise HTTPException(404, "nothing to scan")
+    buf = io.BytesIO()
+    segno.make(start_link(user.start_code), error="m").save(buf, kind="svg", scale=8, border=2,
+                                                          dark="#1A1A1A", xmldecl=False)
+    return Response(buf.getvalue(), media_type="image/svg+xml",
+                    headers={"Cache-Control": "no-store"})
 
 
 @router.get("/users/{user_id}/schedule", response_model=list[S.ReminderOut])

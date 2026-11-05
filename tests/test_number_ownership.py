@@ -129,3 +129,15 @@ def test_welcome_ends_with_the_invite_link(client, db, live):
     assert reply.endswith("\n\nYou're a Bin rookie for now. Every neighbour who signs up with your link "
                           "levels you up, and five makes you a certified binfluencer: " + ref["link"])
     assert len(reply) <= 4096
+
+
+def test_computer_sign_up_gets_a_qr_and_a_status_to_wait_on(client, db, live):
+    uid, _ = _turn_on(client)
+    assert client.get(f"/api/users/{uid}/status").json()["status"] == "pending"
+    r = client.get(f"/api/users/{uid}/start-qr.svg")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("image/svg+xml")
+    assert b"<svg" in r.content
+    code = db.scalar(select(User).where(User.id == uid)).start_code
+    _say(client, "+447700900123", f"Hi Binny, start my reminders {code}")
+    assert client.get(f"/api/users/{uid}/status").json()["status"] == "active"
+    assert client.get(f"/api/users/{uid}/start-qr.svg").status_code == 404  # code used up

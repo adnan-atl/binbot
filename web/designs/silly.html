@@ -559,6 +559,10 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .p-head .h1{flex:1;min-width:0}
 .p-binji{flex:none;width:150px;height:auto;margin:0 -6px -4px 0}
 @media (min-width:601px){.p-head{gap:24px}.p-binji{width:190px;margin:0 0 -6px}}
+.hi-desk{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:8px}
+.hi-desk[hidden]{display:none}
+#hi-qr{width:232px;height:232px;padding:14px;background:#FFFFFF;border:1px solid #E5E5EA;border-radius:24px;box-sizing:content-box}
+.hi-web{font-size:15px;font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 </style>
 </head>
 <body>
@@ -886,13 +890,18 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1">Last step:<br>say hi to {{BRAND}}</h1>
-<p class="lede">Tap the button to open WhatsApp with your message ready. Send it, and {{BRAND}} replies straight away to start your reminders.</p>
+<h1 class="h1" id="hi-h">Last step:<br>say hi to {{BRAND}}</h1>
+<p class="lede" id="hi-lede">Tap the button to open WhatsApp with your message ready. Send it, and {{BRAND}} replies straight away to start your reminders.</p>
+<div id="hi-desk" class="hi-desk" hidden>
+<img id="hi-qr" alt="QR code that opens WhatsApp with your message ready" width="232" height="232">
+<span class="hint" id="hi-wait">Waiting for your hi. This page moves on by itself.</span>
+<a id="hi-web" class="hi-web" href="https://wa.me/" target="_blank" rel="noopener">Or open WhatsApp on this computer</a>
+</div>
 <a class="pill go" id="hi-go" href="https://wa.me/" target="_blank" rel="noopener" style="width:100%">
 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21"></path></svg>
 Say hi on WhatsApp
 </a>
-<span class="hint" style="text-align:center">{{BRAND}} only messages the number that says hi.</span>
+<span class="hint" id="hi-note" style="text-align:center">{{BRAND}} only messages the number that says hi.</span>
 </div>
 </main>
 </section>
@@ -1631,11 +1640,30 @@ Share to WhatsApp
       .then(function (r) { link = r.link.replace(/^https?:\/\//, ''); $('#link').value = link; renderMsgs(); })
       .catch(function () {}).then(function () {
         // Live with a business number: one more step, saying hi from their own WhatsApp.
-        if (hiLink) { $('#hi-go').href = hiLink; go('hi'); } else go('binfluencer');
+        if (hiLink) { $('#hi-go').href = hiLink; $('#hi-web').href = hiLink; setupHi(); go('hi'); } else go('binfluencer');
       });
   }, true);
   // Say hi: WhatsApp opens in a new tab or the app; this page moves on to the invite step.
   var hiLink = '';
+  // On a computer, WhatsApp is usually on the person's phone: show a QR code of the same
+  // message to scan, and move on by itself once their hi arrives.
+  var ON_COMPUTER = false;
+  try { ON_COMPUTER = matchMedia('(hover: hover) and (pointer: fine)').matches && innerWidth > 600; } catch (e) {}
+  var hiPoll = null;
+  function setupHi() {
+    if (!ON_COMPUTER || !API.userId) return;
+    $('#hi-h').innerHTML = 'Last step:<br>scan with your phone';
+    $('#hi-lede').textContent = "Point your phone's camera at the code. WhatsApp opens with your message ready: send it, and " + BRAND + ' replies straight away.';
+    $('#hi-qr').src = API.base + '/users/' + API.userId + '/start-qr.svg';
+    $('#hi-desk').hidden = false; $('#hi-go').style.display = 'none'; $('#hi-note').style.display = 'none';
+    clearInterval(hiPoll);
+    hiPoll = setInterval(function () {
+      if (current !== 'hi') { if (current === 'binfluencer') clearInterval(hiPoll); return; }
+      api('GET', '/users/' + API.userId + '/status').then(function (r) {
+        if (r && r.status === 'active' && current === 'hi') { clearInterval(hiPoll); go('binfluencer'); }
+      }).catch(function () {});
+    }, 3000);
+  }
   $('#hi-go').addEventListener('click', function () { setTimeout(function () { go('binfluencer'); }, 400); });
 
   // Binfluencer

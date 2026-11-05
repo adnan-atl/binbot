@@ -18,6 +18,7 @@ dependencies = [
   "uk-bin-collection==0.173.5",  # pinned: council scrapers change often; bump deliberately and re-test
   "sentry-sdk[fastapi]==2.70.0",  # error alerts; off unless SENTRY_DSN is set
   "yarl>=1.9",  # Birmingham's scraper imports it; the library doesn't declare it
+  "segno>=1.6,<2",  # QR code for saying hi from a phone when signing up on a computer
 ]
 
 [project.optional-dependencies]
