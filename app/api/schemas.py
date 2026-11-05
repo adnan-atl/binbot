@@ -84,7 +84,7 @@ class PhoneIn(BaseModel):
 
 
 class PrefsIn(BaseModel):
-    mode: str  # night_before | morning_of
+    mode: str = "night_before"  # the only mode: reminders come the evening before
     time: str  # "19:00"
 
 

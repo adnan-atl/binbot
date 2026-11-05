@@ -460,7 +460,16 @@ class Reply:
 SETTINGS_BUTTON = ("menu:settings", "Settings")
 # The times offered in the menu: (id, title). Typed TIME 5:45pm still works for anything else.
 DAY_BEFORE_TIMES = [("16:00", "4pm"), ("17:00", "5pm"), ("18:00", "6pm"), ("19:00", "7pm"), ("20:00", "8pm"), ("21:00", "9pm")]
-MORNING_TIMES = [("06:00", "6am"), ("06:30", "6:30am"), ("07:00", "7am")]
+
+
+def _evening_ok(hhmm: str) -> bool:
+    """Reminders go the evening before: any time from noon to 11pm the day before."""
+    return "12:00" <= hhmm <= "23:00"
+
+
+def _evening_only(user: User) -> Reply:
+    return Reply("I only send reminders the evening before, so there's time to put your bins out. "
+                 "Pick a time:", list_button="Pick a time", sections=time_menu(user).sections)
 
 
 def _user_bins(db: Session, user: User) -> list[UserBinSetting]:
@@ -594,12 +603,12 @@ def _tap(db: Session, user: User, tap: str) -> Reply | None:
                 "bins": lambda: bins_menu(db, user), "pause": lambda: _pause(db, user),
                 "resume": lambda: _resume(db, user),
                 "done": lambda: Reply("All set.")}.get(arg, lambda: settings_menu(db, user))()
-    if kind in ("time", "time_m"):
-        mode = ReminderMode.night_before if kind == "time" else ReminderMode.morning_of
-        offered = DAY_BEFORE_TIMES if kind == "time" else MORNING_TIMES
-        if arg not in dict(offered):
+    if kind == "time_m":  # a morning time tapped on an old menu: evening only now
+        return _evening_only(user)
+    if kind == "time":
+        if arg not in dict(DAY_BEFORE_TIMES):
             return time_menu(user)
-        return _set_time(db, user, mode, arg)
+        return _set_time(db, user, ReminderMode.night_before, arg)
     if kind == "bin":
         b = db.get(UserBinSetting, arg)
         if b is None or b.user_id != user.id:
@@ -746,19 +755,21 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
         hits = _find_bin(bins, rest)
         return _set_bin(db, user, hits[0], head == "ON") if len(hits) == 1 else bins_menu(db, user)
     if head == "TIME":
-        hhmm = parse_time(rest, user.reminder_mode) if rest else None
+        hhmm = parse_time(rest, ReminderMode.night_before) if rest else None
+        if hhmm and not _evening_ok(hhmm):
+            return _evening_only(user)
         if not hhmm:
             return Reply("I didn't catch that time. Try TIME 7pm or TIME 18:30, or pick one below.",
                          list_button="Pick a time", sections=time_menu(user).sections)
         return _set_time(db, user, user.reminder_mode, hhmm)
-    if head == "MORNING" or head in ("EVENING", "NIGHT") or words[:2] == ["DAY", "BEFORE"]:
-        mode = ReminderMode.morning_of if head == "MORNING" else ReminderMode.night_before
+    if head == "MORNING":  # reminders only ever come the evening before
+        return _evening_only(user)
+    if head in ("EVENING", "NIGHT") or words[:2] == ["DAY", "BEFORE"]:
         arg = " ".join(words[2:]) if words[:2] == ["DAY", "BEFORE"] else rest
-        hhmm = parse_time(arg, mode) if arg else _DEFAULT_TIME[mode]
-        if not hhmm:
-            example = "MORNING 6:30am" if mode == ReminderMode.morning_of else "EVENING 7pm"
-            return Reply(f"I didn't catch that time. Try {example}.")
-        return _set_time(db, user, mode, hhmm)
+        hhmm = parse_time(arg, ReminderMode.night_before) if arg else _DEFAULT_TIME[ReminderMode.night_before]
+        if not hhmm or not _evening_ok(hhmm):
+            return Reply("I didn't catch that time. Try EVENING 7pm.")
+        return _set_time(db, user, ReminderMode.night_before, hhmm)
     return collection_answer(db, user, t) or _bin_phrase(db, user, t)
 
 
@@ -863,7 +874,7 @@ def _erase(db: Session, user: User, phone: str, text: str) -> str | None:
 def handle_inbound(db: Session, phone: str, text: str) -> str:
     """Replies to a user's message or tap: the sign-up hi ("start my reminders <code>"), DONE /
     SNOOZE / WRONG / STOP / START, the settings menus (taps, or "settings"), and typed shortcuts
-    (TIME 4pm, EVENING 7pm, MORNING, "turn off garden"). Returns the reply text."""
+    (TIME 4pm, EVENING 7pm, "turn off garden"). Returns the reply text."""
     hi = _handle_hi(db, phone, text)
     if hi:
         if hi[1] != "welcome":  # the welcome went out already, as its separate messages

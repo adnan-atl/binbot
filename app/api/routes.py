@@ -252,10 +252,9 @@ def set_prefs(user_id: str, body: S.PrefsIn, db: Session = Depends(get_db)):
     user = _user(db, user_id)
     if not user.phone_e164:
         raise HTTPException(400, "Add a WhatsApp number first")
-    try:
-        user.reminder_mode = ReminderMode(body.mode)
-    except ValueError:
-        raise HTTPException(400, "mode must be night_before or morning_of")
+    if body.mode != ReminderMode.night_before.value:  # reminders only come the evening before
+        raise HTTPException(400, "mode must be night_before")
+    user.reminder_mode = ReminderMode.night_before
     if not re.fullmatch(r"\d{2}:\d{2}", body.time):
         raise HTTPException(400, "time must be HH:MM")
     user.reminder_time = body.time

@@ -1,5 +1,5 @@
 """Residents change their reminder time and bins over WhatsApp by tapping: a Settings menu, a
-time list and a bins list. Typed shortcuts (TIME 4pm, MORNING, DAY BEFORE, "turn off garden")
+time list and a bins list. Typed shortcuts (TIME 4pm, EVENING 7pm, DAY BEFORE, "turn off garden")
 still work."""
 from datetime import timedelta
 from zoneinfo import ZoneInfo
@@ -116,12 +116,10 @@ def test_tapping_a_time_saves_it_and_rebuilds_reminders(client, db, uid):
         assert (local.hour, local.minute) == (16, 0) and local.date() == r.collection_date - timedelta(days=1)
     assert reply.endswith(f"on {rows[0].collection_date.strftime('%a %-d %b')}.")
 
-    assert say(client, "time_m:06:30").startswith("Done. I'll remind you on the morning of collection at 6:30am.")
+    # a morning time tapped on an old menu: evening only now
+    assert say(client, "time_m:06:30").startswith("I only send reminders the evening before")
     db.expire_all()
-    assert db.get(User, uid).reminder_mode == ReminderMode.morning_of
-    for r in scheduled(db, uid):
-        local = r.send_at.astimezone(LONDON)
-        assert local.date() == r.collection_date and (local.hour, local.minute) == (6, 30)
+    assert db.get(User, uid).reminder_mode == ReminderMode.night_before
 
 
 def test_a_time_that_isnt_offered_shows_the_list_again(client, db, uid):
@@ -133,8 +131,9 @@ def test_a_time_that_isnt_offered_shows_the_list_again(client, db, uid):
 def test_typed_time_shortcuts_still_work(client, db, uid):
     assert say(client, "TIME   4pm").startswith("Done. I'll remind you the evening before at 4pm.")
     assert say(client, "time 18:45").startswith("Done. I'll remind you the evening before at 6:45pm.")
-    assert say(client, "MORNING").startswith("Done. I'll remind you on the morning of collection at 6:30am.")
-    assert say(client, "TIME 7").startswith("Done. I'll remind you on the morning of collection at 7am.")
+    assert say(client, "MORNING").startswith("I only send reminders the evening before")
+    assert say(client, "TIME 6am").startswith("I only send reminders the evening before")
+    assert say(client, "TIME 7").startswith("Done. I'll remind you the evening before at 7pm.")
     assert say(client, "Day  Before").startswith("Done. I'll remind you the evening before at 7pm.")
     assert say(client, "evening 8.15pm").startswith("Done. I'll remind you the evening before at 8:15pm.")
     assert say(client, "night 25") == "I didn't catch that time. Try EVENING 7pm."
