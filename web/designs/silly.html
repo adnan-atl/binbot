@@ -1656,7 +1656,7 @@ Share to WhatsApp
   function setupHi(preview) {
     if (!ON_COMPUTER || (!API.userId && !preview)) return;
     $('#hi-h').textContent = 'Scan with your phone';
-    $('#hi-lede').textContent = "Scan the code with your phone's camera, then send the message in WhatsApp.";
+    $('#hi-lede').textContent = "Point your phone's camera at the code. WhatsApp opens with your message ready: send it, and " + BRAND + ' replies straight away.';
     $('#hi-qr').src = preview ? API.base + '/preview-qr.svg' : API.base + '/users/' + API.userId + '/start-qr.svg';
     $('#hi-desk').hidden = false; $('#hi-go').style.display = 'none'; $('#hi-note').style.display = 'none';
     clearInterval(hiPoll);
