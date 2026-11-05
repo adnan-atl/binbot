@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.services import inbox
 from app.services.reminders import handle_inbound
 
 router = APIRouter(prefix="/webhooks")
@@ -49,6 +50,28 @@ async def meta(req: Request, db: Session = Depends(get_db)):
                 text = message_text(m)
                 if text:
                     handle_inbound(db, "+" + m["from"], text)
+                    inbox.note_inbound(db, "+" + m["from"])
+    return {"ok": True}
+
+
+@router.post("/slack")
+async def slack(req: Request):
+    """Slack Events API (the team inbox, services/inbox.py): the URL check when the app is set
+    up, then ✅ reactions. Answers at once; the work happens off the request."""
+    raw = await req.body()
+    if not inbox.signature_ok(raw, req.headers.get("X-Slack-Request-Timestamp"),
+                              req.headers.get("X-Slack-Signature")):
+        raise HTTPException(403, "bad signature")
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        raise HTTPException(400, "body is not JSON")
+    if payload.get("type") == "url_verification":
+        return PlainTextResponse(payload.get("challenge", ""))
+    if req.headers.get("X-Slack-Retry-Num"):
+        return {"ok": True}  # already handled the first time (sending is never repeated anyway)
+    if payload.get("type") == "event_callback":
+        inbox.handle_event(payload)
     return {"ok": True}
 
 

@@ -53,6 +53,9 @@ def delete_account(db: Session, user: User) -> None:
     db.execute(delete(Reminder).where(Reminder.user_id == uid))
     if user.phone_e164:
         db.execute(delete(Outbox).where(Outbox.to_phone == user.phone_e164))
+        from app.services.inbox import forget
+
+        forget(db, user.phone_e164)
     db.execute(delete(ChangeLog).where(ChangeLog.scope == "user", ChangeLog.scope_id == uid))
     # "These aren't my days" votes carry the user id in the round's log
     for row in db.scalars(select(ChangeLog).where(ChangeLog.kind == "wrong_day")):

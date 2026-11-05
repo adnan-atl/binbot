@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     # sending us "hi" from their own WhatsApp, which proves the number is theirs and opens the
     # reply window for the welcome. Empty (local, stub): reminders start straight away.
     meta_display_number: str = ""
+    # Team inbox in Slack (services/inbox.py): messages Binjamin can't answer are posted to the
+    # channel; a ✅ on a reply in the thread sends it to the resident on WhatsApp. Empty token = off.
+    slack_bot_token: str = ""
+    slack_signing_secret: str = ""
+    slack_inbox_channel: str = "binjamin-inbox"  # name or ID; the Binjamin app must be in it
 
     public_base_url: str = "http://localhost:8000"
 

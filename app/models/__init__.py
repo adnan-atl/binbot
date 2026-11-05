@@ -230,6 +230,9 @@ class User(Base):
     wa_data: Mapped[dict | None] = mapped_column(JSON)
     # When we sent the one "share with neighbours" message (services/reminders.share_nudges)
     share_nudged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Their last message or tap to us: WhatsApp lets us send free text for 24 hours after it
+    # (the Slack inbox checks this before sending a team reply)
+    last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     # Last time they used the service: a message or tap on WhatsApp, the site, or a reminder
     # that reached them. Accounts idle for 2 years are deleted (services/retention.py).
@@ -295,6 +298,34 @@ class Outbox(Base):
     provider: Mapped[str] = mapped_column(String(20))
     provider_message_id: Mapped[str | None] = mapped_column(String(80))
     error: Mapped[str | None] = mapped_column(Text)
+
+
+# ---------------------------------------------------------------- Slack inbox
+
+class InboxThread(Base):
+    """A resident's conversation in the team's Slack inbox (services/inbox.py): one Slack thread
+    per phone, reused while it's recent. Deleted with the account."""
+
+    __tablename__ = "inbox_threads"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
+    phone_e164: Mapped[str] = mapped_column(String(20), index=True)
+    channel: Mapped[str] = mapped_column(String(40))
+    thread_ts: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    last_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class InboxReply(Base):
+    """A Slack message the team approved (✅) and we sent on WhatsApp: never sent twice."""
+
+    __tablename__ = "inbox_replies"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
+    thread_id: Mapped[str] = mapped_column(ForeignKey("inbox_threads.id"), index=True)
+    slack_ts: Mapped[str] = mapped_column(String(40), unique=True)
+    approved_by: Mapped[str] = mapped_column(String(40))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
 # ---------------------------------------------------------------- monitoring

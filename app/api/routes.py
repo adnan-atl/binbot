@@ -358,7 +358,12 @@ def get_referral(user_id: str, db: Session = Depends(get_db)):
 @router.post("/inbound")
 def inbound(body: S.InboundIn, db: Session = Depends(get_db)):
     """Generic inbound. The Meta webhook maps into this shape in app/api/webhooks.py."""
-    return {"reply": handle_inbound(db, _e164(body.phone), body.text)}
+    phone = _e164(body.phone)
+    reply = handle_inbound(db, phone, body.text)
+    from app.services.inbox import note_inbound
+
+    note_inbound(db, phone)
+    return {"reply": reply}
 
 
 # ---- ops ------------------------------------------------------------------------------

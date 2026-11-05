@@ -644,6 +644,14 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             u.last_active_at = datetime.now(ZoneInfo("UTC"))
         db.commit()
         return hi[0]
+    from app.services import inbox
+
+    if inbox.enabled() and inbox.wants_human(text) and ":" not in text.split(" ")[0]:
+        # "Talk to a human": straight to the team inbox, from anyone, at any step
+        send_reply(db, phone, inbox.HANDED_OVER, kind="reply")
+        db.commit()
+        inbox.post(db, phone, text, "human")
+        return inbox.HANDED_OVER
     user = db.scalar(select(User).where(User.phone_e164 == phone))
     from app.services import wa_signup
 
@@ -664,6 +672,7 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         .order_by(Reminder.sent_at.desc())
     )
     reply = None
+    to_inbox = None  # posted to the team's Slack inbox after replying (services/inbox.py)
     if cmd not in ("STOP", "START", "DONE", "SNOOZE", "WRONG") or len(words) > 1:
         reply = _command(db, user, text)
     if reply is not None:
@@ -693,12 +702,19 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         # No promise to get back to them: nothing is sent unless their round actually changes.
         reply = Reply("Thanks, noted. If your home's days are different, tap \"These aren't my "
                       f"days\" in {get_settings().brand_name} to set your own.")
+        to_inbox = "wrong_day"
     else:
         # Kept so we can see what people ask for that we don't handle yet. Deleted after
         # UNRECOGNISED_KEEP_DAYS by the worker (purge_unrecognised, daily).
         db.add(ChangeLog(scope="user", scope_id=user.id, kind="unrecognised",
                          diff={"text": text.strip()[:1000]}))
+        if inbox.in_conversation(db, phone):
+            # The team is talking to them: this goes to the team, not the usual menu
+            db.commit()
+            inbox.post(db, phone, text, "unrecognised")
+            return ""
         reply = Reply(FALLBACK, buttons=[SETTINGS_BUTTON])
+        to_inbox = "unrecognised"
     if cmd in ("DONE", "SNOOZE") and last and len(words) == 1:
         # The reminder's template couldn't carry the referral news: it rides on this reply.
         news = referral_news(db, user)
@@ -710,4 +726,6 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     if cmd == "DONE" and last and len(words) == 1:
         share_after_done(db, user, phone)
     db.commit()
+    if to_inbox:
+        inbox.post(db, phone, text, to_inbox)
     return reply.text

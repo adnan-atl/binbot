@@ -183,6 +183,11 @@ def _on_postcode(db: Session, user: User, t: str) -> Reply:
         pc = geo.normalise_postcode(t)
     except geo.BadPostcode:
         if len(t) > 12 or not re.search(r"\d", t):  # chat, not a mistyped postcode
+            if len(t) > 12 and user.phone_e164:  # a question, maybe: the team sees it too
+                from app.services import inbox
+
+                db.commit()
+                inbox.post(db, user.phone_e164, t, "signup")
             return Reply(f"Let's get you set up. {ASK_POSTCODE}")
         return Reply(BAD_POSTCODE)
     if not allow("wa-postcode", user.phone_e164 or user.id, 10, 3600):
