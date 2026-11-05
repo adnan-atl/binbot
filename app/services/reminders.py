@@ -759,6 +759,11 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         last.status = ReminderStatus.done
         last.reply = "done"
         reply = Reply("Nice one. I'll be in touch before the next one.")
+    elif cmd == "DONE" and len(words) == 1 and db.scalar(
+            select(Reminder.id).where(Reminder.user_id == user.id,
+                                      Reminder.status == ReminderStatus.done)):
+        # Done tapped again on an old reminder (the buttons stay tappable): nothing left to do
+        reply = Reply("Already sorted \U0001F44D I'll be in touch before the next one.")
     elif cmd == "SNOOZE" and last:
         last.status = ReminderStatus.snoozed
         last.reply = "snooze"

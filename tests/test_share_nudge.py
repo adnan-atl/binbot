@@ -104,3 +104,18 @@ def test_real_whatsapp_waits_for_the_approved_template(client, db, monkeypatch):
     assert share_nudges(db, now_utc=nxt) == 1
     code = db.get(User, uid).referral_code
     assert fake.sent == ("bin_share", ["Binny", f"http://localhost:8000/?ref={code}"])
+
+
+def test_done_tapped_twice_just_says_already_sorted(client, db):
+    from app.models import ChangeLog, Reminder
+    from app.services.reminders import dispatch_due
+
+    uid = signup(client)["user_id"]
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    first = db.scalar(select(Reminder).where(Reminder.user_id == uid).order_by(Reminder.send_at))
+    dispatch_due(db, now_utc=first.send_at + timedelta(minutes=1))
+    assert _say(client, "DONE").startswith("Nice one.")
+    assert _say(client, "DONE") == "Already sorted \U0001F44D I'll be in touch before the next one."
+    db.expire_all()
+    assert not db.scalars(select(ChangeLog).where(ChangeLog.kind == "unrecognised")).all()
