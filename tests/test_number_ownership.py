@@ -174,3 +174,25 @@ def test_im_bin_from_another_number_claims_the_sign_up_by_postcode(client, db, l
 def test_claim_with_no_matching_sign_up_carries_on_as_a_whatsapp_sign_up(client, db, live):
     _say(client, "+447700900888", "Hey Binny, I'M BIN")
     assert _say(client, "+447700900888", "E8 1AA").startswith("Which one is your home?")
+
+
+def test_fourth_welcome_message_asks_them_to_share(client, db, live):
+    from app.models import Outbox
+    uid = signup(client)["user_id"]
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True,
+                                                 "marketing_consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
+    assert reply.endswith("Know a neighbour who always forgets bin day? Share me with them or your "
+                          "street group. They can check me out by saying hi to Binny on WhatsApp: "
+                          "https://wa.me/447700900999")
+    db.expire_all()
+    assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()) == 3
+    assert db.get(User, uid).share_nudged_at  # no second share nudge later
+
+
+def test_no_share_message_for_people_who_opted_out(client, db, live):
+    uid = signup(client)["user_id"]
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    assert "street group" not in _say(client, "+447700900123", "Hey Binny, I'M BIN")

@@ -301,7 +301,7 @@ def purge_unrecognised(db: Session, now_utc: datetime | None = None) -> int:
 
 def welcome_parts(db: Session, user: User) -> list[str]:
     """The welcome, sent the moment reminders go on as separate short messages: set up, first
-    collection, how to stop. (The share link comes later: share_nudges.) Shows the service works and (on WhatsApp) opens the
+    collection, how to stop, and (welcome_share) a nudge to share it with neighbours. Shows the service works and (on WhatsApp) opens the
     24-hour window for free-form replies."""
     first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
                       .order_by(Reminder.send_at))
@@ -316,7 +316,24 @@ def welcome_parts(db: Session, user: User) -> list[str]:
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
         parts.append(f"First up: {bins} on {first.collection_date.strftime('%a %-d %b')}.")
     parts.append("Want to bin me off? Reply STOP anytime.")
+    nudge = welcome_share(user)
+    if nudge:
+        parts.append(nudge)
     return [p[:4096] for p in parts]  # WhatsApp's text limit; each is far shorter in practice
+
+
+def welcome_share(user: User) -> str | None:
+    """The fourth welcome message: share Binjamin with neighbours or the street group. Written
+    to be forwarded as it is, so the link opens a chat with Binjamin (any message there starts
+    sign-up). Only for people who didn't opt out of hearing from us, and only once there's a
+    business number to link to. It counts as their one share nudge (share_nudges)."""
+    s = get_settings()
+    digits = re.sub(r"\D", "", s.meta_display_number)
+    if not digits or user.marketing_consent_at is None:
+        return None
+    return (f"Know a neighbour who always forgets bin day? Share me with them or your street "
+            f"group. They can check me out by saying hi to {s.brand_name} on WhatsApp: "
+            f"https://wa.me/{digits}")
 
 
 def welcome_message(db: Session, user: User) -> str:
@@ -330,6 +347,8 @@ def send_welcome(db: Session, phone: str, user: User) -> str:
     import time
 
     real = get_provider().name == "meta"
+    if welcome_share(user):  # the share nudge rides on the welcome: no second one later
+        user.share_nudged_at = datetime.now(ZoneInfo("UTC"))
     for i, part in enumerate(welcome_parts(db, user)):
         if i and real:
             time.sleep(0.7)  # WhatsApp doesn't promise order: a beat apart keeps them in sequence
