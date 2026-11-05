@@ -18,7 +18,7 @@ main{width:100%;max-width:640px;display:flex;flex-direction:column;align-items:c
 .truck{position:absolute;width:52%;height:auto;right:-14%;bottom:-6%;animation:drive-in 1.1s cubic-bezier(.2,.8,.2,1) both}
 @keyframes drive-in{from{transform:translateX(-60%);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.truck{animation:none}}
-h1{margin:0 0 24px;font-size:clamp(30px,6vw,48px);line-height:1.04;font-weight:800;letter-spacing:-0.032em;text-wrap:balance}
+h1{margin:0 0 32px;font-size:clamp(30px,6vw,48px);line-height:1.04;font-weight:800;letter-spacing:-0.032em;text-wrap:balance}
 .pill{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:0 32px;border-radius:999px;background:var(--green);color:#0B0B0B;font-size:17px;font-weight:700;text-decoration:none}
 .pill:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 @media (max-width:600px){.truck{right:-6%;width:54%}.pill{width:100%}}
@@ -26,12 +26,12 @@ h1{margin:0 0 24px;font-size:clamp(30px,6vw,48px);line-height:1.04;font-weight:8
 </head>
 <body>
 <main>
+<h1>This page has already been collected</h1>
 <div class="scene" aria-hidden="true">
 <img class="digits" src="/static/404-digits.webp" alt="" width="1200" height="487">
 <img class="truck" src="/static/binji-truck.webp" alt="" width="720" height="476">
 </div>
-<h1>This page has already been collected.</h1>
-<a class="pill" href="/">Return to the home page</a>
+<a class="pill" href="/">Return to home page</a>
 </main>
 </body>
 </html>
