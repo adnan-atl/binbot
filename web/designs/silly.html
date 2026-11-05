@@ -389,8 +389,9 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .home-foot{font-size:13px;opacity:.6}
 @media (min-width:1100px){.home-foot{font-size:15px}}
 .home-foot .foot-links{flex-direction:row;gap:16px;margin-left:0;width:100%;justify-content:space-between}
-/* Phone: the page scrolls, and the footer sits below the phone mockup instead of on screen */
-@media (max-width:600px){
+/* Every screen size: the page scrolls, so the whole phone mockup can be seen, and the footer
+   sits below it instead of on top of it */
+@media all{
 #home{height:auto;min-height:100svh;overflow:visible}
 #home .hero{overflow:visible;flex:none}
 #home .home-main{flex:none}
