@@ -567,8 +567,8 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 #hi-qr{grid-column:2}
 #hi-qr{width:232px;height:232px;padding:14px;background:#FFFFFF;border:1px solid #E5E5EA;border-radius:24px;box-sizing:content-box}
 .hi-web{font-size:15px;font-weight:500;color:#8A8A8E;text-decoration:underline;text-underline-offset:3px}
-/* Reminder time: Binji checking his watch. Computers: beside the headline. Phones: standing on
-   the 6pm pill (top right), with more room between the headline and the times. */
+/* Reminder time: Binji checking his watch. Computers: beside the headline. Phones: sitting on
+   the green 'Turn on reminders' button. */
 .t-head{display:flex;align-items:flex-end;gap:24px}
 .t-head .h1{flex:1;min-width:0}
 .t-binji{height:auto;pointer-events:none}
@@ -577,8 +577,8 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .t-binji-phone{display:none}
 @media (max-width:600px){
   .t-binji-web{display:none}
-  .t-sec{margin-top:96px}
-  .t-binji-phone{display:block;position:absolute;width:104px;bottom:calc(100% - 3px);right:calc((100% - 20px) / 6 - 52px)}  /* feet on the 6pm pill */
+  .t-go{margin-top:108px;position:relative}  /* room above the green button for Binji */
+  .t-binji-phone{display:block;position:absolute;z-index:2;width:104px;right:24px;top:-146px}  /* on the green button's top edge, clear of its label */
 }
 </style>
 </head>
@@ -892,10 +892,10 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div class="t-head"><h1 class="h1">When should<br>{{BRAND}} nudge you?</h1><img class="t-binji t-binji-web" src="/static/binji-watch.webp" alt="" width="382" height="560"></div>
 <div class="t-sec" style="display:flex;flex-direction:column;gap:10px">
 <span class="lbl" id="time-l">The day before, at</span>
-<div class="times-wrap"><img class="t-binji t-binji-phone" src="/static/binji-watch.webp" alt="" width="382" height="560"><div role="group" aria-labelledby="time-l" id="times" style="margin-top:4px"></div></div>
+<div class="times-wrap"><div role="group" aria-labelledby="time-l" id="times" style="margin-top:4px"></div></div>
 </div>
-<div style="display:flex;flex-direction:column;align-items:stretch;gap:12px">
-<a class="pill go" href="#binfluencer" style="width:100%">Turn on reminders</a>
+<div class="t-go" style="display:flex;flex-direction:column;align-items:stretch;gap:12px">
+<img class="t-binji t-binji-phone" src="/static/binji-watch.webp" alt="" width="382" height="560"><a class="pill go" href="#binfluencer" style="width:100%">Turn on reminders</a>
 <span class="hint" style="text-align:center">Reply STOP to turn them off.</span>
 </div>
 </div>
