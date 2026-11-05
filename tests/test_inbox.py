@@ -144,7 +144,7 @@ def test_their_answer_to_the_team_skips_the_menu(client, db, slack):
     _on(client)
     say(client, "can you help with my council tax?")
     react(slack.human_reply(slack.posts[0]["ts"], "We can't help with that one, sorry"))
-    assert say(client, "ok thanks") == ""  # no "Tap Done or Snooze…" menu
+    assert say(client, "ok thanks") == ""  # no not-understood menu
     assert slack.posts[-1]["text"] == "*New message*\n> ok thanks"
 
 

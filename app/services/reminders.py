@@ -670,8 +670,19 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
     return _bin_phrase(db, user, t)
 
 
-FALLBACK = ("Tap Done or Snooze on your last reminder, or tap Settings to change your bins or time, "
-            "or tell us about a wrong collection day.")
+# When Binjamin doesn't understand: these take turns (per person), then a pointer to Settings.
+NOT_UNDERSTOOD = ("I'm afraid that's beyond my bin grade. I'm just here for the rubbish!",
+                  "I'm just a humble bin butler. Rubbish is my speciality!")
+FALLBACK_TAIL = "Tap Settings to change your bins or reminder time."
+FALLBACK = f"{NOT_UNDERSTOOD[0]} {FALLBACK_TAIL}"
+
+
+def fallback_text(db: Session, user: User) -> str:
+    """The not-understood reply, alternating between the two lines for each person."""
+    n = db.scalar(select(func.count()).select_from(ChangeLog).where(
+        ChangeLog.scope == "user", ChangeLog.scope_id == user.id,
+        ChangeLog.kind == "unrecognised")) or 1
+    return f"{NOT_UNDERSTOOD[(n - 1) % len(NOT_UNDERSTOOD)]} {FALLBACK_TAIL}"
 
 
 DELETE_CONFIRM = ("This deletes your account for good: your number, address, bins and reminders. "
@@ -792,7 +803,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             db.commit()
             inbox.post(db, phone, text, "unrecognised")
             return ""
-        reply = Reply(FALLBACK, buttons=[SETTINGS_BUTTON])
+        db.flush()
+        reply = Reply(fallback_text(db, user), buttons=[SETTINGS_BUTTON])
         to_inbox = "unrecognised"
     if cmd in ("DONE", "SNOOZE") and last and len(words) == 1:
         # The reminder's template couldn't carry the referral news: it rides on this reply.
