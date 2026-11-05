@@ -584,6 +584,10 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .share-foot a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 /* Computers: Binji lower, hugging the phone's corner (its top edge at his hands; legs in front) */
 @media (min-width:601px){.binji{top:calc(-0.66 * var(--bw))}.binji-legs{display:none}}  /* he leans behind the corner: head and thumb over the top, hand round the side */
+/* Bigger selfie Binji; align-items:flex-end keeps his feet on the same line as he grows */
+.done-head .selfie{width:118px}
+@media (min-width:601px){.done-head .selfie{width:168px}}
+@media (max-width:360px){.done-head .selfie{width:84px}}
 </style>
 </head>
 <body>
@@ -932,7 +936,7 @@ Say hi on WhatsApp
 <div class="col">
 <div class="done-head">
 <img class="selfie" src="/static/binji-selfie.webp" alt="" width="640" height="630">
-<h1 class="h1 h1-flip"><span>You're all set</span><br>Now become a <em class="hl">Binfluencer</em></h1>
+<h1 class="h1 h1-flip"><span>You're all set</span><br>Now become<br>a <em class="hl">Binfluencer</em></h1>
 </div>
 <p class="lede share-lede">Share with your neighbours and become a local bin&nbsp;hero.</p>
 <div class="wa-chat" id="wa-chat" aria-label="The message you'll send">
