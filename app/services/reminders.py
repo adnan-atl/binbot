@@ -322,6 +322,12 @@ def welcome_parts(db: Session, user: User) -> list[str]:
     return [p[:4096] for p in parts]  # WhatsApp's text limit; each is far shorter in practice
 
 
+def display_number() -> str:
+    """The business number written for people: +44 7849 468697."""
+    d = re.sub(r"\D", "", get_settings().meta_display_number)
+    return f"+{d[:2]} {d[2:6]} {d[6:]}" if d.startswith("44") and len(d) == 12 else f"+{d}"
+
+
 def invite_text(code: str) -> str:
     """What a personal WhatsApp invite pre-fills: the reference lets Binjamin credit whoever
     shared it when their friend finishes signing up (wa_signup.REF_RE reads it)."""
@@ -342,9 +348,8 @@ def invite_short_link(code: str) -> str:
 
 def _already_invited(user: User, code: str) -> str:
     """Reply when someone already signed up sends an invite message (an old /w/ link)."""
-    digits = re.sub(r"\D", "", get_settings().meta_display_number)
     return ("You're already signed up, so no need for an invite \U0001F44D Share me with friends "
-            f"and neighbours, or pop me in your street's group chat: wa.me/{digits}")
+            f"and neighbours, or pop me in your street's group chat: {display_number()}")
 
 
 def welcome_share(user: User) -> str | None:
@@ -356,11 +361,11 @@ def welcome_share(user: User) -> str | None:
     digits = re.sub(r"\D", "", s.meta_display_number)
     if not digits or user.marketing_consent_at is None:
         return None
-    # WhatsApp's own link, so it opens the chat straight away (no tracking: any message there
-    # starts sign-up)
+    # The number itself rather than a link: it looks trustworthy, and WhatsApp still makes it
+    # tappable (no tracking: any message there starts sign-up)
     return (f"Help your community and become a certified Binfluencer! Pop me in your street's "
             f"group chat or send me to a friend. All they need to do is say hi to {s.brand_name} on WhatsApp: "
-            f"wa.me/{digits}")
+            f"{display_number()}")
 
 
 def welcome_message(db: Session, user: User) -> str:

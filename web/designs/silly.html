@@ -1725,8 +1725,10 @@ Share to WhatsApp
   function shareParts() {
     var parts = ['\u{1F916} Thought I\'d share this little gem! ' + BRAND + ' is a free personal assistant on WhatsApp that tells you which bin to put out the evening before collection.',
                  '', 'Takes less than a minute to set up: https://' + link];
-    // WhatsApp's own link: opens the chat straight away (not counted towards their total)
-    if (WA_NUMBER) parts.push('Or WhatsApp ' + BRAND + ' directly: https://wa.me/' + WA_NUMBER);
+    // The number itself (looks more trustworthy than a link; WhatsApp makes it tappable). Not
+    // counted towards their total.
+    var shown = /^44\d{10}$/.test(WA_NUMBER) ? '+44 ' + WA_NUMBER.slice(2, 6) + ' ' + WA_NUMBER.slice(6) : '+' + WA_NUMBER;
+    if (WA_NUMBER) parts.push('Or WhatsApp ' + BRAND + ' directly: ' + shown);
     return parts;
   }
   function shareText() { return shareParts().join('\n'); }

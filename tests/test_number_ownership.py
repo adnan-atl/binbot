@@ -185,7 +185,7 @@ def test_fourth_welcome_message_asks_them_to_share(client, db, live):
     reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
     assert reply.endswith("Help your community and become a certified Binfluencer! Pop me in your "
                           "street's group chat or send me to a friend. All they need to do is say hi to Binny on "
-                          "WhatsApp: wa.me/447700900999")
+                          "WhatsApp: +44 7700 900999")
     db.expire_all()
     assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()) == 3
     assert db.get(User, uid).share_nudged_at  # no second share nudge later
