@@ -66,8 +66,8 @@ def test_hi_from_the_typed_number_starts_reminders_and_sends_the_welcome(client,
     assert welcome.to_phone == "+447700900123" and reply.startswith(welcome.body)
     # Sent as separate messages: set up, first collection, how to stop, the invite
     more = [o.body for o in db.scalars(select(Outbox).where(Outbox.kind == "welcome_more"))]
-    assert len(more) == 3 and reply == "\n\n".join([welcome.body] + sorted(
-        more, key=lambda b: (not b.startswith("First up"), b.startswith("You're a "))))
+    assert len(more) == 2 and reply == "\n\n".join(
+        [welcome.body] + sorted(more, key=lambda b: not b.startswith("First up")))
     assert "Want to bin me off? Reply STOP anytime." in more
     # A second tap just says it's already on
     assert _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}") == \
@@ -128,13 +128,11 @@ def test_page_has_the_say_hi_step(client):
     assert 'id="hi-go"' in page and "Say hi on WhatsApp" in page
 
 
-def test_welcome_ends_with_the_invite_link(client, db, live):
+def test_welcome_has_no_invite_link(client, db, live):
     uid, res = _turn_on(client)
     reply = _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}")
-    ref = client.get(f"/api/users/{uid}/referral").json()
-    assert reply.endswith("\n\nYou're a Bin rookie for now. Every neighbour who signs up with your link "
-                          "levels you up, and five makes you a certified binfluencer: " + ref["link"])
-    assert len(reply) <= 4096
+    assert reply.endswith("\n\nWant to bin me off? Reply STOP anytime.")
+    assert "/?ref=" not in reply and "rookie" not in reply
 
 
 def test_computer_sign_up_gets_a_qr_and_a_status_to_wait_on(client, db, live):

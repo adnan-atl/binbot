@@ -228,6 +228,8 @@ class User(Base):
     # told us so far. Both cleared once reminders are on.
     wa_step: Mapped[str | None] = mapped_column(String(20))
     wa_data: Mapped[dict | None] = mapped_column(JSON)
+    # When we sent the one "share with neighbours" message (services/reminders.share_nudges)
+    share_nudged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     # Last time they used the service: a message or tap on WhatsApp, the site, or a reminder
     # that reached them. Accounts idle for 2 years are deleted (services/retention.py).

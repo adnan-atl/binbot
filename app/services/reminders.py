@@ -26,7 +26,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.providers.messaging import send_message, send_reply, send_template_batch, uses_template
+from app.providers.messaging import get_provider, send_message, send_reply, send_template_batch, uses_template
 
 _CATEGORY_NAMES = {
     "recycling": "Recycling", "general": "General waste", "food": "Food waste",
@@ -189,6 +189,62 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
     return sent
 
 
+# ---- "share with neighbours": once, after they've had their first reminder --------------------
+
+def share_link(user: User) -> str:
+    return f"{get_settings().public_base_url}/?ref={user.referral_code}"
+
+
+def share_text(user: User) -> str:
+    return (f"If you want to share {get_settings().brand_name} with neighbours or friends, send "
+            f"them this link: {share_link(user)}")
+
+
+def _wants_share(user: User) -> bool:
+    """One nudge per person, and only to people who said yes to hearing from us (it's promoting
+    the service, so the opt-out at sign-up covers it)."""
+    return (user.status == UserStatus.active and user.share_nudged_at is None
+            and user.marketing_consent_at is not None and bool(user.phone_e164))
+
+
+def share_after_done(db: Session, user: User, phone: str) -> bool:
+    """They just tapped Done on a reminder: the product worked, and the chat window is open,
+    so the nudge goes now as free text (no template, no charge)."""
+    if not _wants_share(user):
+        return False
+    send_message(db, phone, share_text(user), kind="share")
+    user.share_nudged_at = datetime.now(ZoneInfo("UTC"))
+    return True
+
+
+def share_nudges(db: Session, now_utc: datetime | None = None) -> int:
+    """Daily (late morning): the share nudge for everyone whose first reminded collection was
+    yesterday or before and who hasn't had it (didn't tap Done). Goes as the
+    META_SHARE_TEMPLATE template; without one (Meta still reviewing it) nobody is sent anything
+    and they stay in the queue. Returns how many were sent."""
+    now_utc = now_utc or datetime.now(ZoneInfo("UTC"))
+    s = get_settings()
+    can_template = uses_template(s.meta_share_template)
+    if not can_template and hasattr(get_provider(), "send_template"):
+        return 0  # real WhatsApp but no approved template: free text wouldn't arrive
+    today = now_utc.astimezone(ZoneInfo(s.timezone)).date()
+    reminded = (select(Reminder.user_id)
+                .where(Reminder.status.in_([ReminderStatus.sent, ReminderStatus.done,
+                                            ReminderStatus.snoozed]),
+                       Reminder.collection_date < today))
+    users = [u for u in db.scalars(select(User).where(User.id.in_(reminded))) if _wants_share(u)]
+    jobs = [(u.phone_e164, [s.brand_name, share_link(u)],
+             f"Hope that made bin day easier. {share_text(u)}") for u in users]
+    rows = send_template_batch(db, s.meta_share_template, jobs, kind="share")
+    sent = 0
+    for u, row in zip(users, rows):
+        if not row.error:
+            u.share_nudged_at = now_utc
+            sent += 1
+    db.commit()
+    return sent
+
+
 UNRECOGNISED_KEEP_DAYS = 90
 
 
@@ -206,7 +262,7 @@ def purge_unrecognised(db: Session, now_utc: datetime | None = None) -> int:
 
 def welcome_parts(db: Session, user: User) -> list[str]:
     """The welcome, sent the moment reminders go on as separate short messages: set up, first
-    collection, how to stop, the invite. Shows the service works and (on WhatsApp) opens the
+    collection, how to stop. (The share link comes later: share_nudges.) Shows the service works and (on WhatsApp) opens the
     24-hour window for free-form replies."""
     first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
                       .order_by(Reminder.send_at))
@@ -220,15 +276,6 @@ def welcome_parts(db: Session, user: User) -> list[str]:
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
         parts.append(f"First up: {bins} on {first.collection_date.strftime('%a %-d %b')}.")
     parts.append("Want to bin me off? Reply STOP anytime.")
-    # Invite link, same format as the referral API: people forward it to neighbours. The level
-    # names and the top threshold come from LEVELS, so the copy follows any change there.
-    link = f"{get_settings().public_base_url}/?ref={user.referral_code}"
-    top_at, top_name = LEVELS[-1]
-    words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven",
-             8: "eight", 9: "nine", 10: "ten"}
-    parts.append(f"You're a {LEVELS[0][1]} for now. Every neighbour who signs up with your link "
-                 f"levels you up, and {words.get(top_at, str(top_at))} makes you a certified "
-                 f"{top_name.lower()}: {link}")
     return [p[:4096] for p in parts]  # WhatsApp's text limit; each is far shorter in practice
 
 
@@ -241,8 +288,6 @@ def send_welcome(db: Session, phone: str, user: User) -> str:
     """Send the welcome as its separate messages. The first is recorded as kind "welcome" (one
     per sign-up), the rest as "welcome_more". Returns the whole text."""
     import time
-
-    from app.providers.messaging import get_provider
 
     real = get_provider().name == "meta"
     for i, part in enumerate(welcome_parts(db, user)):
@@ -647,5 +692,7 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             _mark_announced(news[1], datetime.now(ZoneInfo("UTC")))
     send_reply(db, phone, reply.text, kind="reply", buttons=reply.buttons,
                list_button=reply.list_button, sections=reply.sections)
+    if cmd == "DONE" and last and len(words) == 1:
+        share_after_done(db, user, phone)
     db.commit()
     return reply.text

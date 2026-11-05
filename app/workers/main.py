@@ -4,7 +4,7 @@ import logging
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.core.db import session_factory
-from app.services.reminders import purge_unrecognised
+from app.services.reminders import purge_unrecognised, share_nudges
 from app.services.retention import purge_inactive
 from app.workers import monitor
 
@@ -38,6 +38,7 @@ def main():
     sched.add_job(_with_db(monitor.resolve_disputes), "cron", hour=4, minute=45, id="disputes")
     sched.add_job(_with_db(purge_unrecognised), "cron", hour=5, minute=5, id="purge")
     sched.add_job(_with_db(purge_inactive), "cron", hour=5, minute=10, id="retention")
+    sched.add_job(_with_db(share_nudges), "cron", hour=11, minute=7, id="share")
     log.info("worker up")
     sched.start()
 

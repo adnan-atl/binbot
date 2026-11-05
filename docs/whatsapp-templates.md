@@ -137,6 +137,40 @@ riding on the Done / Snooze reply. Once approved, set `META_REMINDER_NEWS_TEMPLA
 
 ---
 
+## 4. Share with neighbours: `bin_share`
+
+Sent once, the day after someone's first reminded collection (11am), unless they already got the
+link by tapping **Done** on a reminder (that one goes free, inside the chat window). Only to
+people who didn't opt out of updates at sign-up. Until it's approved, leave
+`META_SHARE_TEMPLATE` empty: the Done path still works, and everyone waiting gets the template
+on the first morning after you set it.
+
+| Field | Value |
+|---|---|
+| Category | **Marketing** (it promotes the service, so Meta will file it there anyway) |
+| Name | `bin_share` |
+| Language | **English (UK)** |
+| Header | none |
+| Footer | none |
+| Buttons | none |
+
+**Body** (copy exactly):
+
+```
+Hope that made bin day easier. If you want to share {{1}} with neighbours or friends, send them this link: {{2}}
+```
+
+**Sample values**:
+
+| Variable | Meaning | Sample |
+|---|---|---|
+| `{{1}}` | the product name | `Binjamin` |
+| `{{2}}` | their invite link | `https://binjamin.uk/?ref=ab12cd34` |
+
+Once approved, set `META_SHARE_TEMPLATE=bin_share` in the server's `.env` and restart.
+
+---
+
 ## After approval
 
 Nothing to change in the app if you kept the default names. Check that a test reminder arrives
