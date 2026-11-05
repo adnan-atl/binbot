@@ -617,6 +617,89 @@ _PHRASE_RES = [
 ]
 
 
+# ---- questions about their collections: "when's my next collection?", "is it recycling this week?"
+
+# A question about timing: when / next / which bin / tomorrow / this week (plus a bin word below).
+# "Do you do bulky waste?" or "can you remind me about glass?" aren't: they go to the team.
+_ASK_RE = re.compile(r"\b(when|whens|when's|what day|which day|next|which bins?|what bins?|"
+                     r"tomorrow|today|tonight|this week|bin day)\b", re.IGNORECASE)
+_TOPIC_RE = re.compile(r"\b(collections?|collected|collecting|bins?|bin day|pick ?ups?|picked up|"
+                       r"rubbish|recycling|waste|garbage|trash|refuse|garden|food|caddy|glass|"
+                       r"bottles|paper|cardboard|landfill|general|going out|goes out|go out|put out)\b",
+                       re.IGNORECASE)
+# Requests and complaints, not questions: settings changes, missed or wrong collections, and
+# holiday questions we can't answer from the calendar alone (those go to the team inbox)
+_NOT_A_QUESTION_RE = re.compile(r"\b(turn|switch|stop|pause|delete|change|remind me at|wrong|missed|"
+                                r"didn'?t|wasn'?t|weren'?t|not been|never|forgot|complain\w*|"
+                                r"christmas|xmas|easter|bank holidays?|new year|boxing day)\b",
+                                re.IGNORECASE)
+# Words people use for each kind of bin (the category, or words in the bin's own label)
+_BIN_WORDS = {
+    "recycling": r"recycl\w*|blue",
+    "general": r"rubbish|general|landfill|household|refuse|black|residual|trash|garbage",
+    "food": r"food|caddy|kitchen",
+    "garden": r"garden|green waste|grass",
+    "glass": r"glass|bottles?|jars?",
+    "paper": r"paper|cardboard|card",
+}
+
+
+def _upcoming(db: Session, user: User) -> list[tuple[date, list[dict]]]:
+    """Their reminded collections from the first one that's still to come (today until 7am)."""
+    from app.services.signup import first_showable_day
+
+    first = first_showable_day()
+    return [(d, b) for d, b in effective_collections(db, user).items() if d >= first]
+
+
+def collection_answer(db: Session, user: User, text: str) -> Reply | None:
+    """A genuine question about their collections, answered from their own calendar: the next
+    collection, what goes out tomorrow or this week, or when a particular bin is next.
+    Returns None for anything else."""
+    t = text.strip()
+    if not (_ASK_RE.search(t) and _TOPIC_RE.search(t)) or _NOT_A_QUESTION_RE.search(t):
+        return None
+    days = _upcoming(db, user)
+    tail = (f" I'll remind you at {_clock(user.reminder_time)} {_when(user)}."
+            if user.status == UserStatus.active else "")
+    if not days:
+        return Reply("I don't have any collections coming up for you yet. Tap Settings to check "
+                     "your bins.", buttons=[SETTINGS_BUTTON])
+
+    def fmt(d: date) -> str:
+        return d.strftime("%a %-d %b")
+
+    low = t.lower()
+    for cat, rx in _BIN_WORDS.items():  # a particular bin
+        if not re.search(rf"\b({rx})\b", low):
+            continue
+        for d, bins in days:
+            hit = [b["label"] for b in bins
+                   if b["category"] == cat or re.search(rf"\b({rx})\b", b["label"].lower())]
+            if hit:
+                return Reply(f"{_join(hit)}: next out on {fmt(d)}.{tail}")
+        return Reply("I don't have that bin on your calendar. Tap Settings, then My bins, to see "
+                     "the ones I remind you about.", buttons=[SETTINGS_BUTTON])
+    today = datetime.now(ZoneInfo(get_settings().timezone)).date()
+    if re.search(r"\btomorrow\b", low):
+        on = dict(days).get(today + timedelta(days=1))
+        if on:
+            return Reply(f"Tomorrow ({fmt(today + timedelta(days=1))}): "
+                         f"{_join([b['label'] for b in on])}.{tail}")
+        d, bins = days[0]
+        return Reply(f"Nothing tomorrow. Next up: {_join([b['label'] for b in bins])} on {fmt(d)}.")
+    if re.search(r"\bthis week\b", low):
+        week = [(d, b) for d, b in days if d <= today + timedelta(days=6 - today.weekday())]
+        if week:
+            return Reply("This week: " + "; ".join(
+                f"{_join([b['label'] for b in bins])} on {fmt(d)}" for d, bins in week) + "." + tail)
+        d, bins = days[0]
+        return Reply(f"Nothing more this week. Next up: {_join([b['label'] for b in bins])} on "
+                     f"{fmt(d)}.")
+    d, bins = days[0]
+    return Reply(f"Next up: {_join([b['label'] for b in bins])} on {fmt(d)}.{tail}")
+
+
 def _bin_phrase(db: Session, user: User, text: str) -> Reply | None:
     t = re.sub(r"[.!?]+$", "", text.strip())
     for rx, order in _PHRASE_RES:
@@ -667,7 +750,7 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
             example = "MORNING 6:30am" if mode == ReminderMode.morning_of else "EVENING 7pm"
             return Reply(f"I didn't catch that time. Try {example}.")
         return _set_time(db, user, mode, hhmm)
-    return _bin_phrase(db, user, t)
+    return collection_answer(db, user, t) or _bin_phrase(db, user, t)
 
 
 # When Binjamin doesn't understand: these take turns (per person), then a pointer to Settings.
