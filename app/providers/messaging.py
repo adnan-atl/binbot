@@ -43,6 +43,9 @@ class StubProvider:
                   sections: list[tuple[str, list[tuple[str, str, str]]]]) -> SendResult:
         return self.send(to_phone, readable(body, sections=sections))
 
+    def send_link_button(self, to_phone: str, body: str, label: str, url: str) -> SendResult:
+        return self.send(to_phone, readable(body, link=(label, url)))
+
 
 class MetaProvider:
     name = "meta"
@@ -87,6 +90,14 @@ class MetaProvider:
             "action": {"buttons": [{"type": "reply", "reply": {"id": i, "title": t[:20]}}
                                    for i, t in buttons[:3]]}}})
 
+    def send_link_button(self, to_phone: str, body: str, label: str, url: str) -> SendResult:
+        """One button that opens a web link (label <= 20 chars). Free-form: inside the 24-hour
+        window only."""
+        return self._post({"to": to_phone.lstrip("+"), "type": "interactive", "interactive": {
+            "type": "cta_url", "body": {"text": body},
+            "action": {"name": "cta_url",
+                       "parameters": {"display_text": label[:20], "url": url}}}})
+
     def send_list(self, to_phone: str, body: str, button_label: str,
                   sections: list[tuple[str, list[tuple[str, str, str]]]]) -> SendResult:
         """A list menu: up to 10 rows in all (id, title <= 24, description <= 72)."""
@@ -109,9 +120,11 @@ class MetaProvider:
 QUICK_REPLIES = ("DONE", "SNOOZE", "menu:settings")
 
 
-def readable(body: str, buttons=(), sections=()) -> str:
+def readable(body: str, buttons=(), sections=(), link=None) -> str:
     """What a menu message looks like as plain text: for the outbox, logs and tests."""
     lines = [body]
+    if link:
+        lines.append(f"[{link[0]} -> {link[1]}]")
     if buttons:
         lines.append(" ".join(f"[{t}]" for _, t in buttons))
     for title, rows in sections:
@@ -188,17 +201,19 @@ def send_template_batch(db: Session, template: str, jobs: list[tuple[str, list[s
 
 
 def send_reply(db: Session, to_phone: str, text: str, kind: str, buttons=(), list_button: str = "",
-               sections=()) -> Outbox:
+               sections=(), link=None) -> Outbox:
     """Send a reply that may carry tap options: a list menu, reply buttons, or plain text.
     The outbox records the readable version (body plus options)."""
     p = get_provider()
-    if sections:
+    if link:  # (label, url): one button that opens a web link
+        res = p.send_link_button(to_phone, text, link[0], link[1])
+    elif sections:
         res = p.send_list(to_phone, text, list_button, list(sections))
     elif buttons:
         res = p.send_buttons(to_phone, text, list(buttons))
     else:
         res = p.send(to_phone, text)
-    row = Outbox(to_phone=to_phone, body=readable(text, buttons, sections), kind=kind,
+    row = Outbox(to_phone=to_phone, body=readable(text, buttons, sections, link), kind=kind,
                  provider=p.name, provider_message_id=res.message_id, error=res.error)
     db.add(row)
     db.flush()

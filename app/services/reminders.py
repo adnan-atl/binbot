@@ -352,20 +352,40 @@ def _already_invited(user: User, code: str) -> str:
             f"and neighbours, or pop me in your street's group chat: {display_number()}")
 
 
-def welcome_share(user: User) -> str | None:
-    """The fourth welcome message: share Binjamin with neighbours or the street group. Written
-    to be forwarded as it is. Only for people who didn't opt out of
-    hearing from us, and only once there's a business number. It counts as their one share
-    nudge (share_nudges)."""
+
+
+def local_number() -> str:
+    """The business number as people write it in the UK: 07849 468697."""
+    d = re.sub(r"\D", "", get_settings().meta_display_number)
+    return f"0{d[2:6]} {d[6:]}" if d.startswith("44") and len(d) == 12 else display_number()
+
+
+def share_message() -> str:
+    """What the Share button puts in WhatsApp's "send to…" screen. No referral link: the number
+    and the plain site, so it reads like a tip from a friend, not marketing."""
     s = get_settings()
-    digits = re.sub(r"\D", "", s.meta_display_number)
-    if not digits or user.marketing_consent_at is None:
+    site = re.sub(r"^https?://", "", s.public_base_url).rstrip("/")
+    return (f"Thought I'd share this little gem! {s.brand_name} is a free personal assistant on "
+            f"WhatsApp that tells you which bin to put out the evening before collection. Just "
+            f"WhatsApp {s.brand_name} on {local_number()}\n\n{site}")
+
+
+def share_button_url(user: User) -> str:
+    """The Share button's link: binjamin.uk/s/<code>, which counts the tap and opens WhatsApp's
+    "send to…" screen with share_message() (app/main.py)."""
+    return f"{get_settings().public_base_url.rstrip('/')}/s/{user.referral_code}"
+
+
+def welcome_share(user: User) -> str | None:
+    """The fourth welcome message: share Binjamin with neighbours or the street group, with a
+    Share button underneath (share_button_url). Only for people who didn't opt out of hearing
+    from us, and only once there's a business number. It counts as their one share nudge
+    (share_nudges)."""
+    s = get_settings()
+    if not re.sub(r"\D", "", s.meta_display_number) or user.marketing_consent_at is None:
         return None
-    # The number itself rather than a link: it looks trustworthy, and WhatsApp still makes it
-    # tappable (no tracking: any message there starts sign-up)
-    return (f"Help your community and become a certified Binfluencer! Pop me in your street's "
-            f"group chat or send me to a friend. All they need to do is say hi to {s.brand_name} on WhatsApp: "
-            f"{display_number()}")
+    return ("Help your community and become a certified Binfluencer \U0001F606 Pop me in your "
+            "street's group chat or send me to a friend.")
 
 
 def welcome_message(db: Session, user: User) -> str:
@@ -381,10 +401,16 @@ def send_welcome(db: Session, phone: str, user: User) -> str:
     real = get_provider().name == "meta"
     if welcome_share(user):  # the share nudge rides on the welcome: no second one later
         user.share_nudged_at = datetime.now(ZoneInfo("UTC"))
-    for i, part in enumerate(welcome_parts(db, user)):
+    parts = welcome_parts(db, user)
+    share = welcome_share(user)
+    for i, part in enumerate(parts):
         if i and real:
             time.sleep(0.7)  # WhatsApp doesn't promise order: a beat apart keeps them in sequence
-        send_message(db, phone, part, kind="welcome" if i == 0 else "welcome_more")
+        if share and part == share:  # the share nudge carries its Share button
+            send_reply(db, phone, part, kind="welcome_more",
+                       link=(f"Share {get_settings().brand_name}"[:20], share_button_url(user)))
+        else:
+            send_message(db, phone, part, kind="welcome" if i == 0 else "welcome_more")
     return welcome_message(db, user)
 
 

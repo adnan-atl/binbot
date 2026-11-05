@@ -68,6 +68,32 @@ if WEB.exists():
             return HTMLResponse(render_index(page))
         return HTMLResponse(render_index())
 
+    @app.get("/s/{code}", include_in_schema=False)
+    def share_tap(code: str):
+        """The Share button in the welcome: counts the tap (ChangeLog "share_tap" on that
+        person), then opens WhatsApp's "send to…" screen with the share message ready."""
+        from urllib.parse import quote
+
+        from sqlalchemy import select
+
+        from app.core.db import session_factory
+        from app.models import ChangeLog, User
+        from app.services.reminders import share_message
+
+        if re.fullmatch(r"[A-Za-z0-9_-]{4,12}", code):
+            db = session_factory()()
+            try:
+                u = db.scalar(select(User).where(User.referral_code == code))
+                if u is not None:
+                    db.add(ChangeLog(scope="user", scope_id=u.id, kind="share_tap", diff={}))
+                    db.commit()
+            except Exception:
+                logging.getLogger(__name__).exception("share tap not recorded")
+                db.rollback()
+            finally:
+                db.close()
+        return RedirectResponse("https://wa.me/?text=" + quote(share_message()), status_code=302)
+
     @app.get("/w/{code}", include_in_schema=False)
     def whatsapp_invite(code: str):
         """Someone's personal WhatsApp invite (binjamin.uk/w/<code>): opens a chat with Binjamin
