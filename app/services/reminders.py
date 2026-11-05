@@ -234,7 +234,7 @@ def share_nudges(db: Session, now_utc: datetime | None = None) -> int:
                        Reminder.collection_date < today))
     users = [u for u in db.scalars(select(User).where(User.id.in_(reminded))) if _wants_share(u)]
     jobs = [(u.phone_e164, [s.brand_name, share_link(u)],
-             f"Hope that made bin day easier. {share_text(u)}") for u in users]
+             f"Hope that made bin day easier. {share_text(u)}\n\nIt only takes them a minute to sign up.") for u in users]
     rows = send_template_batch(db, s.meta_share_template, jobs, kind="share")
     sent = 0
     for u, row in zip(users, rows):
