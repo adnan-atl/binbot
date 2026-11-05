@@ -173,6 +173,37 @@ Once approved, set `META_SHARE_TEMPLATE=bin_share` in the server's `.env` and re
 
 ---
 
+## 5. Sign-up nudge: `bin_signup_nudge`
+
+For website sign-ups that reached the "Say hi to Binjamin" step but never sent the message.
+Twelve minutes later they get this once, with a **Start reminders** button. Tapping it counts as
+their hi: reminders go on and the welcome follows (free, because they've just tapped). Only sent
+to people who ticked the terms; never sent again.
+
+There's no separate "setup" or "welcome" template: the welcome is always free text, because it
+only ever goes out straight after the person messages or taps.
+
+| Field | Value |
+|---|---|
+| Category | **Utility** (it finishes something they started) |
+| Name | `bin_signup_nudge` |
+| Language | **English (UK)** |
+| Header | none |
+| Footer | none |
+
+**Body** (copy exactly, no variables):
+
+```
+Your bin reminders are nearly ready. Tap Start reminders to switch them on, or ignore this if it wasn't you.
+```
+
+**Buttons**: one **Quick reply** button: `Start reminders`.
+
+Once approved, set `META_SIGNUP_NUDGE_TEMPLATE=bin_signup_nudge` in the server's `.env` and
+restart. Until then nobody is nudged (free text wouldn't reach a number that hasn't messaged us).
+
+---
+
 ## After approval
 
 Nothing to change in the app if you kept the default names. Check that a test reminder arrives

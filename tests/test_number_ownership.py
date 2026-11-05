@@ -42,9 +42,9 @@ def test_turning_on_waits_for_hi_and_sends_nothing(client, db, live):
     code = res["start_code"]
     assert res["status"] == "awaiting_hi" and res["scheduled"] == 0
     assert len(code) == 6 and code.isalnum() and code.isupper()
-    assert res["start_link"] == ("https://wa.me/447700900999?text="
-                                 + quote(f"Hi Binny, start my reminders {code}"))
-    assert "Hi%20Binny%2C%20start%20my%20reminders%20" in res["start_link"]
+    # No code in the message: we know them by the number they message from
+    assert res["start_link"] == "https://wa.me/447700900999?text=" + quote("Hey Binny, I'M BIN")
+    assert code not in res["start_link"]
     user = db.get(User, uid)
     assert user.status == UserStatus.pending and user.start_code == code
     assert _scheduled(db, uid) == []
@@ -145,3 +145,32 @@ def test_computer_sign_up_gets_a_qr_and_a_status_to_wait_on(client, db, live):
     _say(client, "+447700900123", f"Hi Binny, start my reminders {code}")
     assert client.get(f"/api/users/{uid}/status").json()["status"] == "active"
     assert client.get(f"/api/users/{uid}/start-qr.svg").status_code == 404  # code used up
+
+
+def test_im_bin_from_the_typed_number_starts_reminders(client, db, live):
+    uid = signup(client)["user_id"]
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
+    assert reply.startswith("Binny here. You're all set.")
+    db.expire_all()
+    assert db.get(User, uid).status == UserStatus.active
+    assert _say(client, "+447700900123", "Hey Binny, I'M BIN").startswith("Your reminders are already on")
+
+
+def test_im_bin_from_another_number_claims_the_sign_up_by_postcode(client, db, live):
+    uid = signup(client)["user_id"]  # postcode E8 3PB
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    ask = _say(client, "+447700900888", "hey binjamin i'm bin")
+    assert ask.startswith("Hi! I couldn't find a sign-up for this number.")
+    assert _say(client, "+447700900888", "e8 3pb").startswith("Binny here. You're all set.")
+    db.expire_all()
+    u = db.get(User, uid)
+    assert u.phone_e164 == "+447700900888" and u.status == UserStatus.active
+    assert len(db.scalars(select(User)).all()) == 1  # the placeholder for the new number is gone
+
+
+def test_claim_with_no_matching_sign_up_carries_on_as_a_whatsapp_sign_up(client, db, live):
+    _say(client, "+447700900888", "Hey Binny, I'M BIN")
+    assert _say(client, "+447700900888", "E8 1AA").startswith("Which one is your home?")

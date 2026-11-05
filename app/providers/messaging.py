@@ -64,15 +64,17 @@ class MetaProvider:
         return self._post({"to": to_phone.lstrip("+"), "type": "text", "text": {"body": body}})
 
     def send_template(self, to_phone: str, name: str, lang: str, body_params: list[str],
-                      buttons: bool = False) -> SendResult:
+                      buttons=False) -> SendResult:
         """An approved template ({{1}}, {{2}}... filled from body_params), deliverable any time.
-        With buttons, the template's quick replies carry the QUICK_REPLIES payloads, in order."""
+        With buttons=True, the template's quick replies carry the QUICK_REPLIES payloads, in order;
+        a list of payloads instead fills that template's own quick replies."""
         components = [{"type": "body",
                        "parameters": [{"type": "text", "text": p} for p in body_params]}]
         if buttons:
             components += [{"type": "button", "sub_type": "quick_reply", "index": str(i),
                             "parameters": [{"type": "payload", "payload": payload}]}
-                           for i, payload in enumerate(QUICK_REPLIES)]
+                           for i, payload in enumerate(
+                               QUICK_REPLIES if buttons is True else buttons)]
         return self._post({"to": to_phone.lstrip("+"), "type": "template",
                            "template": {"name": name, "language": {"code": lang},
                                         "components": components}})
@@ -140,7 +142,7 @@ def uses_template(template: str) -> bool:
 
 
 def _deliver_template(p, to_phone: str, template: str, params: list[str], body: str,
-                      buttons: bool) -> SendResult:
+                      buttons) -> SendResult:
     """The network part only (no database), so it can run on a worker thread."""
     try:
         if uses_template(template):
@@ -160,7 +162,7 @@ def _record(db: Session, p, to_phone: str, body: str, kind: str, res: SendResult
 
 
 def send_template_message(db: Session, to_phone: str, template: str, params: list[str],
-                          body: str, kind: str, buttons: bool = False) -> Outbox:
+                          body: str, kind: str, buttons=False) -> Outbox:
     """Send an approved template when one is configured and the provider supports templates;
     otherwise send `body` as free text. `body` is what's recorded in the outbox either way."""
     p = get_provider()
@@ -174,7 +176,7 @@ SEND_CONCURRENCY = 10
 
 
 def send_template_batch(db: Session, template: str, jobs: list[tuple[str, list[str], str]],
-                        kind: str, buttons: bool = False) -> list[Outbox]:
+                        kind: str, buttons=False) -> list[Outbox]:
     """send_template_message for many people at once: jobs are (phone, params, body). The HTTP
     calls run SEND_CONCURRENCY at a time; the outbox rows are written here, on the caller's
     thread, in the same order as jobs."""

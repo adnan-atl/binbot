@@ -248,6 +248,40 @@ def share_nudges(db: Session, now_utc: datetime | None = None) -> int:
     return sent
 
 
+# ---- website sign-ups that never sent their hi -------------------------------------------------
+
+SIGNUP_NUDGE_MINUTES = 12
+SIGNUP_NUDGE_TEXT = ("Your bin reminders are nearly ready. Tap Start reminders to switch them on, "
+                     "or ignore this if it wasn't you.")
+
+
+def signup_nudges(db: Session, now_utc: datetime | None = None) -> int:
+    """Every few minutes: anyone who reached the say-hi step SIGNUP_NUDGE_MINUTES ago, typed a
+    number and ticked the terms, but whose message never came, gets one nudge with a Start
+    reminders button (META_SIGNUP_NUDGE_TEMPLATE). Tapping it is their hi. Without an approved
+    template nothing is sent: free text to a number that hasn't messaged us wouldn't arrive."""
+    now_utc = now_utc or datetime.now(ZoneInfo("UTC"))
+    s = get_settings()
+    can_template = uses_template(s.meta_signup_nudge_template)
+    if not can_template and hasattr(get_provider(), "send_template"):
+        return 0
+    due = now_utc - timedelta(minutes=SIGNUP_NUDGE_MINUTES)
+    stale = now_utc - timedelta(hours=24)  # a day later it's no longer a nudge
+    users = db.scalars(select(User).where(
+        User.status == UserStatus.pending, User.phone_e164.is_not(None),
+        User.consent_at.is_not(None), User.signup_nudged_at.is_(None),
+        User.hi_prompted_at.is_not(None), User.hi_prompted_at <= due,
+        User.hi_prompted_at >= stale)).all()
+    users = [u for u in users if u.bin_settings and u.wa_step is None]
+    jobs = [(u.phone_e164, [], SIGNUP_NUDGE_TEXT) for u in users]
+    rows = send_template_batch(db, s.meta_signup_nudge_template, jobs, kind="signup_nudge",
+                               buttons=[START_PAYLOAD])
+    for u in users:
+        u.signup_nudged_at = now_utc  # once, whether or not it got through
+    db.commit()
+    return sum(1 for r in rows if not r.error)
+
+
 UNRECOGNISED_KEEP_DAYS = 90
 
 
@@ -301,11 +335,25 @@ def send_welcome(db: Session, phone: str, user: User) -> str:
     return welcome_message(db, user)
 
 
-def start_link(code: str) -> str:
-    """wa.me link that opens WhatsApp with "Hi <brand>, start my reminders <code>" ready to send."""
-    s = get_settings()
-    digits = re.sub(r"\D", "", s.meta_display_number)
-    return f"https://wa.me/{digits}?text={quote(f'Hi {s.brand_name}, start my reminders {code}')}"
+def hi_text() -> str:
+    """What the say-hi button puts in their WhatsApp: no code to puzzle over. We know who they
+    are from the number they message from (the one they typed on the site)."""
+    return f"Hey {get_settings().brand_name}, I'M BIN"
+
+
+def start_link(code: str | None = None) -> str:
+    """wa.me link that opens WhatsApp with hi_text() ready to send. (`code` is ignored: links from
+    before the change carried one, and those messages still work.)"""
+    digits = re.sub(r"\D", "", get_settings().meta_display_number)
+    return f"https://wa.me/{digits}?text={quote(hi_text())}"
+
+
+HI_RE = re.compile(r"\bI\s*['’]?\s*M\s+BIN\b", re.IGNORECASE)  # "I'M BIN", "im bin", "I’m Bin"
+START_PAYLOAD = "START_REMINDERS"  # the Start reminders button on the sign-up nudge template
+
+
+def is_hi(text: str) -> bool:
+    return bool(HI_RE.search(text or "")) or (text or "").strip() == START_PAYLOAD
 
 
 _START_RE = re.compile(r"\bstart my reminders\s+([A-Za-z0-9]{6})\b", re.IGNORECASE)
@@ -657,6 +705,11 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
 
     if wa_signup.wants(user):  # not signed up yet: sign up right here in WhatsApp
         return wa_signup.handle(db, phone, text, user) or ""
+    if is_hi(text) and user.status == UserStatus.active:  # the sign-up hi, sent twice
+        msg = 'Your reminders are already on. Message "settings" to change them.'
+        send_reply(db, phone, msg, kind="reply")
+        db.commit()
+        return msg
     if text.startswith(wa_signup.REACT):  # an emoji reaction from someone signed up: no reply
         return ""
     user.last_active_at = datetime.now(ZoneInfo("UTC"))

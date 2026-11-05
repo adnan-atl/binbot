@@ -24,7 +24,7 @@ from app.core.guard import allow
 from app.models import ChangeLog, ReminderMode, User, UserStatus, now
 from app.providers.messaging import send_reply
 from app.services import geo, signup
-from app.services.reminders import DAY_BEFORE_TIMES, Reply, _clock, parse_time, send_welcome
+from app.services.reminders import DAY_BEFORE_TIMES, Reply, _clock, is_hi, parse_time, send_welcome
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +51,10 @@ def greeting() -> str:
 
 
 ASK_POSTCODE = "What's your postcode?"
+CLAIM = ("Hi! I couldn't find a sign-up for this number. If you've just signed up on the website "
+         "with a different number, send me the postcode you used and I'll find it. Otherwise, "
+         "send your postcode and we'll set you up here.")
+CLAIM_HOURS = 3  # how recent a website sign-up has to be to claim it by postcode
 BAD_POSTCODE = "That doesn't look like a UK postcode. Try again, like E8 1AA."
 LOOKUP_DOWN = "I couldn't look that postcode up just now. Try again in a minute."
 ASK_HOUSE = "What's your house number or name?"
@@ -101,6 +105,9 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
         user = User(phone_e164=phone, referral_code=signup.new_referral_code())
         db.add(user)
         db.flush()
+        if is_hi(t):  # the website's hi, but from a number nobody typed there
+            user.wa_step = "claim"
+            return _send(db, phone, Reply(CLAIM))
         if _looks_like_postcode(t):  # they led with it: skip the hello
             user.wa_step = "postcode"
             return _send(db, phone, _on_postcode(db, user, t))
@@ -120,8 +127,10 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
     if upper in RESTART_WORDS or t == P + "restart":
         return _send(db, phone, _restart(user))
 
+    if _web_ready(user) and user.wa_step in (None, "web") and is_hi(t):
+        return _switch_on(db, user)  # their hi: reminders on, welcome sent
     if user.wa_step is None:
-        if _web_ready(user):  # started on the website, then messaged without the code
+        if _web_ready(user):  # started on the website, then messaged something else
             user.wa_step = "web"
             when = _clock(user.reminder_time)
             return _send(db, phone, Reply(
@@ -130,7 +139,7 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
                 buttons=[(P + "web:yes", "Start reminders"), (P + "web:over", "Start over")]))
         return _send(db, phone, _restart(user, hello=True))
 
-    step = {"postcode": _on_postcode, "address": _on_address, "house": _on_house,
+    step = {"claim": _on_claim, "postcode": _on_postcode, "address": _on_address, "house": _on_house,
             "bins": _on_bins, "off": _on_bins, "time": _on_time, "consent": _on_consent,
             "web": _on_web}.get(user.wa_step)
     if step is None:
@@ -176,6 +185,36 @@ def _looks_like_postcode(t: str) -> bool:
         return True
     except geo.BadPostcode:
         return False
+
+
+def _on_claim(db: Session, user: User, t: str) -> Reply | str | None:
+    """They sent the website's hi from a number nobody typed there (a typo, or another phone).
+    One recent, finished website sign-up on the postcode they give: that's theirs, so it moves
+    to this number and their reminders start. Otherwise it's a normal WhatsApp sign-up."""
+    try:
+        pc = geo.normalise_postcode(t)
+    except geo.BadPostcode:
+        return Reply(BAD_POSTCODE if re.search(r"\d", t) else CLAIM)
+    from datetime import timedelta
+
+    from app.models import Property
+
+    since = now() - timedelta(hours=CLAIM_HOURS)
+    found = [u for u in db.scalars(
+        select(User).join(Property, User.property_id == Property.id)
+        .where(Property.postcode == pc, User.status == UserStatus.pending, User.id != user.id,
+               User.consent_at.is_not(None), User.hi_prompted_at >= since))
+             if _web_ready(u)]
+    if len(found) != 1:
+        user.wa_step = "postcode"
+        return _on_postcode(db, user, t)
+    web = found[0]
+    phone = user.phone_e164
+    db.delete(user)  # the placeholder row for this number gives way to their real sign-up
+    db.flush()
+    web.phone_e164 = phone
+    web.wa_step = None
+    return _switch_on(db, web)
 
 
 def _on_postcode(db: Session, user: User, t: str) -> Reply:

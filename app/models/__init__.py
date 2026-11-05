@@ -233,6 +233,10 @@ class User(Base):
     # Their last message or tap to us: WhatsApp lets us send free text for 24 hours after it
     # (the Slack inbox checks this before sending a team reply)
     last_inbound_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Website sign-up: when they reached the say-hi step, and when we sent the one nudge
+    # (services/reminders.signup_nudges) because their message never came
+    hi_prompted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    signup_nudged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     # Last time they used the service: a message or tap on WhatsApp, the site, or a reminder
     # that reached them. Accounts idle for 2 years are deleted (services/retention.py).

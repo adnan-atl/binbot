@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # "Share with neighbours" nudge, the day after the first collection (docs/whatsapp-templates.md).
     # Empty until Meta approves it: until then only people who tap Done get the nudge (free text).
     meta_share_template: str = ""
+    # "Your reminders are nearly ready" with a Start reminders button, for website sign-ups that
+    # reached the say-hi step but didn't send the message within SIGNUP_NUDGE_MINUTES. Empty until
+    # Meta approves it (docs/whatsapp-templates.md).
+    meta_signup_nudge_template: str = ""
     meta_template_lang: str = "en_GB"
     # The business WhatsApp number in E.164 (+447...). When set, sign-up ends with the resident
     # sending us "hi" from their own WhatsApp, which proves the number is theirs and opens the

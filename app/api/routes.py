@@ -264,7 +264,9 @@ def set_prefs(user_id: str, body: S.PrefsIn, db: Session = Depends(get_db)):
         # Don't message a typed number cold: the resident says hi to us from their WhatsApp
         # first (handle_inbound), which proves the number and starts their reminders.
         if not user.start_code:
-            user.start_code = _new_start_code(db)
+            user.start_code = _new_start_code(db)  # still keys the QR code and older links
+        if user.hi_prompted_at is None:  # the sign-up nudge counts from here
+            user.hi_prompted_at = now()
         db.commit()
         return {"status": "awaiting_hi", "scheduled": 0, "start_code": user.start_code,
                 "start_link": start_link(user.start_code)}
