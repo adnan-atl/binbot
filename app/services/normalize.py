@@ -74,14 +74,35 @@ KIND_EMOJI = {"recycling": "\u267B\uFE0F", "general": "\U0001F5D1\uFE0F", "food"
               "garden": "\U0001F342", "glass": "\U0001F37E", "paper": "\U0001F4E6"}
 
 
+# When neither the council nor the bin's name gives a colour: the same defaults the website
+# draws its bin icons with, so both show the same colour.
+DEFAULT_COLOUR = {"recycling": "blue", "general": "black", "garden": "green", "food": "brown"}
+
+
 def bin_emoji(label: str, category: str | None = None, colour: str | None = None) -> str:
-    c = (colour or colour_of(label) or "").lower()
+    c = (colour or colour_of(label) or DEFAULT_COLOUR.get(category or "") or "").lower()
     return COLOUR_DOTS.get(c) or KIND_EMOJI.get(category or "", "\U0001F5D1\uFE0F")
 
 
+def _cap(t: str) -> str:
+    t = t.strip()
+    return t[:1].upper() + t[1:]
+
+
+def bin_name(label: str) -> str:
+    """The colour first, the kind in brackets, each starting with a capital:
+    'glass (black box or basket)' -> 'Black box or basket (Glass)',
+    'Mixed dry recycling (blue lidded bin)' -> 'Blue lidded bin (Mixed dry recycling)'.
+    Names without a bracketed colour just get a capital: 'household waste' -> 'Household waste'."""
+    m = re.fullmatch(r"\s*(.+?)\s*\((.+)\)\s*", label)
+    if m and colour_of(m.group(2)):
+        return f"{_cap(m.group(2))} ({_cap(m.group(1))})"
+    return _cap(label)
+
+
 def bin_tag(b: dict) -> str:
-    """'🔵 Mixed dry recycling' from a bin dict (label, category, optional colour)."""
-    return f"{bin_emoji(b['label'], b.get('category'), b.get('colour'))} {b['label']}"
+    """'🔵 Blue lidded bin (Mixed dry recycling)' from a bin dict (label, category, colour)."""
+    return f"{bin_emoji(b['label'], b.get('category'), b.get('colour'))} {bin_name(b['label'])}"
 
 
 def colour_of(label: str) -> str | None:

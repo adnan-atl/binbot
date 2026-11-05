@@ -24,7 +24,7 @@ from app.core.guard import allow
 from app.models import ChangeLog, ReminderMode, User, UserStatus, now
 from app.providers.messaging import send_reply
 from app.services import geo, signup
-from app.services.normalize import bin_emoji
+from app.services.normalize import bin_emoji, bin_name
 from app.services.reminders import DAY_BEFORE_TIMES, Reply, _clock, is_hi, parse_time, send_welcome
 
 log = logging.getLogger(__name__)
@@ -418,7 +418,7 @@ def _bins_reply(where: str, bins) -> Reply:
     for b in bins:
         if not b.enabled:
             continue
-        name = f"{bin_emoji(b.label, b.category, b.colour)} *{b.label}*"
+        name = f"{bin_emoji(b.label, b.category, b.colour)} *{bin_name(b.label)}*"
         days = " and ".join(_DAYS.get(d.upper()[:3], d) for d in b.days)
         freq = _FREQ.get(b.frequency, "")
         when = f"{freq} on {days}" if freq and days else (freq or (f"on {days}" if days else ""))
