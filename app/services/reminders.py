@@ -392,12 +392,13 @@ def welcome_share(user: User) -> str | None:
 
 def binjamin_card() -> dict:
     """Binjamin's contact card, sent after the share nudge for people to forward. With wa_id set,
-    WhatsApp shows it as the business account, with a Message button. Kept to name and number
-    (number written +447…, no spaces): iPhones wouldn't save the fuller version to Contacts."""
+    WhatsApp shows it as the business account, with a Message button."""
     s = get_settings()
     d = re.sub(r"\D", "", s.meta_display_number)
     return {"name": {"formatted_name": s.brand_name, "first_name": s.brand_name},
-            "phones": [{"phone": f"+{d}", "type": "MAIN", "wa_id": d}]}
+            "org": {"company": f"{s.brand_name} by {s.parent_name}"},
+            "phones": [{"phone": display_number(), "type": "WORK", "wa_id": d}],
+            "urls": [{"url": s.public_base_url.rstrip("/"), "type": "WORK"}]}
 
 
 def welcome_message(db: Session, user: User) -> str:

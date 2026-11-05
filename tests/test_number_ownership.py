@@ -189,7 +189,7 @@ def test_fourth_welcome_message_asks_them_to_share(client, db, live):
     assert len(db.scalars(select(Outbox).where(Outbox.kind == "welcome_more")).all()) == 3
     # then Binjamin's contact card, to forward
     card = db.scalar(select(Outbox).where(Outbox.kind == "welcome_card"))
-    assert card.body == "[Contact card: Binny +447700900999]"
+    assert card.body == "[Contact card: Binny +44 7700 900999]"
     assert db.get(User, uid).share_nudged_at  # no second share nudge later
 
 
@@ -200,7 +200,9 @@ def test_contact_card_payload(monkeypatch):
     get_settings.cache_clear()
     assert binjamin_card() == {
         "name": {"formatted_name": "Binny", "first_name": "Binny"},
-        "phones": [{"phone": "+447700900999", "type": "MAIN", "wa_id": "447700900999"}]}
+        "org": {"company": "Binny by Alfred"},
+        "phones": [{"phone": "+44 7700 900999", "type": "WORK", "wa_id": "447700900999"}],
+        "urls": [{"url": "http://localhost:8000", "type": "WORK"}]}
     get_settings.cache_clear()
 
 
