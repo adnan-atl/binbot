@@ -36,7 +36,8 @@ WINDOW = timedelta(hours=24)  # WhatsApp's free-reply window
 APPROVE = {"white_check_mark", "heavy_check_mark", "ballot_box_with_check"}  # ✅ ✔️ ☑️
 
 HUMAN_RE = re.compile(r"\b(human|real person|actual person|speak to (someone|somebody|a person)|"
-                      r"talk to (someone|somebody|a person)|agent|customer service)\b", re.I)
+                      r"talk to (someone|somebody|a person)|(speak|talk|chat) to (an? )?agent|live agent|"
+                      r"agent please|customer service)\b", re.I)
 HANDED_OVER = "I've passed this on to the team. Someone will reply here soon."
 
 

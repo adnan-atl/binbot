@@ -678,6 +678,15 @@ def collection_answer(db: Session, user: User, text: str) -> Reply | None:
                    if b["category"] == cat or re.search(rf"\b({rx})\b", b["label"].lower())]
             if hit:
                 return Reply(f"{_join(hit)}: next out on {fmt(d)}.{tail}")
+        from app.services.signup import bins_out
+
+        for b in bins_out(db, user):  # on their list, just not reminded about
+            if b.category == cat or re.search(rf"\b({rx})\b", b.label.lower()):
+                if not b.enabled:
+                    return Reply(f"You've turned off reminders for {b.label}. Tap Settings, then "
+                                 "My bins, to turn them back on.", buttons=[SETTINGS_BUTTON])
+                if b.daily:
+                    return Reply(f"{b.label} goes out every day, so I don't send reminders for it.")
         return Reply("I don't have that bin on your calendar. Tap Settings, then My bins, to see "
                      "the ones I remind you about.", buttons=[SETTINGS_BUTTON])
     today = datetime.now(ZoneInfo(get_settings().timezone)).date()
@@ -756,6 +765,10 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
 # When Binjamin doesn't understand: these take turns (per person), then a pointer to Settings.
 NOT_UNDERSTOOD = ("I'm afraid that's beyond my bin grade. I'm just here for the rubbish!",
                   "I'm just a humble bin butler. Rubbish is my speciality!")
+OPT_OUT_RE = re.compile(r"(please\s+)?(stop|unsubscribe|opt[ -]?out|cancel|end|quit|pause)"
+                        r"(\s+(please|it|now|all|everything|messaging( me)?|texting( me)?|"
+                        r"sending( me)?( messages)?|reminders|the reminders|my reminders))*"
+                        r"(\s+please)?[\s.!]*", re.IGNORECASE)
 FALLBACK_TAIL = "Tap Settings to change your bins or reminder time."
 FALLBACK = f"{NOT_UNDERSTOOD[0]} {FALLBACK_TAIL}"
 
@@ -763,15 +776,6 @@ FALLBACK = f"{NOT_UNDERSTOOD[0]} {FALLBACK_TAIL}"
 # Things people ask that Binjamin can't do, each with a reply that says so and points them the
 # right way. (pattern, reply, tell the team?) The first match wins; {council} is their council.
 _TOPICS = [
-    (r"^(no thanks|no thank you|no ta)\b", "No problem!", False),
-    (r"^(?!no\b).*\b(thanks|thank you|thank u|cheers|ta|nice one|great|perfect|brilliant|lovely)\b",
-     "You're welcome! \U0001F44B", False),
-    (r"^(hi|hello|hey|hiya|morning|evening|afternoon|yo)\b[\s!.]*$",
-     "Hi! I'll message you the evening before your next collection. Ask me \"when's my next "
-     "collection?\" any time.", False),
-    (r"\b(who are you|what are you|what is this|what's this|who is this|are you (a )?(bot|real|human))\b",
-     "I'm {brand}, by {parent}. I message you the evening before bin day with which bins to "
-     "put out.", False),
     (r"\b(missed|wasn'?t (collected|emptied|picked up)|weren'?t (collected|emptied)|"
      r"not (been )?(collected|emptied)|didn'?t (collect|empty|come)|never came|left my bin)\b",
      "Sorry about that. I can't report missed collections, but {council} can: search "
@@ -797,6 +801,15 @@ _TOPICS = [
      "I'm a bin butler, not a weatherman! I can only help with your bins.", False),
     (r"\b(council tax|energy|electricity|gas bill|broadband|insurance|mortgage|water bill|bills?)\b",
      "That's beyond my bin grade, sorry. I can only help with your bin collections.", True),
+    (r"^(no thanks|no thank you|no ta)\b", "No problem!", False),
+    (r"^(?!no\b).*\b(thanks|thank you|thank u|cheers|ta|nice one|great|perfect|brilliant|lovely)\b",
+     "You're welcome! \U0001F44B", False),
+    (r"^(hi|hello|hey|hiya|morning|evening|afternoon|yo)\b[\s!.]*$",
+     "Hi! I'll message you the evening before your next collection. Ask me \"when's my next "
+     "collection?\" any time.", False),
+    (r"\b(who are you|what are you|what is this|what's this|who is this|are you (a )?(bot|real|human))\b",
+     "I'm {brand}, by {parent}. I message you the evening before bin day with which bins to "
+     "put out.", False),
 ]
 
 
@@ -873,6 +886,11 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
 
     if wa_signup.wants(user):  # not signed up yet: sign up right here in WhatsApp
         return wa_signup.handle(db, phone, text, user) or ""
+    if is_hi(text) and user.status == UserStatus.stopped:  # the sign-up hi from a paused account
+        reply = _resume(db, user)
+        send_reply(db, phone, reply.text, kind="reply")
+        db.commit()
+        return reply.text
     if is_hi(text) and user.status == UserStatus.active:  # the sign-up hi, sent twice
         msg = 'Your reminders are already on. Message "settings" to change them.'
         send_reply(db, phone, msg, kind="reply")
@@ -886,12 +904,19 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     erase = _erase(db, user, phone, text)
     if erase:
         return erase
+    if OPT_OUT_RE.fullmatch(text.strip()):
+        text = "STOP"  # every way of saying stop works, as WhatsApp expects
     words = text.strip().upper().split()
     cmd = words[0] if words else ""
     last = db.scalar(
         select(Reminder).where(Reminder.user_id == user.id, Reminder.status == ReminderStatus.sent)
         .order_by(Reminder.sent_at.desc())
     )
+    # The latest reminder that reached them, whatever they did with it (Done / Snooze / Wrong on
+    # an older message still mean that collection)
+    latest = last or db.scalar(
+        select(Reminder).where(Reminder.user_id == user.id, Reminder.sent_at.is_not(None))
+        .order_by(Reminder.sent_at.desc()))
     reply = None
     to_inbox = None  # posted to the team's Slack inbox after replying (services/inbox.py)
     if cmd not in ("STOP", "START", "DONE", "SNOOZE", "WRONG") or len(words) > 1:
@@ -906,6 +931,14 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         last.status = ReminderStatus.done
         last.reply = "done"
         reply = Reply("Nice one. I'll be in touch before the next one.")
+    elif cmd == "DONE" and latest is not None and latest.status == ReminderStatus.snoozed:
+        # Done after Snooze, before the nudge came: done, and the nudge is called off
+        latest.status, latest.reply = ReminderStatus.done, "done"
+        for r in db.scalars(select(Reminder).where(
+                Reminder.user_id == user.id, Reminder.collection_date == latest.collection_date,
+                Reminder.status == ReminderStatus.scheduled)):
+            r.status = ReminderStatus.cancelled
+        reply = Reply("Nice one. I'll be in touch before the next one.")
     elif cmd == "DONE" and len(words) == 1 and db.scalar(
             select(Reminder.id).where(Reminder.user_id == user.id,
                                       Reminder.status == ReminderStatus.done)):
@@ -917,7 +950,11 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         db.add(Reminder(user_id=user.id, collection_date=last.collection_date, bins=last.bins,
                         send_at=datetime.now(ZoneInfo("UTC")) + timedelta(hours=2)))
         reply = Reply("No problem, I'll nudge you again in 2 hours.")
-    elif cmd == "WRONG" and last:
+    elif cmd == "SNOOZE" and len(words) == 1 and latest is not None \
+            and latest.status == ReminderStatus.snoozed:
+        reply = Reply("Already snoozed: I'll nudge you again soon.")
+    elif cmd == "WRONG" and latest is not None:
+        last = latest
         # A vote against the round's calendar: the monitor's dispute job (split.py) asks the
         # council about more homes on the street and splits the round if it's really two.
         last.reply = "wrong"
