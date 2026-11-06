@@ -207,11 +207,13 @@ def share_link(user: User) -> str:
 
 def share_message(user: User) -> str:
     """The message people forward to neighbours or their street's group chat. Sent on its own,
-    so forwarding it carries nothing else; the link shows a preview with Binjamin's picture."""
+    so forwarding it carries nothing else; the link shows a preview with Binjamin's picture.
+    Same words as the website's share screen."""
     s = get_settings()
-    return (f"Thought I'd share this little gem! {s.brand_name} is a free personal assistant on "
-            f"WhatsApp that connects to your council's data and tells you which bin to put out "
-            f"the evening before collection.\n\n{share_link(user)}")
+    return (f"\U0001F3A9 Thought you might like this little gem!\n\n{s.brand_name} is a free WhatsApp "
+            f"assistant that reminds you which bin to put out the evening before collection. Knows "
+            f"your council's schedule, so you don't have to!\n\nTakes a minute to set up: "
+            f"{share_link(user)}")
 
 
 SHARE_INTRO = "Help your community and become a certified Binfluencer \U0001F606 Forward my next message to your street's group chat or a friend."

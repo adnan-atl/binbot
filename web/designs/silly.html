@@ -1742,8 +1742,9 @@ Share to WhatsApp
   var WA_NUMBER = (($('#t-go').getAttribute('href') || '').match(/^https:\/\/wa\.me\/(\d+)/) || [])[1] || '';
   var copiedT = null;
   function shareParts() {
-    var parts = ['\u{1F916} Thought I\'d share this little gem! ' + BRAND + ' is a free personal assistant on WhatsApp that connects to your council\'s data and tells you which bin to put out the evening before collection.',
-                 '', 'Takes less than a minute to set up: https://' + link];
+    var parts = ['\u{1F3A9} Thought you might like this little gem!', '',
+                 BRAND + ' is a free WhatsApp assistant that reminds you which bin to put out the evening before collection. Knows your council\'s schedule, so you don\'t have to!',
+                 '', 'Takes a minute to set up: https://' + link];
     // Everyone goes to the website (tracked link, and the site shows who Binjamin is): no number.
     return parts;
   }

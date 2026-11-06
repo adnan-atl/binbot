@@ -45,7 +45,7 @@ def test_done_on_the_first_reminder_sends_the_share_link_once(client, db):
     intro, msg = _shares(db)
     code = db.get(User, uid).referral_code
     assert intro.body.startswith("Help your community and become a certified Binfluencer")
-    assert msg.body.startswith("Thought I'd share this little gem!")
+    assert msg.body.startswith("\U0001F3A9 Thought you might like this little gem!")
     assert msg.body.endswith(f"http://localhost:8000/r/{code}")
     assert db.get(User, uid).share_nudged_at
     _say(client, "DONE")

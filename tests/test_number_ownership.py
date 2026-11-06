@@ -190,8 +190,9 @@ def test_fourth_welcome_message_asks_them_to_share(client, db, live):
     # then the message to forward, on its own, with their tracked website link (no contact card)
     share = db.scalar(select(Outbox).where(Outbox.kind == "welcome_share"))
     code = db.get(User, uid).referral_code
-    assert share.body.startswith("Thought I'd share this little gem! Binny is a free personal "
-                                 "assistant on WhatsApp that connects to your council's data")
+    assert share.body.startswith("\U0001F3A9 Thought you might like this little gem!\n\nBinny is a "
+                                 "free WhatsApp assistant that reminds you which bin to put out "
+                                 "the evening before collection. Knows your council's schedule")
     assert share.body.endswith(f"/r/{code}")
     assert not db.scalars(select(Outbox).where(Outbox.kind == "welcome_card")).all()
     assert db.get(User, uid).share_nudged_at  # no second share nudge later

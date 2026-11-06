@@ -328,7 +328,7 @@ def test_share_from_settings_sends_the_link_message_then_the_card(client, db, ui
     db.expire_all()
     code = db.get(User, uid).referral_code
     [msg] = db.scalars(select(Outbox).where(Outbox.kind == "share")).all()
-    assert msg.body.startswith("Thought I'd share this little gem!") and msg.body.endswith(f"/r/{code}")
+    assert msg.body.startswith("\U0001F3A9 Thought you might like this little gem!") and msg.body.endswith(f"/r/{code}")
     assert db.scalar(select(Outbox).where(Outbox.kind == "share_card")).body.startswith("[Contact card: Binny")
     assert say(client, "share").startswith("Forward my next message")
     get_settings.cache_clear()
