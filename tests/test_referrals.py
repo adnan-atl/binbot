@@ -184,7 +184,7 @@ def test_share_link_counts_people_not_link_previews_and_opens_the_site(client, d
 
 def test_home_page_has_a_link_preview(client):
     page = client.get("/").text
-    assert 'property="og:image" content="http://localhost:8000/static/og.jpg?v=2"' in page
+    assert 'property="og:image" content="http://localhost:8000/static/og.jpg?v=3"' in page
     assert "connects to your council's data" in page
 
 
