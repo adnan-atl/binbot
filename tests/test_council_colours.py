@@ -11,7 +11,7 @@ from tests.test_share_nudge import _on
 def test_hammersmith_and_fulham_recycling_is_green():
     assert council_colour("E09000013", "recycling") == "green"
     assert council_colour("E09000013", "general") == "black"
-    assert council_colour("E09000013", "garden") is None  # not known: we ask
+    assert council_colour("E09000013", "glass") is None  # not known: we ask
     assert council_colour("E99999999", "recycling") is None
 
 
