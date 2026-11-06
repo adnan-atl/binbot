@@ -1085,7 +1085,14 @@ Share to WhatsApp
     PSTEPS[2] = step('Read the collection calendar', 'Reading the collection calendar', 'Read the collection calendar',
                      'Asking ' + (API.council || 'your council') + ' for your dates', 'Straight from ' + (API.council || 'your council'));
     PSTEPS[3] = step('Spot your bins', 'Spotting your bins', 'Spotted your bins', '', '');
-    setTimeout(function () { if (fetching) { PSTEPS[hold].sub = 'Some council websites are slow. Nearly there…'; drawParsing(Math.min(shown, hold)); } }, 8000);
+    // Slow councils: say so, in steps, instead of a spinner that looks stuck.
+    var who = API.council || 'Your council';
+    [[8000, 'Some council websites are slow. Hang on…'],
+     [15000, who + "'s website is taking its time. You only do this once."],
+     [30000, 'Still waiting on ' + who + '. Keep this page open, nearly there.']].forEach(function (s) {
+      // Only on the calendar line, and only while the council itself hasn't answered yet.
+      setTimeout(function () { if (fetching && hold === 2) { PSTEPS[2].sub = s[1]; drawParsing(Math.min(shown, hold)); } }, s[0]);
+    });
     go('parsing');
     req.then(function (j) {
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
