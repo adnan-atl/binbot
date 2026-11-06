@@ -436,7 +436,7 @@
     "source": "https://burnley.gov.uk/waste-recycling/recycling/",
     "quote": "Blue Bin/Box: plastics, cartons, tins and cans, glass ... Grey Bin/White Sack: paper, cardboard ... Brown Bin – Subscription required (garden)",
     "checked": "2026-11-06",
-    "note": "General waste bin colour not stated."
+    "note": "General waste colour: Google AI says black in one answer, grey in another; left blank."
   },
   "E08000002": {
     "council": "Bury",
@@ -454,22 +454,25 @@
     "council": "Caerphilly County Borough",
     "recycling": "brown",
     "general": "green",
+    "food": "green",
+    "garden": "green",
     "source": "caerphilly.gov.uk + myrecyclingwales.org.uk",
-    "quote": "\"Your green bin (or in some cases black bin) is to be used for all day-to-day rubbish\"; dry recycling \"from a brown bin or box\"",
+    "quote": "\"Your green bin (or in some cases black bin) is to be used for all day-to-day rubbish\"; dry recycling \"from a brown bin or box\" + council: green food caddies, green garden sacks",
     "checked": "2026-11-06",
-    "note": "Some homes have a black general bin. Food caddy colour not confirmed by council."
+    "note": "Some homes have a black general bin. Garden is green sacks."
   },
   "E08000033": {
     "council": "Calderdale",
     "recycling": "white",
+    "general": "black",
     "food": "brown",
     "garden": "green",
     "glass": "black",
     "paper": "green",
     "source": "new.calderdale.gov.uk",
-    "quote": "Brown food caddies; green sack for paper; white sack for plastics and cans; black box for glass; 240-litre green wheelie bin for garden",
+    "quote": "Brown food caddies; green sack for paper; white sack for plastics and cans; black box for glass; 240-litre green wheelie bin for garden + council Facebook/Google: black wheelie bin (blue sacks if no bin)",
     "checked": "2026-11-06",
-    "note": "General waste is a wheelie bin or bags; colour not stated."
+    "note": "Homes without a wheelie bin use blue sacks."
   },
   "E07000008": {
     "council": "Cambridge",
@@ -509,23 +512,26 @@
     "council": "Canterbury",
     "recycling": "blue",
     "general": "black",
+    "food": "orange",
     "garden": "green",
     "paper": "red",
     "source": "canterbury.gov.uk",
-    "quote": "Blue bin or box (glass, cans, plastics); \"Your red bin or box is for paper and card recycling only\"; Green bin (garden); Black bin or purple sacks",
+    "quote": "Blue bin or box (glass, cans, plastics); \"Your red bin or box is for paper and card recycling only\"; Green bin (garden); Black bin or purple sacks + binbosh and councilbincollection: orange-lidded food caddy",
     "checked": "2026-11-06",
     "note": "General can be purple sacks for some properties."
   },
   "W06000015": {
     "council": "Cardiff",
     "recycling": "red",
+    "general": "black",
     "food": "brown",
+    "garden": "green",
     "glass": "blue",
     "paper": "blue",
     "source": "cardiff.gov.uk + myrecyclingwales.org.uk",
-    "quote": "\"Plastic, cans, and Tetra Pak go in your red sack\"; \"Paper and carboard goes in your blue sack\"; \"Glass goes in your blue caddy\"; food \"from a brown caddy\"",
+    "quote": "\"Plastic, cans, and Tetra Pak go in your red sack\"; \"Paper and carboard goes in your blue sack\"; \"Glass goes in your blue caddy\"; food \"from a brown caddy\" + myrecyclingwales: \"black wheelie bin\"; council: \"maximum of 2 green bins\" (garden)",
     "checked": "2026-11-06",
-    "note": "Recycling and paper are sacks. General container colour not stated."
+    "note": "Recycling and paper are sacks. Some homes use black sacks instead of a bin."
   },
   "W06000010": {
     "council": "Carmarthenshire",
@@ -542,16 +548,19 @@
     "council": "Castle Point",
     "recycling": "pink",
     "general": "black",
+    "garden": "brown",
+    "glass": "green",
     "source": "castlepoint.gov.uk",
-    "quote": "\"all other recycling is put into your pink sack\"; black sacks (non-recyclable); paper and card now go in new blue sacks",
+    "quote": "\"all other recycling is put into your pink sack\"; black sacks (non-recyclable); paper and card now go in new blue sacks + council shop \"Green box (Glass)\"; brown 240L garden bin",
     "checked": "2026-11-06",
-    "note": "Glass box is green or yellow, so left blank. Paper moving to blue sacks; left blank until rolled out."
+    "note": "Paper moving to blue sacks; left blank until rolled out. Food caddy colour not stated."
   },
   "E06000056": {
     "council": "Central Bedfordshire",
     "general": "black",
+    "garden": "green",
     "source": "centralbedfordshire.gov.uk",
-    "quote": "\"Your black bin is for household waste that cannot be recycled\"",
+    "quote": "\"Your black bin is for household waste that cannot be recycled\" + Google (council): green garden waste bin",
     "checked": "2026-11-06",
     "note": "Recycling lid is green in the north, orange in the south, so left blank."
   },
@@ -559,11 +568,12 @@
     "council": "Charnwood",
     "recycling": "green",
     "general": "black",
+    "food": "grey",
     "garden": "brown",
     "source": "charnwood.gov.uk + binbosh.co.uk + councilbincollection.org",
-    "quote": "Council: caddy collected \"on the same day as your green or black bin\"; two guides agree: green recycling, black refuse, brown garden",
+    "quote": "Council: caddy collected \"on the same day as your green or black bin\"; two guides agree: green recycling, black refuse, brown garden + binbosh: \"Light grey 23-litre outdoor caddy\"",
     "checked": "2026-11-06",
-    "note": "Food caddy grey per one guide only; left blank."
+    "note": ""
   },
   "E07000070": {
     "council": "Chelmsford",
@@ -580,12 +590,15 @@
   },
   "E07000078": {
     "council": "Cheltenham",
+    "recycling": "green",
     "general": "green",
     "garden": "brown",
+    "glass": "green",
+    "paper": "blue",
     "source": "cheltenham.gov.uk",
-    "quote": "\"General waste: green wheelie bin\"; \"Garden waste: brown bin\"",
+    "quote": "\"General waste: green wheelie bin\"; \"Garden waste: brown bin\" + council: green boxes for plastics/tins and glass, blue bag for paper and card",
     "checked": "2026-11-06",
-    "note": "Recycling: one page says green boxes + blue card bag, another says blue-lidded bin + black box (service may be changing), so left blank."
+    "note": "Recycling is green boxes; blue bag for card and paper."
   },
   "E07000177": {
     "council": "Cherwell",
@@ -602,8 +615,9 @@
     "council": "Cheshire East",
     "recycling": "silver",
     "general": "black",
+    "food": "green",
     "source": "cheshireeast.gov.uk",
-    "quote": "\"Try to recycle as much as you can in your silver recycling bin\"; \"Your black bin is for general household waste\"",
+    "quote": "\"Try to recycle as much as you can in your silver recycling bin\"; \"Your black bin is for general household waste\" + council: green 23L food caddy (weekly food from early 2027)",
     "checked": "2026-11-06",
     "note": "Garden bin is green or brown, so left blank."
   },
