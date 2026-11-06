@@ -88,3 +88,11 @@ def test_ready_checks_database_and_scraper(client, monkeypatch):
     monkeypatch.setattr(httpx, "get", down)
     r = client.get("/api/ready")
     assert r.status_code == 503 and "scraper" in r.json()["detail"]
+
+
+def test_browser_sessions_match_on_both_sides():
+    yaml = pytest.importorskip("yaml")
+    sv = yaml.safe_load((DEPLOY / "docker-compose.prod.yml").read_text())["services"]
+    assert int(sv["scraper"]["environment"]["BROWSER_SESSIONS"]) == \
+        int(sv["selenium"]["environment"]["SE_NODE_MAX_SESSIONS"])
+    assert sv["selenium"].get("mem_limit")  # a runaway browser can't take the whole server

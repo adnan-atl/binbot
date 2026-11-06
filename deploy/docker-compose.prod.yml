@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
     environment:
       SELENIUM_URL: http://selenium:4444
-      BROWSER_SESSIONS: 2                # keep equal to SE_NODE_MAX_SESSIONS below
+      BROWSER_SESSIONS: 3                # keep equal to SE_NODE_MAX_SESSIONS below (2 CPUs: 3 is the most that helps)
       SCRAPE_TIMEOUT_SECONDS: 90
       HOME: /tmp
     # Only the proxy address (COUNCIL_PROXY_URL), for councils that block cloud servers. Optional.
@@ -72,8 +72,9 @@ services:
     image: selenium/standalone-chromium:4.48.0-20260905  # pinned; bump on purpose
     restart: unless-stopped
     shm_size: 1g
+    mem_limit: 2g                          # ~350MB a session: room for 3, never the whole server
     environment:
-      SE_NODE_MAX_SESSIONS: 2              # keep equal to BROWSER_SESSIONS in .env.production
+      SE_NODE_MAX_SESSIONS: 3              # keep equal to BROWSER_SESSIONS in the scraper service above
       SE_NODE_OVERRIDE_MAX_SESSIONS: "true"
 
   # HTTPS for DOMAIN, certificates from Let's Encrypt, renewed automatically.
