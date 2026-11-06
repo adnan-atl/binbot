@@ -18,7 +18,8 @@ _RULES: list[tuple[BinCategory, tuple[str, ...]]] = [
     (
         BinCategory.general,
         ("general", "refuse", "residual", "rubbish", "household", "black", "grey", "gray",
-         "landfill", "non-recycl", "domestic waste", "waste bin"),
+         "landfill", "non-recycl", "domestic waste", "waste bin",
+         "waste"),  # last: plain "Waste" (Hammersmith & Fulham); food/garden waste match earlier
     ),
 ]
 
@@ -91,7 +92,8 @@ DEFAULT_COLOUR = {"recycling": "blue", "general": "black", "garden": "green", "f
 
 def bin_emoji(label: str, category: str | None = None, colour: str | None = None) -> str:
     c = (colour or colour_of(label) or DEFAULT_COLOUR.get(category or "") or "").lower()
-    return COLOUR_DOTS.get(c) or KIND_EMOJI.get(category or "", "\U0001F5D1\uFE0F")
+    # A bin we can't place still gets a dot, never a wastebasket (Tom: dots read better)
+    return COLOUR_DOTS.get(c) or KIND_EMOJI.get(category or "", "\u26AB")
 
 
 def _cap(t: str) -> str:
@@ -110,9 +112,26 @@ def bin_name(label: str) -> str:
     return _cap(label)
 
 
+# Council names for the everyday rubbish bin. Without a colour of their own they're all shown
+# as one name, so nobody sees "Household waste" with "General waste" underneath.
+_GENERAL_NAMES = re.compile(
+    r"(general|household|domestic|residual|non[\s-]?recyclable)?\s*(waste|refuse|rubbish)"
+    r"(\s+(bin|collection|waste))*|non[\s-]?recyclable(\s+\w+)*|refuse|rubbish|waste", re.I)
+
+
+def display_label(label: str, category: str | None = None) -> str:
+    """How a bin is named to the resident, on the site and in messages (via bin_tag):
+    the council's name with a capital, except the everyday bin without a colour of its own,
+    which is always 'General waste (black bin)' (black: the same default as its dot)."""
+    if category == "general" and not colour_of(label) and _GENERAL_NAMES.fullmatch(label.strip()):
+        return f"General waste ({DEFAULT_COLOUR['general']} bin)"
+    return _cap(label)
+
+
 def bin_tag(b: dict) -> str:
     """'🔵 Blue lidded bin (Mixed dry recycling)' from a bin dict (label, category, colour)."""
-    return f"{bin_emoji(b['label'], b.get('category'), b.get('colour'))} {bin_name(b['label'])}"
+    label = display_label(b["label"], b.get("category"))
+    return f"{bin_emoji(label, b.get('category'), b.get('colour'))} {bin_name(label)}"
 
 
 def colour_of(label: str) -> str | None:

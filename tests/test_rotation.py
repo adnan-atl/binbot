@@ -22,11 +22,11 @@ def test_upcoming_dates_for_weekly_and_fortnightly_bins(client, db, monkeypatch)
 
     iso = lambda ds: [d.isoformat() for d in ds]
     assert bins["Recycling"]["upcoming"] == iso(weeks(wed, 1, 4))
-    assert bins["Residual waste"]["upcoming"] == iso(weeks(wed, 2, 4))
+    assert bins["General waste (black bin)"]["upcoming"] == iso(weeks(wed, 2, 4))
     assert bins["Garden waste"]["upcoming"] == iso(weeks(wed + timedelta(weeks=1), 2, 4))
     # Residual and garden take turns: never on the same Wednesday
-    assert not set(bins["Residual waste"]["upcoming"]) & set(bins["Garden waste"]["upcoming"])
-    assert bins["Residual waste"]["next"] == wed.isoformat()
+    assert not set(bins["General waste (black bin)"]["upcoming"]) & set(bins["Garden waste"]["upcoming"])
+    assert bins["General waste (black bin)"]["next"] == wed.isoformat()
 
 
 def test_manual_bins_get_upcoming_dates_too(client, db, monkeypatch):
