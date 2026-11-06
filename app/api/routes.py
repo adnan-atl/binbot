@@ -345,11 +345,11 @@ def get_referral(user_id: str, db: Session = Depends(get_db)):
     count = db.scalar(select(func.count()).select_from(Referral)
                       .where(Referral.referrer_id == user.id)) or 0
     level, name, nxt = level_for(count)
-    link = f"{get_settings().public_base_url}/?ref={user.referral_code}"
+    from app.services.reminders import share_link, share_message
+
     return S.ReferralOut(
-        code=user.referral_code, link=link, referrals=count, level=level, level_name=name,
-        next_at=nxt,
-        share_text=f"I use {get_settings().brand_name} for bin day reminders on WhatsApp. Sign up with your postcode: {link}",
+        code=user.referral_code, link=share_link(user), referrals=count, level=level,
+        level_name=name, next_at=nxt, share_text=share_message(user),
     )
 
 

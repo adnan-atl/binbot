@@ -4,7 +4,7 @@ import logging
 import re
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -35,7 +35,7 @@ WEB = Path(__file__).resolve().parent.parent / "web"
 def render_index(page: Path | None = None) -> str:
     """The page with the brand and links filled in. Read on every request, so edits to web/
     (mounted into the container) show on refresh. {{BRAND}}, {{PARENT_NAME}}, {{PARENT_URL}},
-    {{PRIVACY_URL}}, {{TERMS_URL}} and {{WA_HI_LINK}} are for HTML text and attributes; {{BRAND_JSON}} is a JS
+    {{PRIVACY_URL}}, {{TERMS_URL}}, {{PUBLIC_URL}} and {{WA_HI_LINK}} are for HTML text and attributes; {{BRAND_JSON}} is a JS
     string literal, safe inside <script>."""
     s = get_settings()
     page = (page or WEB / "index.html").read_text(encoding="utf-8")
@@ -47,7 +47,8 @@ def render_index(page: Path | None = None) -> str:
     # The "Say hello" button's WhatsApp link (same for everyone: no code in it). Empty without a
     # business number (local, demo): the page then turns reminders on directly.
     wa_hi = start_link() if s.meta_display_number else ""
-    for token, value in (("WA_HI_LINK", wa_hi), ("BRAND", s.brand_name), ("PARENT_NAME", s.parent_name),
+    for token, value in (("WA_HI_LINK", wa_hi), ("PUBLIC_URL", s.public_base_url.rstrip("/")),
+                         ("BRAND", s.brand_name), ("PARENT_NAME", s.parent_name),
                          ("PARENT_URL", s.parent_url), ("PRIVACY_URL", s.privacy_url),
                          ("TERMS_URL", s.terms_url)):
         page = page.replace("{{" + token + "}}", html.escape(value))
@@ -68,44 +69,34 @@ if WEB.exists():
             return HTMLResponse(render_index(page))
         return HTMLResponse(render_index())
 
-    @app.get("/s/{code}", include_in_schema=False)
-    def share_tap(code: str):
-        """The Share button in the welcome: counts the tap (ChangeLog "share_tap" on that
-        person), then opens WhatsApp's "send to…" screen with the share message ready."""
-        from urllib.parse import quote
-
+    @app.get("/r/{code}", include_in_schema=False)
+    @app.get("/s/{code}", include_in_schema=False)  # old Share-button links
+    @app.get("/w/{code}", include_in_schema=False)  # old WhatsApp invite links
+    def referral_link(code: str, request: Request):
+        """Someone's share link (binjamin.uk/r/<code>): counts the visit (ChangeLog "ref_visit" on
+        whoever shared it), then opens the website with the referral saved, so their friend's
+        sign-up is credited to them. Link-preview fetches (WhatsApp, Facebook) aren't counted."""
         from sqlalchemy import select
 
         from app.core.db import session_factory
         from app.models import ChangeLog, User
-        from app.services.reminders import share_message
 
-        if re.fullmatch(r"[A-Za-z0-9_-]{4,12}", code):
+        if not re.fullmatch(r"[A-Za-z0-9_-]{4,12}", code):
+            return RedirectResponse("/", status_code=302)
+        agent = request.headers.get("user-agent", "")
+        if not re.search(r"WhatsApp|facebookexternalhit|Facebot|bot|crawl|preview", agent, re.I):
             db = session_factory()()
             try:
                 u = db.scalar(select(User).where(User.referral_code == code))
                 if u is not None:
-                    db.add(ChangeLog(scope="user", scope_id=u.id, kind="share_tap", diff={}))
+                    db.add(ChangeLog(scope="user", scope_id=u.id, kind="ref_visit", diff={}))
                     db.commit()
             except Exception:
-                logging.getLogger(__name__).exception("share tap not recorded")
+                logging.getLogger(__name__).exception("referral visit not recorded")
                 db.rollback()
             finally:
                 db.close()
-        return RedirectResponse("https://wa.me/?text=" + quote(share_message()), status_code=302)
-
-    @app.get("/w/{code}", include_in_schema=False)
-    def whatsapp_invite(code: str):
-        """Someone's personal WhatsApp invite (binjamin.uk/w/<code>): opens a chat with Binjamin
-        with "Hey Binjamin 👋 (invited by a neighbour, ref <code>)" ready to send. Without a
-        business number (local), the website invite instead."""
-        from app.services.reminders import invite_wa_link
-
-        if not re.fullmatch(r"[A-Za-z0-9_-]{4,12}", code):
-            return RedirectResponse("/", status_code=302)
-        if not get_settings().meta_display_number:
-            return RedirectResponse(f"/?ref={code}", status_code=302)
-        return RedirectResponse(invite_wa_link(code), status_code=302)
+        return RedirectResponse(f"/?ref={code}", status_code=302)
 
     @app.get("/d/{name}", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/d/{name}/about", include_in_schema=False, response_class=HTMLResponse)

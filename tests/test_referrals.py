@@ -139,11 +139,10 @@ def test_whatsapp_invite_link_credits_the_sharer(client, db, monkeypatch):
     sharer = signup(client)["user_id"]
     _activate(client, sharer, "07700900123")
     code = client.get(f"/api/users/{sharer}/referral").json()["code"]
-    # binjamin.uk/w/<code> opens WhatsApp with the invite ready to send
+    # old binjamin.uk/w/<code> invites now open the website, with the referral saved
     r = client.get(f"/w/{code}", follow_redirects=False)
-    assert r.status_code == 302 and r.headers["location"].startswith("https://wa.me/447700900999?text=")
-    assert code in r.headers["location"]
-    # the friend sends it, then signs up in the chat
+    assert r.status_code == 302 and r.headers["location"] == f"/?ref={code}"
+    # an old invite message sent from WhatsApp still credits them
     friend = "+447700900555"
     say = lambda t: client.post("/api/inbound", json={"phone": friend, "text": t}).json()["reply"]
     assert say(invite_text(code)).endswith("What's your postcode?")
@@ -167,3 +166,23 @@ def test_signed_up_person_tapping_an_invite_gets_their_own_link(client, db):
     say = lambda t: client.post("/api/inbound", json={"phone": "+447700900123", "text": t}).json()["reply"]
     assert say(invite_text(code)).startswith(
         "You're already signed up, so no need for an invite \U0001F44D Share me with friends")
+
+
+def test_share_link_counts_people_not_link_previews_and_opens_the_site(client, db):
+    from app.models import ChangeLog
+    sharer = signup(client)["user_id"]
+    code = client.get(f"/api/users/{sharer}/referral").json()["code"]
+    assert client.get(f"/api/users/{sharer}/referral").json()["link"].endswith(f"/r/{code}")
+    r = client.get(f"/r/{code}", follow_redirects=False,
+                   headers={"user-agent": "WhatsApp/2.24.1 A"})  # the preview fetch
+    assert r.status_code == 302 and r.headers["location"] == f"/?ref={code}"
+    client.get(f"/r/{code}", follow_redirects=False, headers={"user-agent": "Mozilla/5.0 (iPhone)"})
+    db.expire_all()
+    assert len(db.scalars(select(ChangeLog).where(ChangeLog.kind == "ref_visit",
+                                                  ChangeLog.scope_id == sharer)).all()) == 1
+
+
+def test_home_page_has_a_link_preview(client):
+    page = client.get("/").text
+    assert 'property="og:image" content="http://localhost:8000/static/og.jpg"' in page
+    assert "connects to your council's data" in page

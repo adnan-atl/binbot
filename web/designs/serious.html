@@ -1402,14 +1402,15 @@ Share to WhatsApp
     $('#b-badge').textContent = 'Reminders on' + (phone ? ' for ' + phone : '') + ' · ' + (when === 'night' ? 'evening before, ' : 'morning of, ') + time;
   }
   // Placeholder until the real invite link comes back from the API (demo mode keeps it).
-  if (!$('#link').value) $('#link').value = location.host + '/?ref=[CODE]';
+  if (!$('#link').value) $('#link').value = location.host + '/r/[CODE]';
   var link = $('#link').value;
   // Ready-made share messages, shown as the WhatsApp bubble neighbours will see. "Try another"
   // (or a swipe) changes it; Share opens WhatsApp with it and the invite link. Edit or add here.
   var MSGS = [
-    'Where have you bin all my life? 😍 This little bot tells you which bin to put out, the evening before collection. Add it to your WhatsApp:',
-    'Never miss a bin day again 🗑️ ' + BRAND + ' tells you which bin to put out, the evening before collection. Add it to your WhatsApp:',
-    'Hi neighbours! 👋 Anyone else always forgetting which bin goes out? I\'ve started using ' + BRAND + ', it tells me which bin to put out the evening before collection. Add it to your WhatsApp:'
+    'Thought I\'d share this little gem! ' + BRAND + ' is a free personal assistant on WhatsApp that connects to your council\'s data and tells you which bin to put out the evening before collection.',
+    'Where have you bin all my life? 😍 This little bot connects to your council\'s data and tells you which bin to put out, the evening before collection. Add it to your WhatsApp:',
+    'Never miss a bin day again 🗑️ ' + BRAND + ' connects to your council\'s data and tells you which bin to put out, the evening before collection. Add it to your WhatsApp:',
+    'Hi neighbours! 👋 Anyone else always forgetting which bin goes out? I\'ve started using ' + BRAND + ', it connects to our council\'s data and tells me which bin to put out the evening before collection. Add it to your WhatsApp:'
   ];
   var msgAt = 0, copiedT = null;
   function shareText() { return MSGS[msgAt] + ' https://' + link; }

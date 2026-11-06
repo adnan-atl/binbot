@@ -199,12 +199,27 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
 # ---- "share with neighbours": once, after they've had their first reminder --------------------
 
 def share_link(user: User) -> str:
-    return f"{get_settings().public_base_url}/?ref={user.referral_code}"
+    """binjamin.uk/r/<code>: counts the tap and opens the website with the referral saved
+    (app/main.py). Every share, WhatsApp or website, sends people here: the site shows who
+    Binjamin is, and sign-ups through it are credited to whoever shared."""
+    return f"{get_settings().public_base_url.rstrip('/')}/r/{user.referral_code}"
+
+
+def share_message(user: User) -> str:
+    """The message people forward to neighbours or their street's group chat. Sent on its own,
+    so forwarding it carries nothing else; the link shows a preview with Binjamin's picture."""
+    s = get_settings()
+    return (f"Thought I'd share this little gem! {s.brand_name} is a free personal assistant on "
+            f"WhatsApp that connects to your council's data and tells you which bin to put out "
+            f"the evening before collection.\n\n{share_link(user)}")
+
+
+SHARE_INTRO = "Help your community and become a certified Binfluencer \U0001F606 Forward my next message to your street's group chat or a friend."
 
 
 def share_text(user: User) -> str:
-    return (f"If you want to share {get_settings().brand_name} with neighbours or friends, send "
-            f"them this link: {share_link(user)}")
+    """The share nudge as one text (the template's fallback body)."""
+    return f"If you want to share {get_settings().brand_name} with neighbours or friends, send them this link: {share_link(user)}"
 
 
 def _wants_share(user: User) -> bool:
@@ -219,9 +234,19 @@ def share_after_done(db: Session, user: User, phone: str) -> bool:
     so the nudge goes now as free text (no template, no charge)."""
     if not _wants_share(user):
         return False
-    send_message(db, phone, share_text(user), kind="share")
+    send_share(db, phone, user, kind="share")
     user.share_nudged_at = datetime.now(ZoneInfo("UTC"))
     return True
+
+
+def send_share(db: Session, phone: str, user: User, kind: str, intro: str = SHARE_INTRO) -> None:
+    """The intro, then the message to forward as its own bubble."""
+    import time
+
+    send_message(db, phone, intro, kind=kind)
+    if get_provider().name == "meta":
+        time.sleep(0.7)  # keep them in order
+    send_message(db, phone, share_message(user), kind=kind)
 
 
 def share_nudges(db: Session, now_utc: datetime | None = None) -> int:
@@ -336,15 +361,9 @@ def invite_text(code: str) -> str:
 
 
 def invite_wa_link(code: str) -> str:
-    """wa.me link with invite_text() ready to send. Long, so messages use invite_short_link."""
+    """wa.me link with invite_text() ready to send (only old invites still use it)."""
     digits = re.sub(r"\D", "", get_settings().meta_display_number)
     return f"https://wa.me/{digits}?text={quote(invite_text(code))}"
-
-
-def invite_short_link(code: str) -> str:
-    """binjamin.uk/w/<code>: redirects to invite_wa_link (app/main.py). Tidy enough to send."""
-    host = re.sub(r"^https?://", "", get_settings().public_base_url).rstrip("/")
-    return f"{host}/w/{code}"
 
 
 def _already_invited(user: User, code: str) -> str:
@@ -361,32 +380,15 @@ def local_number() -> str:
     return f"0{d[2:6]} {d[6:]}" if d.startswith("44") and len(d) == 12 else display_number()
 
 
-def share_message() -> str:
-    """What the Share button puts in WhatsApp's "send to…" screen. No referral link: the number
-    and the plain site, so it reads like a tip from a friend, not marketing."""
-    s = get_settings()
-    site = re.sub(r"^https?://", "", s.public_base_url).rstrip("/")
-    return (f"Thought I'd share this little gem! {s.brand_name} is a free personal assistant on "
-            f"WhatsApp that tells you which bin to put out the evening before collection. Just "
-            f"WhatsApp {s.brand_name} on {local_number()}\n\n{site}")
-
-
-def share_button_url(user: User) -> str:
-    """The Share button's link: binjamin.uk/s/<code>, which counts the tap and opens WhatsApp's
-    "send to…" screen with share_message() (app/main.py)."""
-    return f"{get_settings().public_base_url.rstrip('/')}/s/{user.referral_code}"
-
-
 def welcome_share(user: User) -> str | None:
-    """The fourth welcome message: share Binjamin with neighbours or the street group, with a
-    Share button underneath (share_button_url). Only for people who didn't opt out of hearing
-    from us, and only once there's a business number. It counts as their one share nudge
-    (share_nudges)."""
+    """The fourth welcome message: asks them to forward the next one (share_message, with their
+    tracked link) to neighbours or the street group. Only for people who didn't opt out of
+    hearing from us, and only once there's a business number. It counts as their one share
+    nudge (share_nudges)."""
     s = get_settings()
     if not re.sub(r"\D", "", s.meta_display_number) or user.marketing_consent_at is None:
         return None
-    return ("Help your community and become a certified Binfluencer \U0001F606 Forward my card "
-            "below to your street's group chat or a friend.")
+    return SHARE_INTRO
 
 
 def binjamin_card() -> dict:
@@ -415,7 +417,8 @@ def tomorrow_note(db: Session, user: User, now: datetime | None = None) -> str |
 def welcome_message(db: Session, user: User) -> str:
     """The whole welcome as one text (what the API and tests return)."""
     note = tomorrow_note(db, user)
-    return "\n\n".join(welcome_parts(db, user) + ([note] if note else []))
+    share = [share_message(user)] if welcome_share(user) else []
+    return "\n\n".join(welcome_parts(db, user) + share + ([note] if note else []))
 
 
 def send_welcome(db: Session, phone: str, user: User) -> str:
@@ -432,10 +435,10 @@ def send_welcome(db: Session, phone: str, user: User) -> str:
         if i and real:
             time.sleep(0.7)  # WhatsApp doesn't promise order: a beat apart keeps them in sequence
         send_message(db, phone, part, kind="welcome" if i == 0 else "welcome_more")
-        if share and part == share:  # then Binjamin's card, to forward on
+        if share and part == share:  # then the message to forward, with their tracked link
             if real:
                 time.sleep(0.7)
-            send_contact(db, phone, binjamin_card(), kind="welcome_card")
+            send_message(db, phone, share_message(user), kind="welcome_share")
     note = tomorrow_note(db, user)
     if note:  # tomorrow's reminder time has already gone: say it now, last
         if real:
@@ -543,7 +546,7 @@ class Reply:
     buttons: list = field(default_factory=list)
     list_button: str = ""
     sections: list = field(default_factory=list)
-    card: bool = False  # follow it with Binjamin's contact card (to forward on)
+    share: bool = False  # follow it with the message to forward (share_message), then the card
 
 
 SETTINGS_BUTTON = ("menu:settings", "Settings")
@@ -589,8 +592,9 @@ _OFF_NOTE = " Reminders are paused at the moment. Reply START to turn them back 
 # ---- menus -------------------------------------------------------------------------------------
 
 def share_reply() -> Reply:
-    """Settings → Share Binjamin (or typed "share"): Binjamin's card follows, to forward."""
-    return Reply("Forward my card below to your street's group chat or a friend \U0001F447", card=True)
+    """Settings → Share Binjamin (or typed "share"): the message to forward follows, with their
+    tracked link, then Binjamin's card for anyone who'd rather forward that."""
+    return Reply("Forward my next message to your street's group chat or a friend \U0001F447", share=True)
 
 
 def settings_menu(db: Session, user: User) -> Reply:
@@ -604,7 +608,7 @@ def settings_menu(db: Session, user: User) -> Reply:
     rows = [("menu:time", "Reminder time", "When I message you the evening before"),
             ("menu:bins", "My bins", "Turn bins on or off"),
             ("menu:wrong", "Wrong collection day", "Tell us your days don't match"),
-            ("menu:share", f"Share {get_settings().brand_name}"[:24], "Send my card to neighbours"),
+            ("menu:share", f"Share {get_settings().brand_name}"[:24], "Send me to your neighbours"),
             last,
             ("menu:delete", "Delete my data", "Remove your account for good")]
     return Reply(text, list_button="Settings", sections=[("Settings", rows)])
@@ -1116,8 +1120,16 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             _mark_announced(news[1], datetime.now(ZoneInfo("UTC")))
     send_reply(db, phone, reply.text, kind="reply", buttons=reply.buttons,
                list_button=reply.list_button, sections=reply.sections)
-    if reply.card and re.sub(r"\D", "", get_settings().meta_display_number):
-        send_contact(db, phone, binjamin_card(), kind="share_card")
+    if reply.share:
+        real = get_provider().name == "meta"
+        import time as _time
+        if real:
+            _time.sleep(0.7)
+        send_message(db, phone, share_message(user), kind="share")
+        if re.sub(r"\D", "", get_settings().meta_display_number):
+            if real:
+                _time.sleep(0.7)
+            send_contact(db, phone, binjamin_card(), kind="share_card")
     if cmd == "DONE" and last and len(words) == 1:
         share_after_done(db, user, phone)
     db.commit()

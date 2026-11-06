@@ -167,7 +167,7 @@ Hope that made bin day easier. If you want to share {{1}} with neighbours or fri
 | Variable | Meaning | Sample |
 |---|---|---|
 | `{{1}}` | the product name | `Binjamin` |
-| `{{2}}` | their invite link | `https://binjamin.uk/?ref=ab12cd34` |
+| `{{2}}` | their invite link (counts the tap, then opens the website) | `https://binjamin.uk/r/ab12cd34` |
 
 Once approved, set `META_SHARE_TEMPLATE=bin_share` in the server's `.env` and restart.
 

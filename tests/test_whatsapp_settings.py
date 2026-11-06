@@ -76,7 +76,7 @@ def test_parse_time_rejects_nonsense(raw):
 
 
 MENU = ("\nSettings:\n- Reminder time (When I message you the evening before)\n- My bins (Turn bins on or off)\n"
-        "- Wrong collection day (Tell us your days don't match)\n- Share Binny (Send my card to neighbours)\n- {}\n"
+        "- Wrong collection day (Tell us your days don't match)\n- Share Binny (Send me to your neighbours)\n- {}\n"
         "- Delete my data (Remove your account for good)")
 
 
@@ -319,13 +319,16 @@ def test_webhook_routes_button_and_list_taps(client, db, uid):
     assert last_sent(db).startswith("Your reminders: the evening before at 8pm (paused).")
 
 
-def test_share_from_settings_sends_the_card(client, db, uid, monkeypatch):
+def test_share_from_settings_sends_the_link_message_then_the_card(client, db, uid, monkeypatch):
     from app.core.config import get_settings
     from app.models import Outbox
     monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
     get_settings.cache_clear()
-    assert say(client, "menu:share") == "Forward my card below to your street's group chat or a friend \U0001F447"
+    assert say(client, "menu:share") == "Forward my next message to your street's group chat or a friend \U0001F447"
     db.expire_all()
+    code = db.get(User, uid).referral_code
+    [msg] = db.scalars(select(Outbox).where(Outbox.kind == "share")).all()
+    assert msg.body.startswith("Thought I'd share this little gem!") and msg.body.endswith(f"/r/{code}")
     assert db.scalar(select(Outbox).where(Outbox.kind == "share_card")).body.startswith("[Contact card: Binny")
-    assert say(client, "share").startswith("Forward my card below")
+    assert say(client, "share").startswith("Forward my next message")
     get_settings.cache_clear()

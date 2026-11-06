@@ -42,13 +42,14 @@ def test_done_on_the_first_reminder_sends_the_share_link_once(client, db):
     uid = _on(client)
     _send_first(db, uid)
     _say(client, "DONE")
-    [msg] = _shares(db)
+    intro, msg = _shares(db)
     code = db.get(User, uid).referral_code
-    assert msg.body == ("If you want to share Binny with neighbours or friends, send them this "
-                        f"link: http://localhost:8000/?ref={code}")
+    assert intro.body.startswith("Help your community and become a certified Binfluencer")
+    assert msg.body.startswith("Thought I'd share this little gem!")
+    assert msg.body.endswith(f"http://localhost:8000/r/{code}")
     assert db.get(User, uid).share_nudged_at
     _say(client, "DONE")
-    assert len(_shares(db)) == 1
+    assert len(_shares(db)) == 2
 
 
 def test_day_after_the_first_collection_if_they_never_tapped_done(client, db):
@@ -103,7 +104,7 @@ def test_real_whatsapp_waits_for_the_approved_template(client, db, monkeypatch):
     get_settings.cache_clear()
     assert share_nudges(db, now_utc=nxt) == 1
     code = db.get(User, uid).referral_code
-    assert fake.sent == ("bin_share", ["Binny", f"http://localhost:8000/?ref={code}"])
+    assert fake.sent == ("bin_share", ["Binny", f"http://localhost:8000/r/{code}"])
 
 
 def test_done_tapped_twice_just_says_already_sorted(client, db):

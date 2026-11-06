@@ -1722,7 +1722,7 @@ Share to WhatsApp
     $('#b-badge').textContent = 'Reminders on' + (phone ? ' for ' + phone : '') + ' · ' + (when === 'night' ? 'evening before, ' : 'morning of, ') + (time || '7:00pm');
   }
   // Placeholder until the real invite link comes back from the API (demo mode keeps it).
-  if (!$('#link').value) $('#link').value = location.host + '/?ref=[CODE]';
+  if (!$('#link').value) $('#link').value = location.host + '/r/[CODE]';
   var link = $('#link').value;
   // The share message, shown as the WhatsApp bubble neighbours will see. Share opens WhatsApp
   // with it; tapping the bubble copies it. The website link carries their invite code; the

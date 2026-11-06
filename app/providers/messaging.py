@@ -67,7 +67,9 @@ class MetaProvider:
 
     def send(self, to_phone: str, body: str) -> SendResult:
         """Free text: only delivered inside the 24-hour window after the user's last message."""
-        return self._post({"to": to_phone.lstrip("+"), "type": "text", "text": {"body": body}})
+        # A link in the text gets WhatsApp's preview card (Binjamin's picture for binjamin.uk links)
+        text = {"body": body, **({"preview_url": True} if "https://" in body else {})}
+        return self._post({"to": to_phone.lstrip("+"), "type": "text", "text": text})
 
     def send_template(self, to_phone: str, name: str, lang: str, body_params: list[str],
                       buttons=False) -> SendResult:
