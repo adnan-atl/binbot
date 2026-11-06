@@ -87,3 +87,10 @@ def test_silly_phone_step_consent_wording(client, monkeypatch):
             "services within the Alfred family.") in page
     assert "Tick here to opt out of other Alfred household services" in page
     assert 'id="no-offers" type="checkbox"' in page
+
+
+def test_the_original_page_lives_on_at_og(client):
+    # The first live page (silly) is kept as /d/og; oat is the main experience now
+    og, silly = client.get("/d/og"), client.get("/d/silly")
+    assert og.status_code == 200 and og.text == silly.text
+    assert client.get("/d/oat").status_code == 200

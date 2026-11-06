@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     # Error alerts (sentry.io, EU region). Empty = off.
     sentry_dsn: str = ""
     # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.
-    # Which page the home page (/) shows: a design in web/designs (e.g. "silly"), or empty for
+    # Which page the home page (/) shows: a design in web/designs ("oat"; the original page is "og"), or empty for
     # web/index.html. Every design stays reachable at /d/<name>.
     home_design: str = ""
     brand_name: str = "Binjamin"
