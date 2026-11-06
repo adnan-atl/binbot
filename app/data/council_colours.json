@@ -2345,6 +2345,25 @@
     "checked": "2026-11-06",
     "note": "Estates use communal bins with green flaps. Food container colour not stated."
   },
+  "E06000054": {
+    "council": "Wiltshire",
+    "recycling": "blue",
+    "glass": "black",
+    "options": {
+      "general": [
+        "black",
+        "grey"
+      ],
+      "garden": [
+        "green",
+        "brown"
+      ]
+    },
+    "source": "wiltshire.gov.uk + Google (council)",
+    "quote": "\"a blue-lidded bin for paper, cardboard, certain types of plastics\"; grey-lidded bin for household waste; black recycling box for glass; garden bin green-lidded or brown",
+    "checked": "2026-11-06",
+    "note": "General bin has a grey lid (body often black) and a resident picked black, so we ask between black and grey. Garden green-lidded or brown."
+  },
   "E07000128": {
     "council": "Wyre",
     "recycling": "red",
