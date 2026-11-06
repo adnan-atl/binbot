@@ -1547,13 +1547,13 @@ Share to WhatsApp
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
     var empty = !bins.length;
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
-      : editing ? 'Edit your bins' : "Your calendar is ready<br><span>Looks right?</span>";
+      : editing ? 'Edit your bins' : 'Check these are right';
     $('#c-lede').textContent = empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
       : editing ? 'Tap a bin to change its day or how often.'
-      : note ? note : '';  // a council problem still shows here
+      : note ? note : "We'll remind you the night before.";  // a council problem shows here instead
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
-    $('#c-lede').hidden = !empty && !editing && !note;
+    $('#c-lede').hidden = false;
     $('#c-own').hidden = !(editing && shared && API.live && !empty);
     $('#c-view').hidden = editing;
     $('#c-editor').hidden = !editing;
