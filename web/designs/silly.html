@@ -536,13 +536,13 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 @media (min-width:401px){.done-head{gap:16px}}
 /* Add a bin: colour swatches */
 /* "What colour is it?" under a bin whose colour the council didn't give (we never guess it) */
-.cpick{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px}
-.cpick-q{font-size:15px;font-weight:600;color:var(--ink)}
-.cpick-sw{display:flex;flex-wrap:wrap;gap:6px}
-.cswatch{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 8px;border-radius:999px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
-.cswatch i{flex:none;width:18px;height:18px;border-radius:999px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
-.cswatch[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
-.cswatch:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.cpick{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin-top:10px}
+.cpick-q{flex:none;font-size:14px;font-weight:500;color:#6E6E73}
+.cpick-sw{flex:1;min-width:0;max-width:320px;display:flex;justify-content:space-between;gap:2px}
+.cswatch{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:999px;background:none;cursor:pointer}
+.cswatch i{width:20px;height:20px;border-radius:999px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.cswatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink)}
+.cswatch:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
 .efield .cpick-sw{margin-top:2px}
 .acolours{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .acolour{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:64px;padding:0 4px;border-radius:12px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;min-width:0;white-space:nowrap}
@@ -1194,7 +1194,7 @@ Share to WhatsApp
   var NO_COLOUR = '#C7C7CC';
   function colourPicker(b) {  // swatches: data-pickcolour="<bin id>:<colour>"
     return '<div class="cpick-sw">' + BIN_COLOURS.map(function (c) {
-      return '<button type="button" class="cswatch" data-pickcolour="' + b.id + ':' + c[0] + '" aria-pressed="' + (b.colour === c[0]) + '"><i style="background:' + COLOUR_HEX[c[0]] + '"></i>' + c[1] + '</button>';
+      return '<button type="button" class="cswatch" data-pickcolour="' + b.id + ':' + c[0] + '" aria-pressed="' + (b.colour === c[0]) + '" aria-label="' + c[1] + '" title="' + c[1] + '"><i style="background:' + COLOUR_HEX[c[0]] + '"></i></button>';
     }).join('') + '</div>';
   }
   function pickColour(id, c) {
@@ -1517,7 +1517,7 @@ Share to WhatsApp
           '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : daily ? 'Daily, so no reminders' : esc(subline(b))) + '</span></span></span>' +
           '<span class="c-days">' + chips + '</span>' +
           '<span class="c-freq">' + (daily ? 'No reminders' : freqText(b)) + '</span>' +
-          (b.askColour && b.on !== false ? '<div class="cpick" role="group" aria-label="What colour is your ' + esc(b.name) + ' bin?"><span class="cpick-q">What colour is it?</span>' + colourPicker(b) + '</div>' : '') +
+          (b.askColour && b.on !== false ? '<div class="cpick" role="group" aria-label="What colour is your ' + esc(b.name) + ' bin?"><span class="cpick-q">Colour?</span>' + colourPicker(b) + '</div>' : '') +
           '</div>';
       }).join('');
     } else {
