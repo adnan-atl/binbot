@@ -117,6 +117,15 @@ def council_colour(gss_code: str | None, category: str | None) -> str | None:
     return c if c in COLOUR_DOTS else None
 
 
+def council_colour_options(gss_code: str | None, category: str | None) -> list[str]:
+    """When a council uses one of a few colours for this bin depending on the street ("black or
+    grey"), those colours, so we ask the resident to choose between just them. Empty when we
+    don't know: then they get every colour."""
+    entry = _council_colours().get(gss_code or "") or {}
+    opts = [c for c in (entry.get("options") or {}).get(category or "", []) if c in COLOUR_DOTS]
+    return opts if len(opts) >= 2 else []
+
+
 def bin_emoji(label: str, category: str | None = None, colour: str | None = None) -> str:
     """A dot in the bin's colour when the council, the bin's name or the resident gives one;
     otherwise the kind of bin (♻️ recycling, 🗑️ general...), so we never show a colour

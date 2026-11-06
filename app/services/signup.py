@@ -190,16 +190,16 @@ def bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.Bin
             rule["days"] = s.override_rule.get("days", rule["days"])
             rule["frequency"] = s.override_rule.get("frequency", rule["frequency"])
             upcoming = [d.isoformat() for d in dates if d.isoformat() >= first][:4]
-            colour, manual = None, True
+            colour, manual, options = None, True, []
         elif s.bin_type_id in council_bins:
             cb = council_bins[s.bin_type_id]
             rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"],
                     "purpose": cb["purpose"], "frequency_source": cb.get("frequency_source", "")}
             # The round's real dates (bank holiday moves included), as schedule_for has them
             upcoming = [d for d in cb["dates"] if d >= first][:4]
-            colour, manual = cb["colour"], False
+            colour, manual, options = cb["colour"], False, cb.get("colour_options", [])
         else:
-            rule, colour, manual = {"days": [], "frequency": "irregular", "next": None}, None, True
+            rule, colour, manual, options = {"days": [], "frequency": "irregular", "next": None}, None, True, []
             upcoming = []
         if upcoming:  # today's collection after the cutoff isn't "next" any more
             rule["next"] = upcoming[0]
@@ -208,5 +208,6 @@ def bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.Bin
         label = s.label if manual else display_label(s.label, s.category.value)
         out.append(S.BinOut(setting_id=s.id, bin_type_id=s.bin_type_id, label=label,
                             category=s.category.value, colour=s.colour or colour, enabled=s.enabled,
+                            colour_options=[] if (s.colour or colour) else options,
                             manual=manual, upcoming=upcoming, daily=is_daily(rule["days"]), **rule))
     return out

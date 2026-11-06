@@ -34,7 +34,7 @@ from app.models import (
 )
 from app.services import checks as checker
 from app.services import geo, sides
-from app.services.normalize import PURPOSE, categorise, colour_of, council_colour, describe_rule
+from app.services.normalize import PURPOSE, categorise, colour_of, council_colour, council_colour_options, describe_rule
 
 log = logging.getLogger(__name__)
 
@@ -447,11 +447,15 @@ def schedule_for(db: Session, prop: Property, with_checks: bool = False):
         bt = evs[0].bin_type
         rule = describe_rule([e.date for e in all_evs])
         rule["next"] = evs[0].date.isoformat()
+        colour = known_colour(db, bt, prop.round_key)
         out.append({
             "bin_type_id": bt.id,
             "label": bt.council_label,
             "category": bt.category.value,
-            "colour": known_colour(db, bt, prop.round_key),
+            "colour": colour,
+            # Not known, but the council only uses these few colours for it: ask between them
+            "colour_options": [] if colour else council_colour_options(
+                bt.council.gss_code if bt.council else None, bt.category.value),
             "purpose": PURPOSE[bt.category],
             "days": rule["days"],
             "frequency": rule["frequency"],

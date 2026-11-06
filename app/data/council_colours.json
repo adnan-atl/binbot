@@ -1,5 +1,5 @@
 {
-  "_about": "Bin colours councils publish but don't put in their collection data, keyed by GSS code. Used only when the council's own bin name has no colour; a resident's choice always wins. One entry per council: category -> colour (blue, black, green, brown, grey, purple, red, yellow), plus where it came from.",
+  "_about": "Bin colours councils publish but don't put in their collection data, keyed by GSS code. Used only when the council's own bin name has no colour; a resident's choice always wins. One entry per council: category -> colour (blue, black, green, brown, grey, purple, red, yellow), plus where it came from. \"options\": {category: [colours]} when the council uses one of a few colours for that bin depending on the street; we then ask the resident to choose only between those.",
   "S12000033": {
     "council": "Aberdeen City",
     "recycling": "blue",
@@ -59,6 +59,16 @@
     "council": "Ards and North Down",
     "recycling": "blue",
     "general": "grey",
+    "options": {
+      "food": [
+        "green",
+        "brown"
+      ],
+      "garden": [
+        "green",
+        "brown"
+      ]
+    },
     "source": "https://www.ardsandnorthdown.gov.uk/Which-bin-should-I-use",
     "quote": "Use your blue bin to recycle ... Grey bins are collected from every household ... Use your brown or green bin for food waste and garden waste",
     "checked": "2026-11-06",
@@ -101,6 +111,12 @@
     "recycling": "green",
     "general": "red",
     "glass": "blue",
+    "options": {
+      "garden": [
+        "brown",
+        "black"
+      ]
+    },
     "source": "https://www.ashfield.gov.uk/waste-and-recycling/what-goes-in-my-bin/",
     "quote": "Recycling - green-lidded bin ... Glass recycling - blue-lidded bin ... General waste - red-lidded bin ... Garden waste - brown-lid or black bin",
     "checked": "2026-11-06",
@@ -177,6 +193,16 @@
     "recycling": "green",
     "food": "green",
     "garden": "brown",
+    "options": {
+      "general": [
+        "black",
+        "grey"
+      ],
+      "glass": [
+        "green",
+        "red"
+      ]
+    },
     "source": "https://www.basingstoke.gov.uk/rte.aspx?id=2748",
     "quote": "General waste bin (black/grey) ... Recycling bin (green) ... Glass box (green) or bin (red) ... Garden waste bin (brown) ... outdoor green food waste caddy",
     "checked": "2026-11-06",
@@ -253,6 +279,12 @@
     "recycling": "green",
     "food": "orange",
     "garden": "brown",
+    "options": {
+      "general": [
+        "black",
+        "grey"
+      ]
+    },
     "source": "https://www.blaby.gov.uk/waste-and-recycling/garden-waste/garden-waste-collections/",
     "quote": "brown lidded garden waste wheeled bin + Google (council/Facebook): green recycling bin, orange-lidded outdoor food caddy, brown-lidded garden bin",
     "checked": "2026-11-06",
@@ -447,6 +479,13 @@
   "E06000060": {
     "council": "Buckinghamshire",
     "recycling": "blue",
+    "options": {
+      "general": [
+        "green",
+        "black",
+        "grey"
+      ]
+    },
     "source": "https://www.buckinghamshire.gov.uk/waste-and-recycling/",
     "quote": "Google (council policy): blue/blue-lidded recycling bin in both north and south areas",
     "checked": "2026-11-06",
@@ -457,6 +496,12 @@
     "recycling": "blue",
     "garden": "brown",
     "paper": "grey",
+    "options": {
+      "general": [
+        "black",
+        "grey"
+      ]
+    },
     "source": "https://burnley.gov.uk/waste-recycling/recycling/",
     "quote": "Blue Bin/Box: plastics, cartons, tins and cans, glass ... Grey Bin/White Sack: paper, cardboard ... Brown Bin – Subscription required (garden)",
     "checked": "2026-11-06",
@@ -583,6 +628,12 @@
     "council": "Central Bedfordshire",
     "general": "black",
     "garden": "green",
+    "options": {
+      "recycling": [
+        "green",
+        "orange"
+      ]
+    },
     "source": "centralbedfordshire.gov.uk",
     "quote": "\"Your black bin is for household waste that cannot be recycled\" + Google (council): green garden waste bin",
     "checked": "2026-11-06",
@@ -640,6 +691,12 @@
     "recycling": "silver",
     "general": "black",
     "food": "green",
+    "options": {
+      "garden": [
+        "green",
+        "brown"
+      ]
+    },
     "source": "cheshireeast.gov.uk",
     "quote": "\"Try to recycle as much as you can in your silver recycling bin\"; \"Your black bin is for general household waste\" + council: green 23L food caddy (weekly food from early 2027)",
     "checked": "2026-11-06",
@@ -742,6 +799,12 @@
     "council": "Conwy",
     "general": "black",
     "garden": "green",
+    "options": {
+      "food": [
+        "black",
+        "green"
+      ]
+    },
     "source": "conwy.gov.uk + Google (council/myrecyclingwales)",
     "quote": "black bin for rubbish; green bag for garden waste",
     "checked": "2026-11-06",
@@ -798,6 +861,12 @@
     "food": "black",
     "garden": "brown",
     "paper": "blue",
+    "options": {
+      "recycling": [
+        "grey",
+        "green"
+      ]
+    },
     "source": "croydon.gov.uk + London Recycles (via Google)",
     "quote": "Blue lidded wheelie bin or box for paper and card; Grey or green lidded recycling bin or box; black wheelie bin rubbish; black food caddy; brown-lidded garden bin",
     "checked": "2026-11-06",
@@ -838,6 +907,12 @@
     "council": "Denbighshire",
     "food": "orange",
     "garden": "green",
+    "options": {
+      "general": [
+        "blue",
+        "black"
+      ]
+    },
     "source": "sirddinbych.gov.uk + Google (council)",
     "quote": "\"Orange caddy (or black caddy with an orange lid)\" for food; \"240-litre blue (or black) wheelie bin\" for rubbish; Green wheelie bin (garden)",
     "checked": "2026-11-06",
@@ -916,6 +991,12 @@
     "recycling": "red",
     "garden": "brown",
     "paper": "blue",
+    "options": {
+      "general": [
+        "grey",
+        "black"
+      ]
+    },
     "source": "dumfriesandgalloway.gov.uk + Google (council)",
     "quote": "\"a bin with a blue lid, for paper, card and cardboard\"; \"a bin with a red lid, for plastics, metals and food cartons\"; brown lid garden",
     "checked": "2026-11-06",
@@ -985,6 +1066,12 @@
     "garden": "green",
     "glass": "brown",
     "paper": "blue",
+    "options": {
+      "food": [
+        "grey",
+        "silver"
+      ]
+    },
     "source": "eastdunbarton.gov.uk + Google (council Facebook)",
     "quote": "\"grey general waste bin\"; \"£52 per green bin for the collection of garden waste\"; blue bin paper and card; brown bin plastics, glass, cans",
     "checked": "2026-11-06",
@@ -1030,6 +1117,12 @@
     "general": "green",
     "garden": "brown",
     "paper": "blue",
+    "options": {
+      "glass": [
+        "green",
+        "black"
+      ]
+    },
     "source": "eastlothian.gov.uk",
     "quote": "Green bin - non recyclable; white weighted bag for plastic, metals, cartons; glass in green or black box; paper and card in blue box or bag; Brown bin - garden",
     "checked": "2026-11-06",
@@ -1065,6 +1158,12 @@
     "food": "grey",
     "garden": "brown",
     "paper": "green",
+    "options": {
+      "general": [
+        "black",
+        "grey"
+      ]
+    },
     "source": "eastsuffolk.gov.uk + Google (council Facebook)",
     "quote": "Green-lidded recycling bin (paper and card); Blue-lidded recycling bin (mixed incl. glass); \"new outdoor grey food container\"; brown garden bin",
     "checked": "2026-11-06",
@@ -1084,6 +1183,12 @@
   "E07000207": {
     "council": "Elmbridge",
     "recycling": "blue",
+    "options": {
+      "general": [
+        "green",
+        "black"
+      ]
+    },
     "source": "elmbridge.gov.uk + Google (council)",
     "quote": "\"recycling bins with a blue lid\"; rubbish bin all-green or all-black",
     "checked": "2026-11-06",
@@ -1094,6 +1199,12 @@
     "recycling": "blue",
     "food": "brown",
     "garden": "green",
+    "options": {
+      "general": [
+        "black",
+        "grey"
+      ]
+    },
     "source": "enfield.gov.uk",
     "quote": "Recycling bin (blue-lidded); 23 litre brown external food bin; Garden waste bin (green-lidded); General waste bin (black/grey-lidded)",
     "checked": "2026-11-06",
@@ -1177,6 +1288,12 @@
     "council": "Fermanagh and Omagh",
     "recycling": "blue",
     "food": "brown",
+    "options": {
+      "general": [
+        "black",
+        "green"
+      ]
+    },
     "source": "fermanaghomagh.com",
     "quote": "\"Blue Bin Recycling\"; \"Brown Food Waste Caddy and Wheelie Bin\"; \"Black and Green Landfill Bin\"",
     "checked": "2026-11-06",
@@ -1342,6 +1459,12 @@
     "recycling": "green",
     "general": "black",
     "garden": "brown",
+    "options": {
+      "food": [
+        "grey",
+        "blue"
+      ]
+    },
     "source": "hackney.gov.uk (via Google)",
     "quote": "Black bin general; green recycling bags; brown bin or bag for garden; food bins grey or blue",
     "checked": "2026-11-06",
@@ -1381,6 +1504,12 @@
     "recycling": "blue",
     "food": "black",
     "garden": "brown",
+    "options": {
+      "general": [
+        "green",
+        "grey"
+      ]
+    },
     "source": "harrow.gov.uk (via Google)",
     "quote": "Blue bin dry recycling; black caddy food; brown bin garden; general bin green or grey",
     "checked": "2026-11-06",
@@ -1411,6 +1540,16 @@
   "E07000062": {
     "council": "Hastings",
     "garden": "brown",
+    "options": {
+      "recycling": [
+        "green",
+        "pink"
+      ],
+      "general": [
+        "black",
+        "grey"
+      ]
+    },
     "source": "hastings.gov.uk (via Google)",
     "quote": "Green bin or pink sacks for recycling (by area); black or grey refuse bin; brown garden bin",
     "checked": "2026-11-06",
@@ -1420,6 +1559,12 @@
     "council": "Havering",
     "recycling": "orange",
     "general": "black",
+    "options": {
+      "garden": [
+        "brown",
+        "green"
+      ]
+    },
     "source": "havering.gov.uk",
     "quote": "\"Rubbish collections (Black sacks)\"; \"Recycling collections (Orange sacks)\"",
     "checked": "2026-11-06",

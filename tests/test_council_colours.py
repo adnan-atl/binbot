@@ -77,3 +77,28 @@ def test_two_agreeing_residents_teach_the_council(client, db):
     _pick(client, users[1], "food", "brown")
     db.expire_all()
     assert resident_colour(db, bt, mine) == "brown"
+
+
+def test_only_the_councils_options_are_offered(client, db, monkeypatch):
+    # Hackney (the demo council) uses grey or blue food caddies: ask between just those two
+    monkeypatch.setattr(normalize, "_KNOWN", {"E09000012": {"options": {"food": ["grey", "blue"]}}})
+    uid = _on(client)
+    bins = {b["category"]: b for b in client.get(f"/api/users/{uid}/bins").json()}
+    assert bins["food"]["colour"] is None and bins["food"]["colour_options"] == ["grey", "blue"]
+    assert bins["general"]["colour_options"] == []  # nothing known: every colour
+
+
+def test_options_drop_away_once_the_colour_is_known(client, db, monkeypatch):
+    monkeypatch.setattr(normalize, "_KNOWN", {"E09000012": {"food": "grey", "options": {"food": ["grey", "blue"]}}})
+    uid = _on(client)
+    bins = {b["category"]: b for b in client.get(f"/api/users/{uid}/bins").json()}
+    assert bins["food"]["colour"] == "grey" and bins["food"]["colour_options"] == []
+
+
+def test_options_need_two_real_colours():
+    from app.services.normalize import council_colour_options
+    normalize._KNOWN = {"X": {"options": {"general": ["black", "beige"]}}}
+    try:
+        assert council_colour_options("X", "general") == []
+    finally:
+        normalize._KNOWN = None

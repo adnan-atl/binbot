@@ -544,6 +544,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .cswatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--ink)}
 .cswatch:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
 .efield .cpick-sw{margin-top:2px}
+.cpick-sw.cpick-few{flex:none;justify-content:flex-start;gap:10px}
 .acolours{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
 .acolour{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;height:64px;padding:0 4px;border-radius:12px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;min-width:0;white-space:nowrap}
 .acolour i{flex:none;width:22px;height:22px;border-radius:999px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
@@ -1192,8 +1193,12 @@ Share to WhatsApp
   // The council's own bin colour wins over the category default: Glasgow's general waste bin is green.
   var COLOUR_HEX = { blue: '#2F6FEB', green: '#34A853', brown: '#8B5E3C', black: '#3A3A3C', grey: '#8E8E93', purple: '#7E57C2', red: '#D9463E', yellow: '#E6B800', orange: '#F28C28', white: '#D1D1D6', silver: '#B0B3B8', burgundy: '#7A2E3B', maroon: '#7A2E3B', pink: '#E58BB5' };
   var NO_COLOUR = '#C7C7CC';
+  var COLOUR_NAME = { blue: 'Blue', black: 'Black', green: 'Green', brown: 'Brown', grey: 'Grey', purple: 'Purple', red: 'Red', yellow: 'Yellow', orange: 'Orange', white: 'White', silver: 'Silver', burgundy: 'Burgundy', pink: 'Pink' };
   function colourPicker(b) {  // swatches: data-pickcolour="<bin id>:<colour>"
-    return '<div class="cpick-sw">' + BIN_COLOURS.map(function (c) {
+    // When the council only uses a few colours for this bin ("black or grey"), ask between just those
+    var opts = (b.colourOptions || []).filter(function (c) { return COLOUR_HEX[c]; });
+    var list = opts.length >= 2 ? opts.map(function (c) { return [c, COLOUR_NAME[c] || c]; }) : BIN_COLOURS;
+    return '<div class="cpick-sw' + (opts.length >= 2 ? ' cpick-few' : '') + '">' + list.map(function (c) {
       return '<button type="button" class="cswatch" data-pickcolour="' + b.id + ':' + c[0] + '" aria-pressed="' + (b.colour === c[0]) + '" aria-label="' + c[1] + '" title="' + c[1] + '"><i style="background:' + COLOUR_HEX[c[0]] + '"></i></button>';
     }).join('') + '</div>';
   }
@@ -1210,7 +1215,7 @@ Share to WhatsApp
     var ask = !b.colour && !b.manual && b.category !== 'other';
     return { id: b.setting_id, name: b.label, kind: m.kind, days: (b.days || []).map(function (d) { return DAY_IN[d]; }),
       freq: FREQ_IN[b.frequency] || 'unknown', next0: fmtDate(b.next), color: COLOUR_HEX[b.colour] || (ask ? NO_COLOUR : m.color), shape: m.shape, cat: b.category, on: b.enabled !== false,
-      purpose: b.purpose || '', manual: !!b.manual, upcoming: b.upcoming || [], colour: b.colour || null, askColour: ask };
+      purpose: b.purpose || '', manual: !!b.manual, upcoming: b.upcoming || [], colour: b.colour || null, askColour: ask, colourOptions: b.colour_options || [] };
   }
   function binToApi(b) {
     var o = { setting_id: b.id && b.id.indexOf('new') !== 0 ? b.id : null, label: b.name, category: b.cat || 'other', enabled: b.on !== false };

@@ -32,6 +32,8 @@ class BinOut(BaseModel):
     label: str
     category: str
     colour: str | None = None
+    # No colour known but the council only uses these (e.g. black or grey): ask between them
+    colour_options: list[str] = Field(default_factory=list)
     purpose: str = ""  # what goes in it, when the label alone doesn't say
     days: list[str]
     frequency: str

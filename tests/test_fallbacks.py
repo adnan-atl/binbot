@@ -159,6 +159,8 @@ def test_address_fallback_only_when_needed_and_never_crashes(monkeypatch):
 
 def test_turning_reminders_on_sends_a_welcome(client, db, monkeypatch):
     from app.models import Outbox
+    from app.services import normalize
+    monkeypatch.setattr(normalize, "_KNOWN", {})  # no published colour: the kind emoji shows
 
     tue = date.today() + timedelta(days=(1 - date.today().weekday()) % 7 + 7)
     prop, _ = _signup(client, db, monkeypatch, [RawCollection("Recycling", tue)])
