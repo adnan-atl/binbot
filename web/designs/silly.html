@@ -210,7 +210,7 @@ button{font:inherit}
 .badge{color:#FFFFFF}  /* dark brow: name in white like the links */
 .badge-wm{display:block;height:22px;width:auto;margin-bottom:-2px}  /* home page wordmark instead of the name, kept small */
 @media (min-width:601px){.badge-wm{height:26px}}
-.badge-wm~.by-logo{top:-.16em}  /* next to the wordmark: lifted a little off its baseline */
+.badge-wm~.by-logo{top:-.06em}  /* next to the wordmark: lifted a little off its baseline */
 @media (max-width:600px){.badge-wm~.by-logo{top:-.08em}}  /* phones: a touch lower, just above the wordmark's baseline */
 .chat-av img{width:100%;height:100%;object-fit:cover}
 html.vt .home-main{view-transition-name:home-content}
@@ -609,16 +609,18 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .cta-wa{flex:none;margin-top:-1px;color:#0B0B0B}
 /* Real iPhone frame (web/phone-frame.webp: 664x1300, transparent screen opening 56px in at the
    sides and 52px top and bottom, corners ~80px). Shown at 355x695, so the phone's body is ~320px wide
-   like the drawn one it replaces; the screen and Binjamin are moved to match (+15px down, 17px in). */
+   like the drawn one it replaces; the screen and Binjamin are moved to match (the body starts 15px down and 17px in, and the
+   old drawn phone had a 7px rim Binjamin sat on). */
 .phone-wrap .phone-outline{width:355px;height:695px;border:0;border-radius:0;background:none;box-shadow:none}
 .phone-wrap .phone-outline>i,.phone-wrap .island{display:none}
 .phone-frame{position:absolute;inset:0;width:100%;height:100%;z-index:6;pointer-events:none}
 .phone-wrap .pscreen{inset:28px 30px;border-radius:43px}
-.phone-wrap .binji{top:calc(-0.9115 * var(--bw) + 7px);right:-23px}
-@media (max-width:600px){.phone-wrap .binji{right:9px}}
-@media (min-width:601px){.phone-wrap .binji{top:calc(-0.83 * var(--bw) + 15px);right:-11px}}
-.phone-wrap .binji-say{right:141px;top:-85px}
-@media (min-width:601px){.phone-wrap .binji-say{right:auto;left:calc(100% + 43px);top:-113px}}
+.phone-wrap .binji{top:calc(-0.9115 * var(--bw) + 16px);right:-16px}  /* hips on the frame's top edge, legs over the front */
+@media (max-width:600px){.phone-wrap .binji{right:16px}}
+.phone-wrap .binji-legs{clip-path:inset(76% 0 0 0)}  /* starts just above the frame's silver edge, so it never cuts across him */
+@media (min-width:601px){.phone-wrap .binji{top:calc(-0.83 * var(--bw) + 22px);right:-4px}}
+.phone-wrap .binji-say{right:148px;top:-76px}
+@media (min-width:601px){.phone-wrap .binji-say{right:auto;left:calc(100% + 36px);top:-106px}}
 </style>
 </head>
 <body>
