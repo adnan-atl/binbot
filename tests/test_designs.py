@@ -35,7 +35,10 @@ def test_home_page_can_show_a_design(client, monkeypatch):
     monkeypatch.setenv("HOME_DESIGN", "silly")
     get_settings.cache_clear()
     try:
-        assert client.get("/").text == client.get("/d/silly").text
+        # Same design; the public URL just adds its own head (title, canonical, structured data)
+        home, design = client.get("/").text, client.get("/d/silly").text
+        assert home.split("<body", 1)[1] == design.split("<body", 1)[1]
+        assert '<link rel="canonical"' in home and '<link rel="canonical"' not in design
         monkeypatch.setenv("HOME_DESIGN", "nope")
         get_settings.cache_clear()
         assert client.get("/").status_code == 200  # unknown design falls back to index.html

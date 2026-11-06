@@ -7,12 +7,13 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes import router as api_router
 from app.api.webhooks import router as webhook_router
+from app import seo
 from app.core.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -75,16 +76,34 @@ def render_index(page: Path | None = None) -> str:
 if WEB.exists():
     @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False, response_class=HTMLResponse)
     @app.get("/static/index.html", include_in_schema=False, response_class=HTMLResponse)
-    @app.get("/about", include_in_schema=False, response_class=HTMLResponse)
-    @app.get("/faqs", include_in_schema=False, response_class=HTMLResponse)
-    @app.get("/privacy", include_in_schema=False, response_class=HTMLResponse)
-    @app.get("/terms", include_in_schema=False, response_class=HTMLResponse)
-    def index():
+    @app.api_route("/about", methods=["GET", "HEAD"], include_in_schema=False, response_class=HTMLResponse)
+    @app.api_route("/faqs", methods=["GET", "HEAD"], include_in_schema=False, response_class=HTMLResponse)
+    @app.api_route("/privacy", methods=["GET", "HEAD"], include_in_schema=False, response_class=HTMLResponse)
+    @app.api_route("/terms", methods=["GET", "HEAD"], include_in_schema=False, response_class=HTMLResponse)
+    def index(request: Request):
+        path = request.url.path if request.url.path in seo.PAGES else "/"
+        home = _home_page()
+        # Off the public address (the server's IP, a test copy) the page stays out of search.
+        headers = {} if seo.is_canonical_host(request.url.hostname) else {"X-Robots-Tag": "noindex"}
+        return HTMLResponse(seo.apply(render_index(home), path, seo.lastmod_iso(home)), headers=headers)
+
+    def _home_page() -> Path:
+        """The page the public site serves: a design in web/designs (HOME_DESIGN), else index.html."""
         name = get_settings().home_design
         page = WEB / "designs" / f"{name}.html"
-        if name and re.fullmatch(r"[a-z0-9-]{1,40}", name) and page.is_file():
-            return HTMLResponse(render_index(page))
-        return HTMLResponse(render_index())
+        return page if name and re.fullmatch(r"[a-z0-9-]{1,40}", name) and page.is_file() else WEB / "index.html"
+
+    @app.get("/robots.txt", include_in_schema=False, response_class=PlainTextResponse)
+    def robots():
+        return PlainTextResponse(seo.robots_txt())
+
+    @app.get("/sitemap.xml", include_in_schema=False)
+    def sitemap():
+        return Response(seo.sitemap_xml(seo.lastmod_of(_home_page())), media_type="application/xml")
+
+    @app.get("/llms.txt", include_in_schema=False, response_class=PlainTextResponse)
+    def llms():
+        return PlainTextResponse(seo.llms_txt(render_index(_home_page())))
 
     @app.api_route("/r/{code}", methods=["GET", "HEAD"], include_in_schema=False)
     @app.get("/s/{code}", include_in_schema=False)  # old Share-button links
@@ -125,7 +144,8 @@ if WEB.exists():
         page = WEB / "designs" / f"{name}.html"
         if not re.fullmatch(r"[a-z0-9-]{1,40}", name) or not page.is_file():
             raise HTTPException(404, "No such design")
-        return HTMLResponse(render_index(page))
+        # previews of the same site: never indexed, so they can't compete with the real pages
+        return HTMLResponse(render_index(page), headers={"X-Robots-Tag": "noindex, nofollow"})
 
     app.mount("/static", StaticFiles(directory=WEB), name="static")
 
