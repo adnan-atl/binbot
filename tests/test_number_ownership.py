@@ -235,3 +235,25 @@ def test_signing_up_after_tomorrows_reminder_time_gets_a_reminder_in_the_welcome
         assert reminders.tomorrow_note(db, u, now=early) is None  # the reminder will still come
     finally:
         reminders.effective_collections = orig
+
+
+def test_signing_up_before_7am_on_a_collection_day_gets_today_in_the_welcome(db):
+    from datetime import date, datetime
+    from zoneinfo import ZoneInfo
+    from app.models import ReminderMode
+    from app.services import reminders
+
+    u = User(referral_code="abcd1235", reminder_mode=ReminderMode.night_before, reminder_time="20:00",
+             timezone="Europe/London")
+    today = date(2026, 11, 6)
+    bins = [{"label": "Recycling", "category": "recycling"}]
+    orig = reminders.effective_collections
+    reminders.effective_collections = lambda db, user: {today: bins}
+    try:
+        small_hours = datetime(2026, 11, 6, 0, 53, tzinfo=ZoneInfo("Europe/London"))
+        assert reminders.tomorrow_note(db, u, now=small_hours) == (
+            "And don't forget your \U0001F535 Recycling today, out by 7am!")
+        later = datetime(2026, 11, 6, 7, 30, tzinfo=ZoneInfo("Europe/London"))
+        assert reminders.tomorrow_note(db, u, now=later) is None  # today's has gone by then
+    finally:
+        reminders.effective_collections = orig

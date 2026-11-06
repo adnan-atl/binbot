@@ -1111,13 +1111,26 @@ Share to WhatsApp
   var subline = function (b) {
     var nx = nextDate(b);
     // the date never splits over two lines (non-breaking spaces)
-    return [purposeText(b), nx ? ('next ' + fmtDate(nx)).replace(/ /g, '\u00A0') : freqText(b)].filter(Boolean).join(' · ');  // just the next date; how often only if there's no date
+    var when = nx && nx === todayIso() ? 'today' : nx ? 'next ' + fmtDate(nx) : '';
+    return [purposeText(b), when ? when.replace(/ /g, '\u00A0') : freqText(b)].filter(Boolean).join(' · ');  // just the next date; how often only if there's no date
   };
   // The next collection: the council's own date for untouched bins, otherwise worked out from the
   // days, how often and (for 2/3/4-weekly bins) the week the resident picked.
+  // Today's collection still counts until 7am (London), when bins should be out; then it's gone.
+  // Same rule as the server (services/signup.py first_showable_day).
+  function firstShowable() {
+    var now = new Date(), p = {};
+    try {
+      new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' })
+        .formatToParts(now).forEach(function (x) { p[x.type] = x.value; });
+    } catch (e) {}
+    var d = p.year ? new Date(+p.year, +p.month - 1, +p.day, 12) : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+    if ((p.hour ? +p.hour : now.getHours()) >= 7) d.setDate(d.getDate() + 1);
+    return d;
+  }
+  function todayIso() { var d = firstShowable(), t = new Date(); return isoDate(d) === isoDate(new Date(t.getFullYear(), t.getMonth(), t.getDate(), 12)) ? isoDate(d) : null; }
   function nextDate(b) {
-    var t = new Date(); t.setHours(12, 0, 0, 0);
-    var tomorrow = new Date(t); tomorrow.setDate(t.getDate() + 1);
+    var tomorrow = firstShowable();  // the first day that still counts: today before 7am
     var fromIso = isoDate(tomorrow);
     if (!b.dirty && b.upcoming) { var u = b.upcoming.filter(function (d) { return d >= fromIso; })[0]; if (u) return u; }
     if (!b.days || !b.days.length) return null;
@@ -1267,7 +1280,7 @@ Share to WhatsApp
     var n = CYCLE[freq]; if (!n || !days.length) return [];
     var idx = days.map(function (d) { return DAYS.indexOf(d); }).filter(function (i) { return i > -1; }).sort();
     var t = new Date(); t.setHours(12, 0, 0, 0);
-    var tomorrow = new Date(t); tomorrow.setDate(t.getDate() + 1);
+    var tomorrow = firstShowable();  // today before 7am, otherwise tomorrow
     var first = new Date(tomorrow);
     while (idx.indexOf((first.getDay() + 6) % 7) < 0) first.setDate(first.getDate() + 1);
     var mon0 = new Date(first); mon0.setDate(first.getDate() - (first.getDay() + 6) % 7);

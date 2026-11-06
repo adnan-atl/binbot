@@ -403,12 +403,21 @@ def binjamin_card() -> dict:
 
 
 def tomorrow_note(db: Session, user: User, now: datetime | None = None) -> str | None:
-    """Signing up after tomorrow's reminder time: that reminder won't come, so the welcome ends
-    with it instead ("And don't forget your … tomorrow!")."""
+    """Signing up after a reminder's time: that reminder won't come, so the welcome ends with it
+    instead ("And don't forget your … tomorrow!", or "… today, out by 7am!" before 7am on a
+    collection day)."""
+    from app.services.signup import SAME_DAY_CUTOFF
+
     tz = ZoneInfo(user.timezone or "Europe/London")
-    now = now or datetime.now(tz)
-    tomorrow = now.astimezone(tz).date() + timedelta(days=1)
-    bins = effective_collections(db, user).get(tomorrow)
+    now = (now or datetime.now(tz)).astimezone(tz)
+    cal = effective_collections(db, user)
+    # Signing up in the small hours of a collection day: its reminder went last evening, and
+    # the bins still need to go out this morning.
+    today = cal.get(now.date()) if now.time() < SAME_DAY_CUTOFF else None
+    if today:
+        return f"And don't forget your {_join([bin_tag(b) for b in today])} today, out by 7am!"
+    tomorrow = now.date() + timedelta(days=1)
+    bins = cal.get(tomorrow)
     if not bins or send_at_for(user, tomorrow) > now:
         return None
     return f"And don't forget your {_join([bin_tag(b) for b in bins])} tomorrow!"
