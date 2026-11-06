@@ -484,12 +484,14 @@
   },
   "E09000007": {
     "council": "Camden",
+    "recycling": "green",
+    "general": "black",
     "food": "brown",
     "garden": "brown",
-    "source": "camden.gov.uk",
-    "quote": "\"a brown outdoor food waste caddy\"; \"one brown garden waste bin\" (or white reusable garden bags)",
+    "source": "camden.gov.uk + londonrecycles.co.uk + binformation.app",
+    "quote": "Council: \"a brown outdoor food waste caddy\", \"one brown garden waste bin\"; London Recycles: \"Rubbish Black wheelie bin\", green recycling bin; binformation: \"green recycling bin\"",
     "checked": "2026-11-06",
-    "note": "Recycling/general container colours vary by property; not stated."
+    "note": "Estates use communal bins; flats above shops use clear/orange bags."
   },
   "E07000192": {
     "council": "Cannock Chase",
