@@ -85,14 +85,17 @@ KIND_EMOJI = {"recycling": "\u267B\uFE0F", "general": "\U0001F5D1\uFE0F", "food"
               "garden": "\U0001F342", "glass": "\U0001F37E", "paper": "\U0001F4E6"}
 
 
-# When neither the council nor the bin's name gives a colour: the same defaults the website
-# draws its bin icons with, so both show the same colour.
+# The colours the website draws its bin icons with when it has nothing better. Never used to
+# tell a resident what colour their bin is: that differs street by street (recycling is green
+# on some Hammersmith & Fulham streets, blue on others), so a guess here would be wrong.
 DEFAULT_COLOUR = {"recycling": "blue", "general": "black", "garden": "green", "food": "brown"}
 
 
 def bin_emoji(label: str, category: str | None = None, colour: str | None = None) -> str:
-    c = (colour or colour_of(label) or DEFAULT_COLOUR.get(category or "") or "").lower()
-    # A bin we can't place still gets a dot, never a wastebasket (Tom: dots read better)
+    """A dot in the bin's colour when the council, the bin's name or the resident gives one;
+    otherwise the kind of bin (♻️ recycling, 🗑️ general...), so we never show a colour
+    we only guessed. A bin we can't place at all still gets a plain dot."""
+    c = (colour or colour_of(label) or "").lower()
     return COLOUR_DOTS.get(c) or KIND_EMOJI.get(category or "", "\u26AB")
 
 
@@ -122,9 +125,9 @@ _GENERAL_NAMES = re.compile(
 def display_label(label: str, category: str | None = None) -> str:
     """How a bin is named to the resident, on the site and in messages (via bin_tag):
     the council's name with a capital, except the everyday bin without a colour of its own,
-    which is always 'General waste (black bin)' (black: the same default as its dot)."""
+    which is always 'General waste' (no colour: we'd only be guessing it)."""
     if category == "general" and not colour_of(label) and _GENERAL_NAMES.fullmatch(label.strip()):
-        return f"General waste ({DEFAULT_COLOUR['general']} bin)"
+        return "General waste"
     return _cap(label)
 
 

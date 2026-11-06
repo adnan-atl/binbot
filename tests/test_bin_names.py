@@ -8,8 +8,11 @@ def test_colour_first_kind_in_brackets_and_capitals():
     assert bin_name("food waste (weekly)") == "Food waste (weekly)"  # bracket isn't a colour
 
 
-def test_household_waste_is_black_like_the_website():
-    assert bin_emoji("Household waste", "general") == "⚫"
+def test_no_colour_given_means_no_colour_shown():
+    # H&F says only "Recycling" and "Waste": recycling is green on some streets, blue on others
+    assert bin_emoji("Recycling", "recycling") == "\u267B\uFE0F"
+    assert bin_emoji("Household waste", "general") == "\U0001F5D1\uFE0F"
+    assert bin_emoji("Recycling", "recycling", "green") == "\U0001F7E2"  # the resident said green
     assert bin_tag({"label": "glass (black box or basket)", "category": "glass"}) == \
         "⚫ Black box or basket (Glass)"
     assert bin_emoji("Glass", "glass") == "\U0001F37E"  # no colour anywhere: the kind of bin
@@ -25,13 +28,14 @@ def test_non_recyclable_refuse_is_general_and_mixed_recycling_with_glass_is_recy
     assert categorise("Mixed dry recycling (blue lidded bin)").value == "recycling"
 
 
-def test_everyday_bin_is_general_waste_black_bin_and_never_a_wastebasket():
+def test_everyday_bin_is_general_waste_with_no_guessed_colour():
     from app.services.normalize import bin_tag, categorise, display_label
     for council_name in ("Household waste", "Waste", "Rubbish collection", "Refuse",
                          "Non-Recyclable Refuse collection", "Residual waste"):
         cat = categorise(council_name).value
-        assert display_label(council_name, cat) == "General waste (black bin)", council_name
-        assert bin_tag({"label": council_name, "category": cat}) == "⚫ Black bin (General waste)"
+        assert display_label(council_name, cat) == "General waste", council_name
+        assert bin_tag({"label": council_name, "category": cat}) == "\U0001F5D1\uFE0F General waste"
+        assert bin_tag({"label": council_name, "category": cat, "colour": "black"}) == "⚫ General waste"
     assert display_label("Green bin", "general") == "Green bin"  # Glasgow: its own colour stays
     assert display_label("glass (black box or basket)", "glass") == "Glass (black box or basket)"
     assert bin_tag({"label": "Something odd", "category": "other"}).startswith("⚫")  # a dot

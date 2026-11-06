@@ -161,10 +161,10 @@ def test_verify_fills_missing_recycling_from_a_neighbour(client, db, fake_adapte
 
     monkeypatch.setattr(schedule, "fetch_collections", fetch)
     start = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
-    assert [b["label"] for b in start["bins"]] == ["General waste (black bin)"]
+    assert [b["label"] for b in start["bins"]] == ["General waste"]
 
     bins = client.post(f"/api/users/{start['user_id']}/verify").json()
-    assert sorted(b["label"] for b in bins) == ["General waste (black bin)", "Recycling"]
+    assert sorted(b["label"] for b in bins) == ["General waste", "Recycling"]
     assert "10" in asked
     rec = next(b for b in bins if b["label"] == "Recycling")
     assert rec["frequency"] == "fortnightly" and rec["days"] == ["TUE"]
@@ -192,7 +192,7 @@ def test_failed_address_is_rescued_by_a_neighbour(client, db, fake_adapter, monk
 
     monkeypatch.setattr(schedule, "fetch_collections", fetch)
     r = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": "10000002"}).json()
-    assert r["error"] is None and [b["label"] for b in r["bins"]] == ["General waste (black bin)"]
+    assert r["error"] is None and [b["label"] for b in r["bins"]] == ["General waste"]
     assert r["bins"][0]["frequency"] == "weekly"
 
 

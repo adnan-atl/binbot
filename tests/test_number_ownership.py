@@ -233,7 +233,7 @@ def test_signing_up_after_tomorrows_reminder_time_gets_a_reminder_in_the_welcome
     try:
         late = datetime(2026, 11, 9, 23, 12, tzinfo=ZoneInfo("Europe/London"))
         assert reminders.tomorrow_note(db, u, now=late) == (
-            "And don't forget your \U0001F535 Recycling and \u26AB Black bin (General waste) tomorrow!")
+            "And don't forget your \u267B\uFE0F Recycling and \U0001F5D1\uFE0F General waste tomorrow!")
         early = datetime(2026, 11, 9, 19, 0, tzinfo=ZoneInfo("Europe/London"))
         assert reminders.tomorrow_note(db, u, now=early) is None  # the reminder will still come
     finally:
@@ -255,7 +255,7 @@ def test_signing_up_before_7am_on_a_collection_day_gets_today_in_the_welcome(db)
     try:
         small_hours = datetime(2026, 11, 6, 0, 53, tzinfo=ZoneInfo("Europe/London"))
         assert reminders.tomorrow_note(db, u, now=small_hours) == (
-            "And don't forget your \U0001F535 Recycling today, out by 7am!")
+            "And don't forget your \u267B\uFE0F Recycling today, out by 7am!")
         later = datetime(2026, 11, 6, 7, 30, tzinfo=ZoneInfo("Europe/London"))
         assert reminders.tomorrow_note(db, u, now=later) is None  # today's has gone by then
     finally:
