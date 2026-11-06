@@ -622,6 +622,8 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 @media (min-width:601px){.phone-wrap .binji{top:calc(-0.83 * var(--bw) + 22px);right:-4px}}
 .phone-wrap .binji-say{right:148px;top:-76px}
 @media (min-width:601px){.phone-wrap .binji-say{right:auto;left:calc(100% + 36px);top:-106px}}
+.home-note{margin:-6px 0 0;font-size:clamp(14px,1.25vw,16px);line-height:1.3;font-weight:500;color:#8E8E93}  /* coverage, small and quiet under the description */
+.pc-note{font-size:14px;color:#8E8E93}  /* "will this work for me?" answered on the postcode step */
 </style>
 </head>
 <body>
@@ -634,6 +636,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div class="home-copy">
 <h1 class="home-h">Never miss a bin day again</h1>
 <p class="home-p">A personal assistant that lives in your <span class="wa-word"><svg viewBox="0 0 720 720" width="18" height="18" fill="#25D366" aria-hidden="true"><path d="M360,0C161.18,0,0,161.18,0,360c0,65.41,17.45,126.75,47.94,179.61L0,720l187.02-44.21c51.34,28.18,110.28,44.21,172.98,44.21,198.82,0,360-161.18,360-360S558.82,0,360,0ZM360,655.52c-60.17,0-116.13-17.98-162.82-48.87l-110.49,28.14,30.99-105.61c-33.53-47.93-53.2-106.26-53.2-169.19,0-163.21,132.31-295.52,295.52-295.52s295.52,132.31,295.52,295.52-132.31,295.52-295.52,295.52Z"/><path d="M444.35,407.52l87.1,41.06c4,1.88,6.56,5.94,6.2,10.34-.94,11.46-5.54,34.43-26.13,55.02-58.12,58.12-162.49-7.64-166.74-10.18-25.67-13.79-50.06-32.24-73.19-55.36-23.12-23.12-41.58-47.52-55.37-73.19-2.55-4.24-68.31-108.61-10.18-166.74,20.59-20.59,43.56-25.19,55.02-26.13,4.41-.36,8.46,2.2,10.34,6.2l41.07,87.1c1.94,4.12,1.09,9.02-2.13,12.24l-30.61,30.61c-6.62,6.62-8.56,16.93-4,25.11,11.17,20.03,26.19,39.32,43.59,57.07,17.75,17.4,37.04,32.43,57.07,43.59,8.18,4.56,18.48,2.62,25.11-4l30.61-30.61c3.22-3.22,8.12-4.08,12.24-2.13Z"/></svg> <span style="color:#FFFFFF">WhatsApp</span></span><br class="br-web"> and tells you which bin to put out, the night before collection.</p>
+<p class="home-note"><span aria-hidden="true">🇬🇧</span> Works with 300+ UK councils</p>
 <div class="home-cta" style="margin-top:18px"><a class="cta" href="#postcode"><svg viewBox="0 0 720 720" class="cta-wa" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M360,0C161.18,0,0,161.18,0,360c0,65.41,17.45,126.75,47.94,179.61L0,720l187.02-44.21c51.34,28.18,110.28,44.21,172.98,44.21,198.82,0,360-161.18,360-360S558.82,0,360,0ZM360,655.52c-60.17,0-116.13-17.98-162.82-48.87l-110.49,28.14,30.99-105.61c-33.53-47.93-53.2-106.26-53.2-169.19,0-163.21,132.31-295.52,295.52-295.52s295.52,132.31,295.52,295.52-132.31,295.52-295.52,295.52Z"/><path d="M444.35,407.52l87.1,41.06c4,1.88,6.56,5.94,6.2,10.34-.94,11.46-5.54,34.43-26.13,55.02-58.12,58.12-162.49-7.64-166.74-10.18-25.67-13.79-50.06-32.24-73.19-55.36-23.12-23.12-41.58-47.52-55.37-73.19-2.55-4.24-68.31-108.61-10.18-166.74,20.59-20.59,43.56-25.19,55.02-26.13,4.41-.36,8.46,2.2,10.34,6.2l41.07,87.1c1.94,4.12,1.09,9.02-2.13,12.24l-30.61,30.61c-6.62,6.62-8.56,16.93-4,25.11,11.17,20.03,26.19,39.32,43.59,57.07,17.75,17.4,37.04,32.43,57.07,43.59,8.18,4.56,18.48,2.62,25.11-4l30.61-30.61c3.22-3.22,8.12-4.08,12.24-2.13Z"/></svg>Add to WhatsApp</a></div>
 </div>
 <div class="phone-col" aria-hidden="true">
@@ -703,7 +706,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <h1 class="h1">FAQs</h1>
 <div class="faqs">
 <details class="faq"><summary>How does {{BRAND}} know my bin days?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>It reads your council's own website, using your postcode or address. It checks it again every week, and more often before bank holidays.</p></div></div></details>
-<details class="faq"><summary>Does it work for my council?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>It covers most councils in the UK. If yours isn't covered, you can add your bin days yourself and still get reminders.</p></div></div></details>
+<details class="faq"><summary>Does it work for my council?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>It works with 300+ UK councils, about 9 in 10. Enter your postcode and you'll see straight away. If your council isn't covered, or its website is having a slow day, you can add your bin days yourself and still get reminders.</p></div></div></details>
 <details class="faq"><summary>How much does it cost?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>Nothing. {{BRAND}} is free for everyone, and included with {{PARENT_NAME}} membership.</p></div></div></details>
 <details class="faq"><summary>What if my collection day changes?<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>{{BRAND}} spots changes on your council's calendar, such as bank holiday moves, and messages you with the new date.</p></div></div></details>
 <details class="faq"><summary>The days look wrong for my home.<span class="pm" aria-hidden="true"></span></summary><div class="faq-a"><div><p>Reply WRONG to a reminder, or tap "These aren't my days" when you check your bins. {{BRAND}} then looks up your home on its own.</p></div></div></details>
@@ -848,6 +851,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <label for="pc" class="lbl">Postcode</label>
 <div class="pc-wrap"><img class="pc-binji" src="/static/binji-think.webp" alt="" width="359" height="480"><input id="pc" class="field" type="text" autocomplete="postal-code" placeholder="e.g. E8 3PB" aria-describedby="pc-err"></div>
 <span id="pc-err" class="error" hidden>Enter a UK postcode, like E8 3PB.</span>
+<span class="pc-note">Works with 300+ UK councils.</span>
 </div>
 <div id="house-wrap" style="display:flex;flex-direction:column;gap:8px" hidden>
 <label for="house" class="lbl">House number or name</label>
@@ -1092,7 +1096,7 @@ Share to WhatsApp
   }
   // Content of the incoming page, in the order it should rise in.
   function enterItems(screen) {
-    if (screen.id === 'home') return [['.home-h', 'in'], ['.home-p', 'in'], ['.home-cta', 'fade'], ['.phone-col', 'in'], ['.home-foot', 'fade']]
+    if (screen.id === 'home') return [['.home-h', 'in'], ['.home-p', 'in'], ['.home-note', 'in'], ['.home-cta', 'fade'], ['.phone-col', 'in'], ['.home-foot', 'fade']]
       .map(function (x) { var el = $(x[0], screen); el.dataset.anim = x[1]; return el; });
     var out = [];
     screen.querySelectorAll('.page-main > *').forEach(function (el) {
