@@ -211,7 +211,7 @@ def share_message(user: User) -> str:
     Same words as the website's share screen."""
     s = get_settings()
     return (f"\U0001F3A9 Thought you might like this little gem!\n\n{s.brand_name} is a free WhatsApp "
-            f"assistant that reminds you which bin to put out the evening before collection. Knows "
+            f"assistant that reminds you which bin to put out the night before collection. Knows "
             f"your council's schedule, so you don't have to!\n\nTakes a minute to set up: "
             f"{share_link(user)}")
 
@@ -337,7 +337,8 @@ def welcome_parts(db: Session, user: User) -> list[str]:
                       .order_by(Reminder.send_at))
     clock = _clock(user.reminder_time)
     # "night_before" is the evening before, at any time the resident picks (4pm is an option).
-    # Copy always says "the evening before", never "the day before" or "the night before".
+    # Bot messages say "the evening before", never "the day before" or "the night before". (The
+    # share message, which is marketing copy, says "the night before": share_message.)
     when = ("the evening before" if user.reminder_mode == ReminderMode.night_before
             else "on the morning")
     brand = get_settings().brand_name
