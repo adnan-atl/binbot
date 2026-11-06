@@ -15,6 +15,7 @@ from app.adapters.manual import expand_rule
 from app.core.config import get_settings
 from app.models import (
     BINFLUENCER_AT,
+    BinType,
     Referral,
     ChangeLog,
     CollectionEvent,
@@ -25,7 +26,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.services.normalize import bin_tag, council_colour, describe_rule, is_daily
+from app.services.normalize import bin_tag, describe_rule, is_daily
 from app.providers.messaging import get_provider, send_contact, send_message, send_reply, send_template_batch, uses_template
 
 _CATEGORY_NAMES = {
@@ -43,9 +44,12 @@ def effective_collections(db: Session, user: User) -> dict[date, list[dict]]:
     for s in settings:
         if not s.enabled:
             continue
-        council = user.property.council if user.property else None
-        colour = s.colour or (council_colour(council.gss_code if council else None, s.category.value)
-                              if s.bin_type_id and not s.override_rule else None)
+        colour = s.colour
+        if not colour and s.bin_type_id and not s.override_rule:
+            from app.services.schedule import known_colour
+
+            bt = db.get(BinType, s.bin_type_id)
+            colour = known_colour(db, bt, user.property.round_key if user.property else None) if bt else None
         bin_info = {"label": s.label, "category": s.category.value, "setting_id": s.id,
                     "colour": colour}
         if s.override_rule:

@@ -37,3 +37,43 @@ def test_residents_choice_wins(client, db, monkeypatch):
                      for b in bins], "removed": []}
     out = {b["category"]: b for b in client.put(f"/api/users/{uid}/bins", json=body).json()}
     assert out["food"]["colour"] == "brown"
+
+
+def _pick(client, uid, category, colour):
+    bins = client.get(f"/api/users/{uid}/bins").json()
+    body = {"bins": [{"setting_id": b["setting_id"], "label": b["label"], "category": b["category"],
+                      "enabled": True, **({"colour": colour} if b["category"] == category else {})}
+                     for b in bins], "removed": []}
+    client.put(f"/api/users/{uid}/bins", json=body)
+
+
+def test_one_neighbour_teaches_the_round(client, db):
+    from tests.test_flow import signup
+    first = signup(client)["user_id"]
+    _pick(client, first, "food", "brown")
+    second = signup(client)["user_id"]  # same demo postcode: same round
+    bins = {b["category"]: b for b in client.get(f"/api/users/{second}/bins").json()}
+    assert bins["food"]["colour"] == "brown"
+
+
+def test_two_agreeing_residents_teach_the_council(client, db):
+    from app.models import Property, User
+    from app.services.schedule import resident_colour
+    from app.models import BinType, UserBinSetting
+    from tests.test_flow import signup
+    users = [signup(client)["user_id"] for _ in range(3)]
+    db.expire_all()
+    # put the two pickers on other rounds of the same council
+    for n, uid in enumerate(users[:2]):
+        u = db.get(User, uid)
+        u.property = Property(postcode="E8 1AA", round_key=f"pc:other{n}", council_id=u.property.council_id)
+    db.commit()
+    _pick(client, users[0], "food", "brown")
+    db.expire_all()
+    bt = db.get(BinType, db.scalar(select(UserBinSetting.bin_type_id).where(
+        UserBinSetting.user_id == users[2], UserBinSetting.category == "food")))
+    mine = db.get(User, users[2]).property.round_key
+    assert resident_colour(db, bt, mine) is None  # one pick elsewhere isn't enough
+    _pick(client, users[1], "food", "brown")
+    db.expire_all()
+    assert resident_colour(db, bt, mine) == "brown"

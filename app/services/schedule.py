@@ -28,6 +28,8 @@ from app.models import (
     CouncilStatus,
     Property,
     Snapshot,
+    User,
+    UserBinSetting,
     now,
 )
 from app.services import checks as checker
@@ -389,6 +391,37 @@ def _mark_success(council: Council):
 # ------------------------------------------------------------------ read model
 
 
+# Residents who picked a bin's colour on the website teach it to everyone else: one pick is
+# enough for their own round (same street, same bins), two agreeing picks for the council.
+ROUND_PICKS, COUNCIL_PICKS = 1, 2
+
+
+def resident_colour(db: Session, bt: BinType, round_key: str | None = None) -> str | None:
+    """The colour residents chose for this council bin, if enough of them agree."""
+    from collections import Counter
+
+    rows = db.execute(
+        select(UserBinSetting.colour, Property.round_key)
+        .join(User, User.id == UserBinSetting.user_id)
+        .join(Property, Property.id == User.property_id)
+        .where(UserBinSetting.bin_type_id == bt.id, UserBinSetting.colour.is_not(None))
+    ).all()
+    for scope, need in ((round_key, ROUND_PICKS), (None, COUNCIL_PICKS)):
+        picks = Counter(c for c, rk in rows if scope is None or rk == scope)
+        top = picks.most_common(2)
+        if top and top[0][1] >= need and (len(top) == 1 or top[0][1] > top[1][1]):
+            return top[0][0]
+    return None
+
+
+def known_colour(db: Session, bt: BinType, round_key: str | None = None) -> str | None:
+    """A council bin's colour, best source first: the council's own name for it ("Blue lidded
+    bin"), what residents picked (round, then council), the colour the council publishes
+    (council_colours.json). None: we don't know, so the site asks."""
+    return (bt.colour or resident_colour(db, bt, round_key)
+            or council_colour(bt.council.gss_code if bt.council else None, bt.category.value))
+
+
 def schedule_for(db: Session, prop: Property, with_checks: bool = False):
     """
     Bins for a round with a derived rule each. This is what step 3 shows. Frequencies go
@@ -418,9 +451,7 @@ def schedule_for(db: Session, prop: Property, with_checks: bool = False):
             "bin_type_id": bt.id,
             "label": bt.council_label,
             "category": bt.category.value,
-            # the council's name for it, else the colour the council publishes (council_colours.json)
-            "colour": bt.colour or council_colour(bt.council.gss_code if bt.council else None,
-                                                  bt.category.value),
+            "colour": known_colour(db, bt, prop.round_key),
             "purpose": PURPOSE[bt.category],
             "days": rule["days"],
             "frequency": rule["frequency"],
