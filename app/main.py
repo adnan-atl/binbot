@@ -38,7 +38,7 @@ PREVIEW_TAGS = """<meta name="description" content="{desc}">
 <meta property="og:title" content="{{{{BRAND}}}}: bin day reminders on WhatsApp">
 <meta property="og:description" content="{desc}">
 <meta property="og:url" content="{{{{PUBLIC_URL}}}}/">
-<meta property="og:image" content="{{{{PUBLIC_URL}}}}/static/og.jpg">
+<meta property="og:image" content="{{{{PUBLIC_URL}}}}/static/og.jpg?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Never miss a bin day again: {{{{BRAND}}}} chasing a bin lorry">
