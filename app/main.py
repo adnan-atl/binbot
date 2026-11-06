@@ -32,6 +32,21 @@ app.include_router(webhook_router)
 WEB = Path(__file__).resolve().parent.parent / "web"
 
 
+PREVIEW_TAGS = """<meta name="description" content="{desc}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{{{BRAND}}}}">
+<meta property="og:title" content="{{{{BRAND}}}}: bin day reminders on WhatsApp">
+<meta property="og:description" content="{desc}">
+<meta property="og:url" content="{{{{PUBLIC_URL}}}}/">
+<meta property="og:image" content="{{{{PUBLIC_URL}}}}/static/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Never miss a bin day again: {{{{BRAND}}}} chasing a bin lorry">
+<meta name="twitter:card" content="summary_large_image">
+""".format(desc="A free personal assistant that connects to your council&#39;s data and tells you which "
+                "bin to put out the evening before collection.")
+
+
 def render_index(page: Path | None = None) -> str:
     """The page with the brand and links filled in. Read on every request, so edits to web/
     (mounted into the container) show on refresh. {{BRAND}}, {{PARENT_NAME}}, {{PARENT_URL}},
@@ -39,6 +54,8 @@ def render_index(page: Path | None = None) -> str:
     string literal, safe inside <script>."""
     s = get_settings()
     page = (page or WEB / "index.html").read_text(encoding="utf-8")
+    if 'property="og:image"' not in page:  # every design gets the link preview (WhatsApp etc.)
+        page = re.sub(r"(</title>\n?)", lambda m: m.group(1) + PREVIEW_TAGS, page, count=1)
     brand_json = json.dumps(s.brand_name).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     page = page.replace("{{BRAND_JSON}}", brand_json)
     page = page.replace("{{TURNSTILE_SITE_KEY_JSON}}", json.dumps(s.turnstile_site_key).replace("<", "\\u003c"))
@@ -56,7 +73,7 @@ def render_index(page: Path | None = None) -> str:
 
 
 if WEB.exists():
-    @app.get("/", include_in_schema=False, response_class=HTMLResponse)
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False, response_class=HTMLResponse)
     @app.get("/static/index.html", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/about", include_in_schema=False, response_class=HTMLResponse)
     @app.get("/faqs", include_in_schema=False, response_class=HTMLResponse)
@@ -69,7 +86,7 @@ if WEB.exists():
             return HTMLResponse(render_index(page))
         return HTMLResponse(render_index())
 
-    @app.get("/r/{code}", include_in_schema=False)
+    @app.api_route("/r/{code}", methods=["GET", "HEAD"], include_in_schema=False)
     @app.get("/s/{code}", include_in_schema=False)  # old Share-button links
     @app.get("/w/{code}", include_in_schema=False)  # old WhatsApp invite links
     def referral_link(code: str, request: Request):

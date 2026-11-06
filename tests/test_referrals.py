@@ -186,3 +186,13 @@ def test_home_page_has_a_link_preview(client):
     page = client.get("/").text
     assert 'property="og:image" content="http://localhost:8000/static/og.jpg"' in page
     assert "connects to your council's data" in page
+
+
+def test_every_home_design_has_the_link_preview_and_answers_head(client, monkeypatch):
+    from app.core.config import get_settings
+    monkeypatch.setenv("HOME_DESIGN", "silly")  # what binjamin.uk serves
+    get_settings.cache_clear()
+    page = client.get("/").text
+    assert page.count('property="og:image"') == 1 and "connects to your council" in page
+    assert client.head("/").status_code == 200  # some link-preview fetchers check with HEAD
+    get_settings.cache_clear()
