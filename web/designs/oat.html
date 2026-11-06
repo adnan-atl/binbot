@@ -666,10 +666,10 @@ button,input,select,textarea{font-family:inherit}
 .badge{background:none;padding:0;color:var(--ink)}
 /* the logo: Binjamin set in the headline serif, "by Alfred" in ink (the SVG is white) */
 .badge-name{align-items:baseline}
-.badge-serif{font-family:"DM Serif Display",Georgia,"Times New Roman",serif;font-weight:400;font-size:30px;line-height:1;letter-spacing:-0.01em;color:var(--ink)}
-@media (min-width:601px){.badge-serif{font-size:34px}}
+.badge-serif{white-space:nowrap;font-family:"DM Serif Display",Georgia,"Times New Roman",serif;font-weight:400;font-size:26px;line-height:1;letter-spacing:-0.01em;color:var(--ink)}
+@media (min-width:601px){.badge-serif{font-size:30px}}
 .by-logo{filter:brightness(0);opacity:.82;top:0 !important}
-.logo b{font-family:"DM Serif Display",Georgia,"Times New Roman",serif;font-weight:400;font-size:21px;letter-spacing:-0.01em}
+.logo b{white-space:nowrap;font-family:"DM Serif Display",Georgia,"Times New Roman",serif;font-weight:400;font-size:21px;letter-spacing:-0.01em}
 .menu-btn{color:var(--ink)}
 /* the iPhone mockup keeps the phone's own font */
 .phone-outline,.phone-outline *{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif}
@@ -680,7 +680,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- 1 · Home -->
 <section id="home" class="screen" data-screen="home">
-<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}}</span><img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about">About</a><a href="/faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}} by {{PARENT_NAME}}</span></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about">About</a><a href="/faqs">FAQs</a></nav></div></header>
 <div class="hero">
 <main class="home-main">
 <div class="home-copy">
@@ -733,7 +733,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- About (from the brow). Plain copy: edit it here. -->
 <section class="screen" data-screen="about" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}}</span><img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about" aria-current="page">About</a><a href="/faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}} by {{PARENT_NAME}}</span></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about" aria-current="page">About</a><a href="/faqs">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">About {{BRAND}}</h1>
@@ -750,7 +750,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- FAQs (from the brow). One <details> per question: edit the copy here. -->
 <section class="screen" data-screen="faqs" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}}</span><img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about">About</a><a href="/faqs" aria-current="page">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}} by {{PARENT_NAME}}</span></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about">About</a><a href="/faqs" aria-current="page">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main">
 <h1 class="h1">FAQs</h1>
@@ -772,7 +772,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- Privacy (linked from the footer, FAQs and the number step). DRAFT: have it checked before launch. -->
 <section class="screen" data-screen="privacy" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}}</span><img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about">About</a><a href="/faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}} by {{PARENT_NAME}}</span></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about">About</a><a href="/faqs">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main legal">
 <h1 class="h1">Privacy</h1>
@@ -839,7 +839,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- Terms (linked from the footer and the number step). DRAFT: have it checked before launch. -->
 <section class="screen" data-screen="terms" hidden>
-<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}}</span><img class="by-logo" src="/static/by-alfred-white.svg?v=2" alt="by {{PARENT_NAME}}" width="64" height="15"></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about">About</a><a href="/faqs">FAQs</a></nav></div></header>
+<header class="brow"><div class="brow-in"><a class="badge" href="/" aria-label="{{BRAND}} home"><span class="badge-name"><span class="badge-serif">{{BRAND}} by {{PARENT_NAME}}</span></span></a><button type="button" class="menu-btn" aria-label="Menu" aria-expanded="false"><svg class="i-open" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg><svg class="i-close" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><nav class="brow-nav" aria-label="Site"><a href="/about">About</a><a href="/faqs">FAQs</a></nav></div></header>
 <div class="page-card">
 <main class="page-main legal">
 <h1 class="h1">Terms</h1>
@@ -1045,7 +1045,7 @@ Share to WhatsApp
 <button type="button" class="back" data-back aria-label="Back"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
 <a class="logo" href="/" aria-label="{{BRAND}} home">
 <span class="logo-mark"><img src="/static/binji-logo.png?v=3" alt="" width="38" height="38"></span>
-<span><b>{{BRAND}}</b><span class="by">by {{PARENT_NAME}}</span></span>
+<span><b>{{BRAND}} by {{PARENT_NAME}}</b></span>
 </a>
 </div>
 <span class="step-of"></span>
