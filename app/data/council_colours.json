@@ -387,6 +387,16 @@
     "checked": "2026-11-06",
     "note": "Recycling and rubbish bins differ by area (black/green wheelie bins, communal bins), so blank. Food caddy by orange lid."
   },
+  "E09000006": {
+    "council": "Bromley",
+    "recycling": "green",
+    "general": "black",
+    "paper": "black",
+    "source": "https://www.bromley.gov.uk/household-waste-recycling",
+    "quote": "Black box paper recycling ... Green box bottles, cans, plastic recycling ... Non-recyclable refuse (black sacks, supplied by residents)",
+    "checked": "2026-11-06",
+    "note": "Council names boxes: green box (bottles, cans, plastic, glass), black box (paper and card). Refuse in residents' own black sacks. Food caddy and garden bin colours conflict between sources, so blank."
+  },
   "E07000234": {
     "council": "Bromsgrove",
     "recycling": "green",
