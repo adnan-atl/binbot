@@ -99,6 +99,8 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
         log_checks(db, prop)
     db.commit()
     secs = monotonic() - started
+    user.lookup_seconds, user.lookup_source = round(secs, 1), "manual" if error else source
+    db.commit()
     if not shared and (error or secs > SLOW_LOOKUP_SECONDS):
         from app.services import inbox  # Slack: we look into it
 
@@ -132,8 +134,11 @@ def seed_settings(db: Session, user: User, prop) -> None:
 def fill_gaps(db: Session, user: User) -> None:
     """If the checker found a gap, ask the council about a neighbour or two on the same
     postcode and fill it (re-seeding the bins). Quick enough to wait for."""
+    started = monotonic()
     if user.property and verify_round(db, user.property, confirm=False)["filled"]:
         seed_settings(db, user, user.property)
+    if user.lookup_seconds is not None:  # the loader waited for this too
+        user.lookup_seconds = round(user.lookup_seconds + monotonic() - started, 1)
 
 
 def confirm_round(property_id: str) -> None:

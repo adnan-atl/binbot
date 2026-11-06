@@ -237,6 +237,10 @@ class User(Base):
     # (services/reminders.signup_nudges) because their message never came
     hi_prompted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     signup_nudged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # How long the sign-up checker took for them (council lookup + neighbour check), and
+    # whether it came from the council, a neighbour's calendar or by hand: the sign-ups channel
+    lookup_seconds: Mapped[float | None] = mapped_column(nullable=True)
+    lookup_source: Mapped[str | None] = mapped_column(String(12))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     # Last time they used the service: a message or tap on WhatsApp, the site, or a reminder
     # that reached them. Accounts idle for 2 years are deleted (services/retention.py).

@@ -199,12 +199,14 @@ def test_every_sign_up_is_posted_to_the_signups_channel(client, db, slack, monke
     get_settings.cache_clear()
     _on(client)  # website sign-up, no business number: reminders go on straight away
     [card] = [p for p in slack.posts if p["channel"] == "binjamin-signups"]
-    assert card["text"] == ":tada: New sign-up! That's 1 on Binny."
+    head, detail = card["text"].split("\n")
+    assert head == ":tada: New sign-up! That's 1 on Binny."
+    assert detail.startswith("Hackney · checker took ") and detail.endswith("s")
     say(client, "hi", phone="+447700900555")
     for t in ("E8 1AA", "su:addr:1", "su:bins:ok", "su:time:18:00", "su:go:yes"):
         say(client, t, phone="+447700900555")
-    assert [p["text"] for p in slack.posts if p["channel"] == "binjamin-signups"][-1] == \
-        ":tada: New sign-up! That's 2 on Binny."
+    assert [p["text"] for p in slack.posts if p["channel"] == "binjamin-signups"][-1].startswith(
+        ":tada: New sign-up! That's 2 on Binny.\nHackney · ")
 
 
 def test_a_council_site_that_doesnt_answer_fails_fast_and_pings_the_team(client, db, slack, monkeypatch):
@@ -243,3 +245,29 @@ def test_stale_sign_up_buttons_and_share_links_dont_reach_the_team(client, db, s
     assert say(client, "su:go:nomkt").startswith("You're already signed up")
     assert say(client, "https://binjamin.uk/r/ifiy-la0").startswith("That's a share link")
     assert not [p for p in slack.posts if p["channel"] == "binjamin-inbox"]
+
+
+def test_sign_up_card_says_how_the_checker_went():
+    from types import SimpleNamespace as N
+    from app.services.inbox import signup_card
+
+    class Q:  # stands in for the session: only the total is asked for
+        def scalar(self, *a): return 7
+        def scalars(self, *a): return []
+    def card(secs, source):
+        u = N(property=N(council=N(name="Glasgow City")), lookup_seconds=secs, lookup_source=source)
+        return signup_card(Q(), u, "website").split("\n")[1]
+    assert card(12.4, "manual") == "Glasgow City · checker failed after 12s, bins added by hand"
+    assert card(0.3, "neighbours") == "Glasgow City · instant (a neighbour's calendar)"
+    assert card(34.6, "council") == "Glasgow City · checker took 35s"
+
+
+def test_sign_up_card_flags_bins_changed_by_hand(client, db, slack, monkeypatch):
+    from app.models import UserBinSetting, User
+    from app.services.inbox import signup_card
+    uid = client.post("/api/signup/start", json={"postcode": "e83pb", "uprn": "10000002",
+                                                  "house_number": "12"}).json()["user_id"]
+    db.add(UserBinSetting(user_id=uid, label="Garden", category="garden",
+                          override_rule={"days": ["TUE"], "frequency": "weekly"}))
+    db.commit()
+    assert "1 bin added or changed by hand" in signup_card(db, db.get(User, uid), "website")

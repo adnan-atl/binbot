@@ -200,12 +200,28 @@ def announce_signup(db: Session, user: User, via: str = "website") -> None:
 
 
 def signup_card(db: Session, user: User, via: str) -> str:
-    """Just the alert and the running total."""
+    """The alert, the running total, their council and how long the checker made them wait."""
     from sqlalchemy import func
 
     total = db.scalar(select(func.count()).select_from(User)
                       .where(User.status == UserStatus.active)) or 0
-    return f":tada: New sign-up! That's {total} on {get_settings().brand_name}."
+    lines = [f":tada: New sign-up! That's {total} on {get_settings().brand_name}."]
+    council = user.property.council.name if user.property and user.property.council else ""
+    secs, source = user.lookup_seconds, user.lookup_source
+    wait = ("" if secs is None else
+            f"checker failed after {secs:.0f}s, bins added by hand" if source == "manual" else
+            f"instant (a neighbour's calendar)" if source == "neighbours" and secs < 2 else
+            f"checker took {secs:.0f}s")
+    # Bins they added or changed themselves (a different day, a bin the council didn't list)
+    from app.models import UserBinSetting
+    hand = [b for b in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id))
+            if b.override_rule or b.bin_type_id is None] if getattr(user, "id", None) else []
+    edited = (f"{len(hand)} bin{'s' if len(hand) != 1 else ''} added or changed by hand"
+              if hand and source != "manual" else "")
+    detail = " · ".join(x for x in (council, wait, edited) if x)
+    if detail:
+        lines.append(detail)
+    return "\n".join(lines)
 
 
 # ---- slow council lookups ---------------------------------------------------------------------
