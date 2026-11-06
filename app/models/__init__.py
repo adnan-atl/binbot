@@ -291,6 +291,9 @@ class Reminder(Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     provider_message_id: Mapped[str | None] = mapped_column(String(80))
     reply: Mapped[str | None] = mapped_column(String(40))  # done | snooze | stop
+    # Failed sends so far: a failed reminder is tried again a little later (RETRY_AFTER_MINUTES)
+    # before it's given up on and the team is told (inbox.alert_failed_reminders)
+    attempts: Mapped[int] = mapped_column(default=0, server_default="0")
 
 
 class Outbox(Base):

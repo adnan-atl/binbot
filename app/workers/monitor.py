@@ -23,8 +23,6 @@ from app.models import (
     Council,
     CouncilStatus,
     Property,
-    Reminder,
-    ReminderStatus,
     Snapshot,
     User,
     UserStatus,
@@ -181,18 +179,18 @@ def resolve_disputes(db: Session) -> dict:
 
 def dispatch(db: Session) -> int:
     """Send due reminders, then ping the heartbeat (if set) so an outside monitor notices when
-    reminders stop: the worker died, or every send in a run failed (expired Meta token, say)."""
-    def failed() -> int:
-        return db.scalar(select(func.count()).select_from(Reminder)
-                         .where(Reminder.status == ReminderStatus.failed)) or 0
-    before = failed()
+    reminders stop: the worker died, or every send in a run failed (expired Meta token, say).
+    Failed sends are retried (and alerted on in Slack if they keep failing), but a run where
+    nothing got through is still a bad run."""
+    from app.services import reminders
+
+    reminders.last_errors = 0
     try:
         sent = dispatch_due(db)
     except Exception:
         heartbeat(ok=False)
         raise
-    newly_failed = failed() - before
-    heartbeat(ok=not (newly_failed and not sent))
+    heartbeat(ok=not (reminders.last_errors and not sent))
     return sent
 
 

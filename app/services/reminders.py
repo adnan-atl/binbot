@@ -73,10 +73,14 @@ def send_at_for(user: User, collection: date) -> datetime:
 
 def rebuild_reminders(db: Session, user: User) -> int:
     """Drop unsent reminders for the user and recreate from current data. Returns count."""
+    retrying = set()
     for r in db.scalars(
         select(Reminder).where(Reminder.user_id == user.id,
                                Reminder.status == ReminderStatus.scheduled)
     ):
+        if r.attempts and user.status == UserStatus.active:
+            retrying.add(r.collection_date)  # mid-retry: keep it, or it'd be dropped as past
+            continue
         db.delete(r)
     db.flush()
     if user.status != UserStatus.active or not user.phone_e164:
@@ -85,7 +89,7 @@ def rebuild_reminders(db: Session, user: User) -> int:
     now_ = datetime.now(ZoneInfo(user.timezone or "Europe/London"))
     for d, bins in effective_collections(db, user).items():
         send_at = send_at_for(user, d)
-        if send_at < now_:
+        if send_at < now_ or d in retrying:
             continue
         db.add(Reminder(user_id=user.id, collection_date=d, send_at=send_at,
                         bins=[{"label": b["label"], "category": b["category"], "colour": b.get("colour")}
@@ -149,6 +153,9 @@ def render_reminder(user: User, r: Reminder) -> str:
             f"that's not your bin day. STOP to stop.")
 
 
+last_errors = 0  # failed sends in the latest dispatch_due run, retries included (the heartbeat)
+
+
 def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
     """Send every reminder whose time has come. Run every minute by the worker. The sends go out
     in parallel (send_template_batch), so a few thousand people on the same time all get theirs
@@ -180,10 +187,18 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
     if with_news:
         rows += send_template_batch(db, news_template or s.meta_reminder_template,
                                     [j for _, j, _ in with_news], kind="reminder", buttons=True)
-    sent = 0
+    global last_errors
+    sent, gave_up = 0, []
+    last_errors = sum(1 for row in rows if row.error)
     for (r, _, news_rows), row in zip(plain + with_news, rows):
         if row.error:
-            r.status = ReminderStatus.failed
+            r.attempts = (r.attempts or 0) + 1
+            retry_at = _retry_at(db.get(User, r.user_id), r, now_utc)
+            if retry_at:  # try again shortly: a blip at Meta, a template mid-review
+                r.send_at = retry_at
+            else:
+                r.status = ReminderStatus.failed
+                gave_up.append((r, row.error))
         else:
             r.status = ReminderStatus.sent
             r.sent_at = now_utc
@@ -193,7 +208,30 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
                 _mark_announced(news_rows, now_utc)
             sent += 1
     db.commit()
+    if gave_up:
+        from app.services import inbox
+
+        inbox.alert_failed_reminders(db, gave_up)
     return sent
+
+
+# A failed reminder is tried again this many minutes after each failure, then given up on.
+RETRY_AFTER_MINUTES = (10, 30)
+# ...but never once it's too late to be useful: the collection day's morning.
+RETRY_UNTIL = time(8, 0)
+
+
+def _retry_at(user: User, r: Reminder, now_utc: datetime) -> datetime | None:
+    """When to try a failed reminder again, or None to give up (out of tries, or too late)."""
+    if r.attempts > len(RETRY_AFTER_MINUTES):
+        return None
+    if now_utc.tzinfo is None:  # SQLite hands back naive UTC
+        now_utc = now_utc.replace(tzinfo=ZoneInfo("UTC"))
+    at = now_utc + timedelta(minutes=RETRY_AFTER_MINUTES[r.attempts - 1])
+    tz = ZoneInfo(user.timezone or "Europe/London")
+    if at > datetime.combine(r.collection_date, RETRY_UNTIL, tz):
+        return None
+    return at
 
 
 # ---- "share with neighbours": once, after they've had their first reminder --------------------

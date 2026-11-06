@@ -12,6 +12,7 @@ Off (no-op) without SLACK_BOT_TOKEN. Slack is never allowed to break a WhatsApp 
 call is wrapped and logged.
 """
 import hashlib
+import json
 import hmac
 import html
 import logging
@@ -251,6 +252,42 @@ def alert_slow_lookup(prop, secs: float, source: str, error: str | None) -> None
         threading.Thread(target=_api, args=("chat.postMessage",), daemon=True,
                          kwargs={"channel": s.slack_alerts_channel, "text": text,
                                  "unfurl_links": False}).start()
+
+
+def _send_error(raw: str | None) -> str:
+    """Meta's error JSON as one readable line: '(#132001) Template name does not exist in the
+    translation: template name (bin_reminder) does not exist in en_GB'."""
+    try:
+        e = json.loads(raw or "")["error"]
+        msg = e.get("message", "")
+        detail = (e.get("error_data") or {}).get("details", "")
+        return f"{msg}: {detail}" if detail and detail not in msg else msg or str(raw)
+    except Exception:
+        return str(raw or "unknown error")
+
+
+def alert_failed_reminders(db: Session, failures: list) -> None:
+    """Reminders that still didn't send after their retries: one message to SLACK_ALERTS_CHANNEL
+    tagging the team, so someone can look at it the same evening (a template not approved, an
+    expired token, a number that left WhatsApp). failures: (Reminder, error) pairs. Street and
+    district plus the number's last four digits, never the full number or house."""
+    s = get_settings()
+    if not enabled() or not s.slack_alerts_channel or not failures:
+        return
+    n = len(failures)
+    lines = [f":rotating_light: *{n} reminder{'s' if n != 1 else ''} didn't send* "
+             f"(gave up after retrying) {s.slack_alert_mention}".rstrip()]
+    for r, err in failures[:10]:
+        user = db.get(User, r.user_id)
+        council = user.property.council.name if user and user.property and user.property.council else ""
+        bins = ", ".join(b.get("label", "") for b in r.bins)
+        where = " · ".join(x for x in (_street(user), council) if x)
+        lines.append(f"• …{(user.phone_e164 or '')[-4:] if user else '????'} · {where} · {bins} "
+                     f"for {r.collection_date.strftime('%a %-d %b')}\n   `{_send_error(err)[:200]}`")
+    if n > 10:
+        lines.append(f"…and {n - 10} more")
+    _api("chat.postMessage", channel=s.slack_alerts_channel, text="\n".join(lines),
+         unfurl_links=False)
 
 
 def _street(user: User | None) -> str:
