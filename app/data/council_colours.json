@@ -409,11 +409,13 @@
   },
   "E07000095": {
     "council": "Broxbourne",
+    "general": "black",
+    "food": "brown",
     "garden": "green",
-    "source": "https://www.broxbourne.gov.uk/greenwaste",
-    "quote": "The Council will supply you with a green 240-litre wheeled bin (garden waste)",
+    "source": "https://www.broxbourne.gov.uk/news/article/142/recycle-right-for-broxbourne-find-out-what-can-and-cannot-be-recycled-in-the-council-s-a-z-of-recycling",
+    "quote": "Non-recyclable domestic waste should be placed in the black wheeled bin ... Food waste should be placed in the brown caddy ... a green 240-litre wheeled bin (garden)",
     "checked": "2026-11-06",
-    "note": "Only garden colour found; other bin pages didn't load or don't state colours."
+    "note": "Rechecked via search. Recycling in stacked kerbside boxes with nets (colour not stated), so blank."
   },
   "E07000172": {
     "council": "Broxtowe",
