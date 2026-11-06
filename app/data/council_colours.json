@@ -213,6 +213,209 @@
     "checked": "2026-11-06",
     "note": "Bins named by lid on the extra-capacity page (orange-, black-, green-lidded)."
   },
+  "N09000003": {
+    "council": "Belfast",
+    "general": "black",
+    "food": "green",
+    "source": "https://www.belfastcity.gov.uk/bins-recycling-environment/bins-boxes-collections/what-goes-in-my-bins-and-boxes",
+    "quote": "general waste (black) bin ... Green food waste bin ... Suburban (usually blue or brown bins) ... recycling boxes in various colours",
+    "checked": "2026-11-06",
+    "note": "Recycling varies (blue bin, brown bin, or boxes in various colours), so blank. Green food bin where there's no brown bin."
+  },
+  "E09000004": {
+    "council": "Bexley",
+    "recycling": "white",
+    "general": "green",
+    "food": "brown",
+    "garden": "brown",
+    "paper": "blue",
+    "source": "https://www.bexley.gov.uk/services/rubbish-and-recycling/recycling/what-goes-my-recycling-wheelie-bins",
+    "quote": "Your white-lidded bin is for plastic packaging, glass, cans and cartons. Your blue-lidded bin is for clean paper and card ... general rubbish green wheeled bin ... 23-litre brown food waste box ... brown wheeled bin for garden",
+    "checked": "2026-11-06",
+    "note": "All wheelie bins are green bodies: recycling by white lid, paper by blue lid. Sack homes use green/black/maroon boxes."
+  },
+  "E08000025": {
+    "council": "Birmingham",
+    "recycling": "blue",
+    "general": "grey",
+    "source": "https://www.birmingham.gov.uk/info/20009/waste_and_recycling/105/about_your_recycling_and_rubbish_bins",
+    "quote": "Most households have one recycling wheelie bin which has a blue lid and removeable pod insert ... The lid of your rubbish bin is grey",
+    "checked": "2026-11-06",
+    "note": "Named by lid. Paper goes in the pod inside the recycling bin (some homes: green-lid bin), so paper blank."
+  },
+  "E07000129": {
+    "council": "Blaby",
+    "garden": "brown",
+    "source": "https://www.blaby.gov.uk/waste-and-recycling/garden-waste/garden-waste-collections/",
+    "quote": "brown lidded garden waste wheeled bin",
+    "checked": "2026-11-06",
+    "note": "Only garden colour stated; recycling and rubbish colours not on the council pages."
+  },
+  "E06000008": {
+    "council": "Blackburn with Darwen",
+    "recycling": "grey",
+    "general": "burgundy",
+    "garden": "brown",
+    "paper": "blue",
+    "source": "https://www.blackburn.gov.uk/bins-and-waste/recycling-and-waste",
+    "quote": "Your blue recycling bin is for paper, card and cardboard ... Your grey recycling bin is for glass, metals, plastics and cartons ... Your burgundy general waste bin",
+    "checked": "2026-11-06",
+    "note": "Brown garden waste bin (/bins-and-waste/garden-waste)."
+  },
+  "E06000009": {
+    "council": "Blackpool",
+    "recycling": "blue",
+    "general": "grey",
+    "garden": "green",
+    "paper": "brown",
+    "source": "https://www.blackpool.gov.uk/Residents/Waste-and-recycling/Bin-collections/Waste-changes.aspx",
+    "quote": "Grey lid bin - general waste; Blue lid bin - recycling glass, cans, plastic; Brown lid bin - recycling paper and cardboard; Green lid bin - garden waste",
+    "checked": "2026-11-06",
+    "note": "Named by lid. Some homes use red refuse sacks. Three-weekly cycle."
+  },
+  "W06000019": {
+    "council": "Blaenau Gwent",
+    "general": "black",
+    "garden": "green",
+    "source": "https://www.blaenau-gwent.gov.uk/en/resident/waste-recycling/",
+    "quote": "black wheeled bin ... green waste sacks ... Troliboc lids (red, blue and green)",
+    "checked": "2026-11-06",
+    "note": "Recycling in a Troliboc (stacked boxes with red/blue/green lids), so blank. Garden waste goes in green sacks."
+  },
+  "E07000033": {
+    "council": "Bolsover",
+    "recycling": "burgundy",
+    "general": "black",
+    "garden": "green",
+    "source": "https://www.bolsover.gov.uk/waste-bins-recycling",
+    "quote": "Black Bins (domestic waste) Burgundy Bins (recyclable waste) and Green Bins (garden waste)",
+    "checked": "2026-11-06",
+    "note": "Food caddy colour not stated."
+  },
+  "E08000001": {
+    "council": "Bolton",
+    "recycling": "burgundy",
+    "general": "grey",
+    "food": "green",
+    "garden": "green",
+    "source": "https://www.bolton.gov.uk/rubbish-recycling",
+    "quote": "Beige bin ... Burgundy bin ... Green bin and food waste container ... Grey bin",
+    "checked": "2026-11-06",
+    "note": "Burgundy for glass/cans/plastic; paper goes in a beige bin (beige isn't one of our colours, so blank). Food in green bin or green food container."
+  },
+  "E07000136": {
+    "council": "Boston",
+    "recycling": "blue",
+    "general": "green",
+    "food": "orange",
+    "garden": "brown",
+    "paper": "purple",
+    "source": "https://www.boston.gov.uk/waste",
+    "quote": "Green Refuse Bin ... Blue Recycling Bin ... Purple-lidded Paper and Card Bin ... Brown Garden Waste Bin ... an orange-lidded outdoor caddy",
+    "checked": "2026-11-06",
+    "note": "Food caddy named by orange lid; paper by purple lid."
+  },
+  "E06000036": {
+    "council": "Bracknell Forest",
+    "recycling": "blue",
+    "general": "green",
+    "garden": "brown",
+    "source": "https://www.bracknell-forest.gov.uk/bins-and-recycling",
+    "quote": "In Bracknell Forest, green bins are for general waste ... blue bins are for recycling ... brown bins are for garden waste",
+    "checked": "2026-11-06",
+    "note": "Flats may have green or red general waste bins. Food caddy colour not stated."
+  },
+  "E08000032": {
+    "council": "Bradford",
+    "recycling": "grey",
+    "general": "green",
+    "garden": "brown",
+    "source": "https://www.bradford.gov.uk/recycling-and-waste/wheeled-bins-and-recycling-containers/what-goes-in-your-bins/",
+    "quote": "Grey bin - recycling only ... Green bin for general waste ... Brown bin - garden waste",
+    "checked": "2026-11-06",
+    "note": "Some flats use large blue recycling bins."
+  },
+  "E07000067": {
+    "council": "Braintree",
+    "recycling": "blue",
+    "general": "grey",
+    "garden": "green",
+    "paper": "red",
+    "source": "https://www.braintree.gov.uk/wastechanges",
+    "quote": "Grey bin ... Paper and card recycling (red-lidded bin) ... Mixed recycling (blue-lidded bin) ... Garden waste and garden bin (green bin)",
+    "checked": "2026-11-06",
+    "note": "Recycling and paper named by lid. Food bin colour not stated."
+  },
+  "E07000143": {
+    "council": "Breckland",
+    "recycling": "black",
+    "general": "green",
+    "food": "blue",
+    "garden": "brown",
+    "source": "https://www.breckland.gov.uk/rubbish/household-waste",
+    "quote": "What goes in my black recycling bin? ... green household waste bin ... blue food waste containers ... brown garden waste bin",
+    "checked": "2026-11-06",
+    "note": "Garden by subscription."
+  },
+  "E09000005": {
+    "council": "Brent",
+    "recycling": "blue",
+    "general": "grey",
+    "garden": "green",
+    "paper": "blue",
+    "source": "https://www.brent.gov.uk/bins-rubbish-and-recycling/what-you-can-put-in-your-bins",
+    "quote": "Recycling bin (blue lidded bin) ... Grey bin The grey bin is for general rubbish ... Paper and cardboard (blue sack) ... additional green bin (garden)",
+    "checked": "2026-11-06",
+    "note": "Recycling by blue lid; paper in a blue sack. Some homes use black sacks for rubbish."
+  },
+  "W06000013": {
+    "council": "Bridgend County Borough",
+    "food": "brown",
+    "glass": "black",
+    "source": "https://www.bridgend.gov.uk/residents/recycling-and-waste/recycling-collections/",
+    "quote": "Brown caddies - Food waste ... Black caddy - Glass ... Orange bag - Cardboard ... Blue bag - Plastic, cans ... White bag - Paper",
+    "checked": "2026-11-06",
+    "note": "Recycling in coloured sacks (blue plastics/cans, white paper, orange cardboard); rubbish in residents' own bags. So only food and glass set."
+  },
+  "E06000043": {
+    "council": "Brighton and Hove",
+    "food": "orange",
+    "garden": "brown",
+    "glass": "black",
+    "source": "https://www.brighton-hove.gov.uk/rubbish-recycling-and-streets/recycling/how-use-your-recycling-bins-and-boxes",
+    "quote": "a 23 litre orange lidded food waste caddy ... black glass recycling box ... brown garden bin ... Some areas in the city have black wheelie bins for recycling",
+    "checked": "2026-11-06",
+    "note": "Recycling and rubbish bins differ by area (black/green wheelie bins, communal bins), so blank. Food caddy by orange lid."
+  },
+  "E07000234": {
+    "council": "Bromsgrove",
+    "recycling": "green",
+    "general": "grey",
+    "garden": "brown",
+    "source": "https://www.bromsgrove.gov.uk/residents/my-place/bins-and-recycling/your-guide-to-bin-colours-and-what-can-go-in-each/",
+    "quote": "Grey Bin ... Green Lid or All Green recycling bin ... Brown Lid or Brown Bin",
+    "checked": "2026-11-06",
+    "note": "Glass goes in the green recycling bin."
+  },
+  "E07000095": {
+    "council": "Broxbourne",
+    "garden": "green",
+    "source": "https://www.broxbourne.gov.uk/greenwaste",
+    "quote": "The Council will supply you with a green 240-litre wheeled bin (garden waste)",
+    "checked": "2026-11-06",
+    "note": "Only garden colour found; other bin pages didn't load or don't state colours."
+  },
+  "E07000172": {
+    "council": "Broxtowe",
+    "recycling": "green",
+    "general": "black",
+    "garden": "brown",
+    "glass": "red",
+    "source": "https://www.broxtowe.gov.uk/for-you/waste-and-recycling/bin-information/",
+    "quote": "Black-lidded general waste bin ... Green-lidded recycling bin ... Glass bag or red-lidded glass bin ... Brown-lidded garden waste bin",
+    "checked": "2026-11-06",
+    "note": "All named by lid. Some homes use a glass bag."
+  },
   "E09000013": {
     "council": "Hammersmith and Fulham",
     "recycling": "green",
