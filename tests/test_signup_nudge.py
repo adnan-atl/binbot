@@ -37,7 +37,7 @@ def test_one_nudge_after_12_minutes_then_the_button_starts_reminders(client, db,
     [n] = _nudges(db)
     assert n.to_phone == PHONE and n.body.startswith("Your bin reminders are nearly ready.")
     assert signup_nudges(db, now_utc=_at(db, uid, 30)) == 0  # only once
-    assert _say(client, PHONE, START_PAYLOAD).startswith("Binny here. You're all set.")
+    assert _say(client, PHONE, START_PAYLOAD).startswith("Binny here!")
     db.expire_all()
     assert db.get(User, uid).status == UserStatus.active
 

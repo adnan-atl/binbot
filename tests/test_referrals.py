@@ -150,7 +150,7 @@ def test_whatsapp_invite_link_credits_the_sharer(client, db, monkeypatch):
     say("su:addr:2")
     say("su:bins:ok")
     say("su:time:19:00")
-    assert say("su:go:yes").startswith("Binny here. You're all set.")
+    assert say("su:go:yes").startswith("Binny here!")
     db.expire_all()
     assert db.scalar(select(Referral).where(Referral.referrer_id == sharer)) is not None
     monkeypatch.delenv("META_DISPLAY_NUMBER")

@@ -56,7 +56,8 @@ def test_full_sign_up_in_whatsapp(client, db):
             and "offers from" not in consent)
     assert "[Start reminders] [No feature updates]" in last_sent(db)
     welcome = say(client, "su:go:yes")
-    assert welcome.startswith("Binny here. You're all set. I'll message you at 6pm the evening before collection.")
+    assert welcome.startswith("Binny here! Found you at 12 Elm Road")
+    assert "I'll give you a nudge at 6pm the evening before." in welcome
     u = me(db)
     assert u.status == UserStatus.active and u.reminder_time == "18:00"
     assert u.consent_at and u.marketing_consent_at
@@ -72,7 +73,7 @@ def test_no_feature_updates_still_starts_reminders_without_marketing(client, db)
     to_bins(client, db)
     say(client, "su:bins:ok")
     say(client, "7pm")  # typed instead of tapped
-    assert say(client, "su:go:nomkt").startswith("Binny here. You're all set.")
+    assert say(client, "su:go:nomkt").startswith("Binny here!")
     u = me(db)
     assert u.status == UserStatus.active and u.reminder_time == "19:00"
     assert u.consent_at and u.marketing_consent_at is None
@@ -140,7 +141,7 @@ def test_website_sign_up_that_messages_without_the_code(client, db, live):  # no
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "20:00"})
     ask = _say(client, "+447700900123", "hello?")
     assert ask.startswith("Looks like you started signing up on the website.") and "8pm" in ask
-    assert _say(client, "+447700900123", "su:web:yes").startswith("Binny here. You're all set.")
+    assert _say(client, "+447700900123", "su:web:yes").startswith("Binny here!")
     db.expire_all()
     u = db.get(User, uid)
     assert u.status == UserStatus.active and u.start_code is None

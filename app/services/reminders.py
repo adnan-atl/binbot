@@ -327,25 +327,72 @@ def purge_unrecognised(db: Session, now_utc: datetime | None = None) -> int:
 
 
 def welcome_parts(db: Session, user: User) -> list[str]:
-    """The welcome, sent the moment reminders go on as separate short messages: set up, first
-    collection, and (welcome_share) a nudge to share it with neighbours. Shows the service works and (on WhatsApp) opens the
-    24-hour window for free-form replies."""
+    """The welcome, sent the moment reminders go on as separate short messages: we found their
+    home and got the calendar from their council (the reassurance), the first collection and
+    when they'll hear from us, and (welcome_share) a nudge to share it with neighbours. The
+    only playful messages: reminders themselves stay plain. Opens the 24-hour window too."""
     first = db.scalar(select(Reminder).where(Reminder.user_id == user.id)
                       .order_by(Reminder.send_at))
     clock = _clock(user.reminder_time)
     # "night_before" is the evening before, at any time the resident picks (4pm is an option).
     # Copy always says "the evening before", never "the day before" or "the night before".
-    when = ("the evening before collection" if user.reminder_mode == ReminderMode.night_before
-            else "on the morning of collection")
-    parts = [f"{get_settings().brand_name} here. You're all set. I'll message you at {clock} {when}."]
+    when = ("the evening before" if user.reminder_mode == ReminderMode.night_before
+            else "on the morning")
+    brand = get_settings().brand_name
+    home, council = home_line(user), council_name(user)
+    hello = f"{brand} here! Found you at {home}. Lovely spot." if home else f"{brand} here!"
+    if council:
+        hello += (f"\n\nI've had a word with my friends at {council} and got your bin rounds "
+                  f"all worked out.")
+    parts = [hello]
     if first:
         names = [bin_tag(b) for b in first.bins]
         bins = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
-        parts.append(f"Next up: {bins} on {first.collection_date.strftime('%a %-d %b')}.")
+        parts.append(f"Next up: {bins} on {first.collection_date.strftime('%a %-d %b')}. "
+                     f"I'll give you a nudge at {clock} {when}.")
+    else:
+        parts.append(f"I'll give you a nudge at {clock} {when} each collection.")
     nudge = welcome_share(user)
     if nudge:
         parts.append(nudge)
     return [p[:4096] for p in parts]  # WhatsApp's text limit; each is far shorter in practice
+
+
+def home_line(user: User) -> str:
+    """Their home as people say it: '12 Church Street, Malmesbury' (number and street, then the
+    town), from the address the council lookup gave us. Empty if we don't have one."""
+    prop = user.property
+    if prop is None or not prop.address_line:
+        return ""
+    pc = (prop.postcode or "").replace(" ", "").upper()
+    parts = [p.strip() for p in prop.address_line.split(",") if p.strip()
+             and p.replace(" ", "").upper() != pc]
+    if not parts:
+        return ""
+    # "46, SILVERDALE ROAD, ..." -> "46 Silverdale Road"; "FLAT 2, 10 ELM ROAD" stays as written
+    merged = []
+    for part in parts:  # a bare house number joins the street after it
+        if merged and re.fullmatch(r"\d+[A-Za-z]?", merged[-1].split(", ")[-1]) and not re.match(r"\d", part):
+            merged[-1] = f"{merged[-1]} {part}"
+        else:
+            merged.append(part)
+    parts = merged
+    if len(parts) > 2 and re.match(r"(flat|apartment|unit|maisonette)\b", parts[0], re.I):
+        parts = [f"{parts[0]}, {parts[1]}"] + parts[2:]  # "Flat 2, 10 High Street"
+    street, town = parts[0], (parts[-1] if len(parts) > 1 else "")
+    fix = lambda t: re.sub(r"\b[A-Z][A-Z']+\b", lambda m: m.group(0).capitalize(), t)  # SHOUTY -> Shouty
+    if town == street:
+        town = ""
+    return ", ".join(fix(x) for x in (street, town) if x)
+
+
+def council_name(user: User) -> str:
+    """'Wiltshire Council', 'Hammersmith and Fulham Council'. Names that already say council
+    (or city) stay as they are."""
+    c = user.property.council if user.property else None
+    if c is None or not c.name:
+        return ""
+    return c.name if re.search(r"\b(council|corporation)\b", c.name, re.I) else f"{c.name} Council"
 
 
 def display_number() -> str:

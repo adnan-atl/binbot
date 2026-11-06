@@ -57,7 +57,9 @@ def test_turning_on_waits_for_hi_and_sends_nothing(client, db, live):
 def test_hi_from_the_typed_number_starts_reminders_and_sends_the_welcome(client, db, live):
     uid, res = _turn_on(client)
     reply = _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}")
-    assert reply.startswith("Binny here. You're all set. I'll message you at 7pm the evening before collection.")
+    assert reply.startswith("Binny here!")
+    assert "I've had a word with my friends at Hackney Council and got your bin rounds all worked out." in reply
+    assert "I'll give you a nudge at 7pm the evening before." in reply
     db.expire_all()
     user = db.get(User, uid)
     assert user.status == UserStatus.active and user.start_code is None
@@ -151,7 +153,7 @@ def test_im_bin_from_the_typed_number_starts_reminders(client, db, live):
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
-    assert reply.startswith("Binny here. You're all set.")
+    assert reply.startswith("Binny here!")
     db.expire_all()
     assert db.get(User, uid).status == UserStatus.active
     assert _say(client, "+447700900123", "Hey Binny, I'M BIN").startswith("Your reminders are already on")
@@ -163,7 +165,7 @@ def test_im_bin_from_another_number_claims_the_sign_up_by_postcode(client, db, l
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     ask = _say(client, "+447700900888", "hey binjamin i'm bin")
     assert ask.startswith("Hi! I couldn't find a sign-up for this number.")
-    assert _say(client, "+447700900888", "e8 3pb").startswith("Binny here. You're all set.")
+    assert _say(client, "+447700900888", "e8 3pb").startswith("Binny here!")
     db.expire_all()
     u = db.get(User, uid)
     assert u.phone_e164 == "+447700900888" and u.status == UserStatus.active
@@ -257,3 +259,16 @@ def test_signing_up_before_7am_on_a_collection_day_gets_today_in_the_welcome(db)
         assert reminders.tomorrow_note(db, u, now=later) is None  # today's has gone by then
     finally:
         reminders.effective_collections = orig
+
+
+def test_welcome_names_their_home_and_council_the_way_people_say_them():
+    from types import SimpleNamespace as N
+    from app.services.reminders import council_name, home_line
+
+    def home(line, pc):
+        return home_line(N(property=N(address_line=line, postcode=pc)))
+    assert home("46, SILVERDALE ROAD, PETTS WOOD, ORPINGTON, BR5 1NJ", "BR5 1NJ") == "46 Silverdale Road, Orpington"
+    assert home("Flat 3, 12, ELM ROAD, LONDON, E8 3PB", "E8 3PB") == "Flat 3, 12 Elm Road, London"
+    assert home("Manor Farm, Little Somerford, SN15 5JW", "SN15 5JW") == "Manor Farm, Little Somerford"
+    assert council_name(N(property=N(council=N(name="Wiltshire")))) == "Wiltshire Council"
+    assert council_name(N(property=N(council=N(name="Westminster City Council")))) == "Westminster City Council"

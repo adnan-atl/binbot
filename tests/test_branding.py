@@ -26,7 +26,7 @@ def test_brand_name_setting(client, db, brand):
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123"})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     welcome = db.scalar(select(Outbox).where(Outbox.kind == "welcome"))
-    assert welcome.body.startswith(f"{brand} here.")
+    assert welcome.body.startswith(f"{brand} here!")
     assert brand in client.get(f"/api/users/{uid}/referral").json()["share_text"]
 
     r = client.get("/")
