@@ -532,8 +532,9 @@ def _switch_on(db: Session, user: User) -> str:
     holder = db.scalar(select(User).where(User.phone_e164 == user.phone_e164, User.id != user.id))
     if holder is not None:  # can't happen (numbers are unique), but never two on one number
         holder.phone_e164 = None
+    via = "website, finished in WhatsApp" if user.wa_step == "web" else "WhatsApp"
     user.wa_step, user.wa_data = None, None
     signup.activate(db, user)
-    text = send_welcome(db, user.phone_e164, user)  # its separate messages go out here
+    text = send_welcome(db, user.phone_e164, user, via=via)  # its separate messages go out here
     db.commit()
     return text

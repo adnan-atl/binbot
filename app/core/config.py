@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     slack_bot_token: str = ""
     slack_signing_secret: str = ""
     slack_inbox_channel: str = "binjamin-inbox"  # name or ID; the Binjamin app must be in it
+    slack_signups_channel: str = "binjamin-signups"  # every new sign-up is posted here; empty turns it off
 
     public_base_url: str = "http://localhost:8000"
 

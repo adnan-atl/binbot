@@ -430,7 +430,7 @@ def welcome_message(db: Session, user: User) -> str:
     return "\n\n".join(welcome_parts(db, user) + share + ([note] if note else []))
 
 
-def send_welcome(db: Session, phone: str, user: User) -> str:
+def send_welcome(db: Session, phone: str, user: User, via: str = "website") -> str:
     """Send the welcome as its separate messages. The first is recorded as kind "welcome" (one
     per sign-up), the rest as "welcome_more". Returns the whole text."""
     import time
@@ -453,6 +453,10 @@ def send_welcome(db: Session, phone: str, user: User) -> str:
         if real:
             time.sleep(0.7)
         send_message(db, phone, note, kind="welcome_more")
+    db.flush()
+    from app.services import inbox as _inbox
+
+    _inbox.announce_signup(db, user, via)  # every sign-up gets one welcome: the Slack tracker
     return welcome_message(db, user)
 
 

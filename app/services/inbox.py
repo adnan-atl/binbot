@@ -177,6 +177,58 @@ def _post(phone: str, text: str, reason: str) -> None:
         db.close()
 
 
+# ---- sign-ups tracker ------------------------------------------------------------------------
+
+def announce_signup(db: Session, user: User, via: str = "website") -> None:
+    """Post a new sign-up to SLACK_SIGNUPS_CHANNEL the moment their reminders go on: street (no
+    house number), council, how they signed up, reminder time, bins, who referred them, and the
+    running total. Never the phone number beyond its last 4 digits. Off without a token."""
+    s = get_settings()
+    if not enabled() or not s.slack_signups_channel:
+        return
+    try:
+        text = signup_card(db, user, via)
+    except Exception:
+        log.exception("sign-up card failed")
+        return
+    if s.demo_mode:
+        _api("chat.postMessage", channel=s.slack_signups_channel, text=text, unfurl_links=False)
+    else:
+        threading.Thread(target=_api, args=("chat.postMessage",), daemon=True,
+                         kwargs={"channel": s.slack_signups_channel, "text": text,
+                                 "unfurl_links": False}).start()
+
+
+def signup_card(db: Session, user: User, via: str) -> str:
+    from sqlalchemy import func
+
+    from app.services.normalize import bin_emoji, bin_name
+    from app.services.reminders import _clock
+
+    total = db.scalar(select(func.count()).select_from(User)
+                      .where(User.status == UserStatus.active)) or 0
+    council = user.property.council.name if user.property and user.property.council else "no council"
+    head = (f":tada: *New sign-up #{total}* · {_street(user)} · {council} · via {via}"
+            f" · {_clock(user.reminder_time)} the evening before")
+    lines = [head]
+    if user.property:
+        from app.services.signup import bins_out
+
+        bits = [f"{bin_emoji(b.label, b.category, b.colour)} {bin_name(b.label)}"
+                for b in bins_out(db, user) if b.enabled and not b.daily]
+        if bits:
+            lines.append("Bins: " + ", ".join(bits))
+    extras = []
+    if user.referred_by_id:
+        ref = db.get(User, user.referred_by_id)
+        extras.append(f"referred by a resident in {_street(ref)}" if ref else "referred")
+    extras.append("updates: yes" if user.marketing_consent_at else "updates: no")
+    if user.phone_e164:
+        extras.append(f"…{user.phone_e164[-4:]}")
+    lines.append(" · ".join(extras))
+    return "\n".join(lines)
+
+
 def _street(user: User | None) -> str:
     """Street and postcode district, never the house number: 'Elm Road, E8'."""
     prop = user.property if user else None

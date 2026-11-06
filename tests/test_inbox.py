@@ -47,6 +47,7 @@ class FakeSlack:
 def slack(monkeypatch):
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
     monkeypatch.setenv("SLACK_SIGNING_SECRET", "shh")
+    monkeypatch.setenv("SLACK_SIGNUPS_CHANNEL", "")  # on only in the sign-up tracker tests
     get_settings.cache_clear()
     fake = FakeSlack()
     monkeypatch.setattr(inbox, "_api", fake.api)
@@ -191,3 +192,29 @@ def test_slack_endpoint_checks_the_signature_and_answers_the_url_check(client, s
     assert client.post("/webhooks/slack", content=body, headers=_signed(body, "wrong")).status_code == 403
     old = _signed(body, ts=time.time() - 600)
     assert client.post("/webhooks/slack", content=body, headers=old).status_code == 403
+
+
+def test_every_sign_up_is_posted_to_the_signups_channel(client, db, slack, monkeypatch):
+    monkeypatch.setenv("SLACK_SIGNUPS_CHANNEL", "binjamin-signups")
+    get_settings.cache_clear()
+    _on(client)  # website sign-up, no business number: reminders go on straight away
+    [card] = [p for p in slack.posts if p["channel"] == "binjamin-signups"]
+    assert card["text"].startswith(":tada: *New sign-up #1* · Elm Road, E8 · ")
+    assert "via website" in card["text"] and "7pm the evening before" in card["text"]
+    assert "Bins: " in card["text"] and "updates: no" in card["text"]
+    assert "…0123" in card["text"] and "+447700900123" not in card["text"]  # never the full number
+    assert "12" not in card["text"].split("·")[1]  # street only, no house number
+
+
+def test_whatsapp_sign_up_says_so(client, db, slack, monkeypatch):
+    monkeypatch.setenv("SLACK_SIGNUPS_CHANNEL", "binjamin-signups")
+    get_settings.cache_clear()
+    say(client, "hi", phone="+447700900555")
+    say(client, "E8 1AA", phone="+447700900555")
+    say(client, "su:addr:1", phone="+447700900555")
+    say(client, "su:bins:ok", phone="+447700900555")
+    say(client, "su:time:18:00", phone="+447700900555")
+    say(client, "su:go:yes", phone="+447700900555")
+    [card] = [p for p in slack.posts if p["channel"] == "binjamin-signups"]
+    assert "via WhatsApp" in card["text"] and "6pm the evening before" in card["text"]
+    assert "updates: yes" in card["text"]
