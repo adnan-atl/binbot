@@ -25,7 +25,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
-from app.services.normalize import bin_tag, describe_rule, is_daily
+from app.services.normalize import bin_tag, council_colour, describe_rule, is_daily
 from app.providers.messaging import get_provider, send_contact, send_message, send_reply, send_template_batch, uses_template
 
 _CATEGORY_NAMES = {
@@ -43,8 +43,11 @@ def effective_collections(db: Session, user: User) -> dict[date, list[dict]]:
     for s in settings:
         if not s.enabled:
             continue
+        council = user.property.council if user.property else None
+        colour = s.colour or (council_colour(council.gss_code if council else None, s.category.value)
+                              if s.bin_type_id and not s.override_rule else None)
         bin_info = {"label": s.label, "category": s.category.value, "setting_id": s.id,
-                    "colour": s.colour}
+                    "colour": colour}
         if s.override_rule:
             dates = expand_rule(s.override_rule, today, horizon)
         elif s.bin_type_id and user.property:

@@ -91,6 +91,32 @@ KIND_EMOJI = {"recycling": "\u267B\uFE0F", "general": "\U0001F5D1\uFE0F", "food"
 DEFAULT_COLOUR = {"recycling": "blue", "general": "black", "garden": "green", "food": "brown"}
 
 
+def _council_colours() -> dict:
+    """app/data/council_colours.json, read once."""
+    global _KNOWN
+    if _KNOWN is None:
+        import json
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parent.parent / "data" / "council_colours.json"
+        try:
+            _KNOWN = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            _KNOWN = {}
+    return _KNOWN
+
+
+_KNOWN: dict | None = None
+
+
+def council_colour(gss_code: str | None, category: str | None) -> str | None:
+    """The colour a council publishes for this kind of bin (H&F: recycling is green), for when
+    its collection data only says "Recycling". None when we don't know it: then we ask."""
+    entry = _council_colours().get(gss_code or "") or {}
+    c = entry.get(category or "")
+    return c if c in COLOUR_DOTS else None
+
+
 def bin_emoji(label: str, category: str | None = None, colour: str | None = None) -> str:
     """A dot in the bin's colour when the council, the bin's name or the resident gives one;
     otherwise the kind of bin (♻️ recycling, 🗑️ general...), so we never show a colour

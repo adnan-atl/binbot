@@ -1,0 +1,11 @@
+{
+  "_about": "Bin colours councils publish but don't put in their collection data, keyed by GSS code. Used only when the council's own bin name has no colour; a resident's choice always wins. One entry per council: category -> colour (blue, black, green, brown, grey, purple, red, yellow), plus where it came from.",
+  "E09000013": {
+    "council": "Hammersmith and Fulham",
+    "recycling": "green",
+    "general": "black",
+    "source": "https://www.lbhf.gov.uk/recycling-and-rubbish/recycling-home",
+    "checked": "2026-11-06",
+    "note": "Wheeled bins: green recycling bin (blue lid), black general waste bin. Some homes use clear recycling sacks instead."
+  }
+}

@@ -32,7 +32,7 @@ from app.models import (
 )
 from app.services import checks as checker
 from app.services import geo, sides
-from app.services.normalize import PURPOSE, categorise, colour_of, describe_rule
+from app.services.normalize import PURPOSE, categorise, colour_of, council_colour, describe_rule
 
 log = logging.getLogger(__name__)
 
@@ -418,7 +418,9 @@ def schedule_for(db: Session, prop: Property, with_checks: bool = False):
             "bin_type_id": bt.id,
             "label": bt.council_label,
             "category": bt.category.value,
-            "colour": bt.colour,
+            # the council's name for it, else the colour the council publishes (council_colours.json)
+            "colour": bt.colour or council_colour(bt.council.gss_code if bt.council else None,
+                                                  bt.category.value),
             "purpose": PURPOSE[bt.category],
             "days": rule["days"],
             "frequency": rule["frequency"],
