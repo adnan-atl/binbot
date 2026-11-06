@@ -44,7 +44,7 @@ PREVIEW_TAGS = """<meta name="description" content="{desc}">
 <meta property="og:image:alt" content="{{{{BRAND}}}}, a blue bin in a yellow hat and hi-vis vest, waving">
 <meta name="twitter:card" content="summary">
 """.format(desc="A free personal assistant that connects to your council&#39;s data and tells you which "
-                "bin to put out the evening before collection.")
+                "bin to put out the night before collection.")
 
 
 def render_index(page: Path | None = None) -> str:
