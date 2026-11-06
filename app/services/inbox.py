@@ -180,9 +180,9 @@ def _post(phone: str, text: str, reason: str) -> None:
 # ---- sign-ups tracker ------------------------------------------------------------------------
 
 def announce_signup(db: Session, user: User, via: str = "website") -> None:
-    """Post a new sign-up to SLACK_SIGNUPS_CHANNEL the moment their reminders go on: street (no
-    house number), council, how they signed up, reminder time, bins, who referred them, and the
-    running total. Never the phone number beyond its last 4 digits. Off without a token."""
+    """Post a new sign-up alert to SLACK_SIGNUPS_CHANNEL (public or private: the Binjamin app just
+    has to be in it) the moment their reminders go on, with the running total. Off without a
+    token."""
     s = get_settings()
     if not enabled() or not s.slack_signups_channel:
         return
@@ -200,33 +200,12 @@ def announce_signup(db: Session, user: User, via: str = "website") -> None:
 
 
 def signup_card(db: Session, user: User, via: str) -> str:
+    """Just the alert and the running total."""
     from sqlalchemy import func
-
-    from app.services.normalize import bin_emoji, bin_name
-    from app.services.reminders import _clock
 
     total = db.scalar(select(func.count()).select_from(User)
                       .where(User.status == UserStatus.active)) or 0
-    council = user.property.council.name if user.property and user.property.council else "no council"
-    head = (f":tada: *New sign-up #{total}* · {_street(user)} · {council} · via {via}"
-            f" · {_clock(user.reminder_time)} the evening before")
-    lines = [head]
-    if user.property:
-        from app.services.signup import bins_out
-
-        bits = [f"{bin_emoji(b.label, b.category, b.colour)} {bin_name(b.label)}"
-                for b in bins_out(db, user) if b.enabled and not b.daily]
-        if bits:
-            lines.append("Bins: " + ", ".join(bits))
-    extras = []
-    if user.referred_by_id:
-        ref = db.get(User, user.referred_by_id)
-        extras.append(f"referred by a resident in {_street(ref)}" if ref else "referred")
-    extras.append("updates: yes" if user.marketing_consent_at else "updates: no")
-    if user.phone_e164:
-        extras.append(f"…{user.phone_e164[-4:]}")
-    lines.append(" · ".join(extras))
-    return "\n".join(lines)
+    return f":tada: New sign-up! That's {total} on {get_settings().brand_name}."
 
 
 def _street(user: User | None) -> str:
