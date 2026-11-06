@@ -22,6 +22,9 @@ class Settings(BaseSettings):
 
     # Council scraping
     scrape_timeout_seconds: int = 90
+    # A UK proxy (http://user:pass@host:port) for councils whose sites don't answer cloud
+    # servers (Glasgow). Only the scraper container has it; used only after a direct try fails.
+    council_proxy_url: str = ""
     browser_sessions: int = 4  # must match SE_NODE_MAX_SESSIONS in docker-compose.yml
     selenium_url: str = ""  # e.g. http://selenium:4444 for councils that need a browser
     # Production: council scrapers run in their own container with no database or secrets

@@ -6,4 +6,5 @@ __pycache__/
 .venv/
 *.egg-info/
 deploy/.env.production
+deploy/.env.scraper
 .DS_Store

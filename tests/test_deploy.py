@@ -55,7 +55,9 @@ def test_scrapers_are_locked_away_from_data_and_secrets():
     on_data = {n for n, v in sv.items() if "data" in (v.get("networks") or [])}
     assert on_data == {"db", "api", "worker", "backup"}  # not scraper, selenium or caddy
     scraper = sv["scraper"]
-    assert "env_file" not in scraper and "ports" not in scraper
+    # Never the main env file: at most its own .env.scraper, which holds only the proxy address
+    assert [f["path"] if isinstance(f, dict) else f for f in scraper.get("env_file", [])] in ([], [".env.scraper"])
+    assert "ports" not in scraper
     assert not any(k.startswith(("META", "DATABASE", "POSTGRES", "OS_PLACES", "IDEAL", "TURNSTILE"))
                    for k in scraper["environment"])
     assert scraper["read_only"] is True and scraper["cap_drop"] == ["ALL"]

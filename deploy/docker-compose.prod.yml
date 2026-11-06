@@ -53,6 +53,10 @@ services:
       BROWSER_SESSIONS: 2                # keep equal to SE_NODE_MAX_SESSIONS below
       SCRAPE_TIMEOUT_SECONDS: 90
       HOME: /tmp
+    # Only the proxy address (COUNCIL_PROXY_URL), for councils that block cloud servers. Optional.
+    env_file:
+      - path: .env.scraper
+        required: false
     command: uvicorn app.scraper.service:app --host 0.0.0.0 --port 8100
     working_dir: /tmp                    # scrapers that write files write to the tmpfs
     user: "65534:65534"                  # nobody

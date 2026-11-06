@@ -5,7 +5,7 @@ import json
 import logging
 from datetime import date, datetime
 
-from app.adapters.base import AdapterError, LookupInput, MissingInput, RawCollection
+from app.adapters.base import AdapterError, LookupInput, MissingInput, RawCollection, unreachable
 from app.adapters.registry import AdapterSpec
 from app.core.config import get_settings
 
@@ -93,7 +93,23 @@ class UKBCDAdapter:
         return self.fetch_local(lookup)
 
     def fetch_local(self, lookup: LookupInput) -> list[RawCollection]:
-        """Run the scraper in this process. In production only the scraper container does this."""
+        """Run the scraper in this process. In production only the scraper container does this.
+        A council whose site doesn't answer us (some block cloud servers: Glasgow) is tried once
+        more through COUNCIL_PROXY_URL, and remembered so later lookups go straight there."""
+        proxy = get_settings().council_proxy_url
+        if proxy and not self.spec.needs_browser and self.spec.module in _NEEDS_PROXY:
+            return _fetch_via_proxy(self.spec, lookup, proxy)
+        try:
+            return self._fetch_direct(lookup)
+        except AdapterError as e:
+            if not proxy or self.spec.needs_browser or not unreachable(str(e)):
+                raise
+            log.info("%s didn't answer (%s): trying through the proxy", self.spec.module, e)
+            items = _fetch_via_proxy(self.spec, lookup, proxy)
+            _NEEDS_PROXY.add(self.spec.module)
+            return items
+
+    def _fetch_direct(self, lookup: LookupInput) -> list[RawCollection]:
         from app.adapters.overrides import OVERRIDES
 
         if self.spec.module in OVERRIDES:  # local fix for a broken upstream scraper
@@ -134,3 +150,33 @@ def parse_output(out: str | dict) -> list[RawCollection]:
     if not result:
         raise AdapterError("adapter returned no collections")
     return result
+
+
+# Councils that only answered through the proxy since this process started.
+_NEEDS_PROXY: set[str] = set()
+
+
+def _fetch_via_proxy(spec, lookup: LookupInput, proxy: str) -> list[RawCollection]:
+    """Run the scraper in a child process with HTTP(S)_PROXY set: requests and httpx (which the
+    library's modules and ours use) pick it up, and nothing else in this process goes through
+    the proxy."""
+    import os
+    import subprocess
+    import sys
+
+    from app.scraper.wire import lookup_to_json, result_from_json, spec_to_json
+
+    env = {**os.environ, "HTTP_PROXY": proxy, "HTTPS_PROXY": proxy, "http_proxy": proxy,
+           "https_proxy": proxy, "NO_PROXY": "localhost,127.0.0.1,selenium"}
+    timeout = get_settings().scrape_timeout_seconds
+    try:
+        out = subprocess.run([sys.executable, "-m", "app.scraper.proxied"], env=env, timeout=timeout,
+                             input=json.dumps({"spec": spec_to_json(spec), "lookup": lookup_to_json(lookup)}),
+                             capture_output=True, text=True)
+    except subprocess.TimeoutExpired as e:
+        raise AdapterError(f"{spec.module}: timed out through the proxy after {timeout}s") from e
+    try:
+        return result_from_json(json.loads(out.stdout.strip().splitlines()[-1]))
+    except (ValueError, IndexError) as e:
+        raise AdapterError(f"{spec.module}: proxied run failed: {out.stderr[-300:]}") from e
+
