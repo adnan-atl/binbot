@@ -14,7 +14,8 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.adapters.base import AdapterError, LookupInput, NoCollectionsForAddress, RawCollection
+from app.adapters.base import (AdapterError, LookupInput, NoCollectionsForAddress, RawCollection,
+                               unreachable)
 from app.adapters.registry import candidates, library_version, spec_for
 from app.adapters.ukbcd import UKBCDAdapter
 from app.core.config import get_settings
@@ -188,6 +189,8 @@ def fetch_collections(council: Council, prop: Property) -> list[RawCollection]:
         except AdapterError as e:
             first = first or e
             log.info("fetch: %s failed for %s: %s", adapter.name, prop.postcode, e)
+            if unreachable(str(e)):
+                break  # the council's site isn't answering: another scraper hits the same site
     raise first
 
 
@@ -195,7 +198,8 @@ def _fetch_one(adapter: UKBCDAdapter, full: LookupInput) -> list[RawCollection]:
     try:
         return adapter.fetch(full)
     except AdapterError as first:
-        if not full.uprn or adapter.spec.needs_uprn and not adapter.spec.needs_postcode:
+        if not full.uprn or adapter.spec.needs_uprn and not adapter.spec.needs_postcode \
+                or unreachable(str(first)):
             raise
         try:
             return adapter.fetch(LookupInput(postcode=full.postcode, uprn=None,

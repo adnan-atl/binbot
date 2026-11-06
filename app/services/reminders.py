@@ -418,8 +418,8 @@ def invite_wa_link(code: str) -> str:
 
 def _already_invited(user: User, code: str) -> str:
     """Reply when someone already signed up sends an invite message (an old /w/ link)."""
-    return ("You're already signed up, so no need for an invite \U0001F44D Share me with friends "
-            f"and neighbours, or pop me in your street's group chat: {display_number()}")
+    return ("You're already signed up, so no need for an invite \U0001F44D To share me with friends "
+            f"and neighbours, send them your link: {share_link(user)}")
 
 
 
@@ -1074,6 +1074,20 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     if wa_signup.REF_RE.search(text) and "invited by a neighbour" in text.lower():
         # Someone already signed up tapped an invite (their own, or a friend's)
         msg = _already_invited(user, wa_signup.REF_RE.search(text).group(1))
+        send_reply(db, phone, msg, kind="reply")
+        db.commit()
+        return msg
+    if text.startswith(wa_signup.P):
+        # A button from the sign-up messages, tapped after they'd already signed up: nothing to
+        # do, and it's not a message for the team
+        msg = 'You\'re already signed up \U0001F44D Message "settings" to change anything.'
+        send_reply(db, phone, msg, kind="reply")
+        db.commit()
+        return msg
+    if re.search(r"/r/[A-Za-z0-9_-]{4,12}\b", text) and len(text.split()) <= 3:
+        # They sent us a share link (probably their own, to try it): not one for the team
+        msg = ("That's a share link \U0001F44D Send it to friends and neighbours, or pop it in your "
+               "street's group chat, and they can sign up from it.")
         send_reply(db, phone, msg, kind="reply")
         db.commit()
         return msg

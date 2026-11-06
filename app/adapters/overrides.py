@@ -106,7 +106,7 @@ def glasgow(lookup: LookupInput, *, html: str | None = None, today: date | None 
         url = ("https://onlineservices.glasgow.gov.uk/forms/refuseandrecyclingcalendar/"
                f"CollectionsCalendar.aspx?UPRN={lookup.uprn}")
         try:
-            r = httpx.get(url, headers={"User-Agent": UA}, timeout=30, follow_redirects=True)
+            r = httpx.get(url, headers={"User-Agent": UA}, timeout=12, follow_redirects=True)  # it answers in 1-2s when it answers
             r.raise_for_status()
         except httpx.HTTPError as e:
             raise AdapterError(f"glasgow.gov.uk: {e}") from e

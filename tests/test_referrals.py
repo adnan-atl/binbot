@@ -165,7 +165,7 @@ def test_signed_up_person_tapping_an_invite_gets_their_own_link(client, db):
     code = client.get(f"/api/users/{uid}/referral").json()["code"]
     say = lambda t: client.post("/api/inbound", json={"phone": "+447700900123", "text": t}).json()["reply"]
     assert say(invite_text(code)).startswith(
-        "You're already signed up, so no need for an invite \U0001F44D Share me with friends")
+        "You're already signed up, so no need for an invite \U0001F44D To share me with friends")
 
 
 def test_share_link_counts_people_not_link_previews_and_opens_the_site(client, db):

@@ -44,3 +44,15 @@ class CalendarAdapter(Protocol):
     name: str
 
     def fetch(self, lookup: LookupInput) -> list[RawCollection]: ...
+
+
+_UNREACHABLE = ("timed out", "timeout", "read operation", "connecterror", "connection refused",
+                "connection reset", "remote end closed", "name or service not known",
+                "temporary failure in name resolution", "403", "forbidden", "502", "503", "504")
+
+
+def unreachable(error: str | None) -> bool:
+    """The council's website didn't answer us (timed out, refused, blocked, down). Trying again
+    with other inputs or for the neighbours just hits the same site, so callers stop."""
+    e = (error or "").lower()
+    return any(k in e for k in _UNREACHABLE)

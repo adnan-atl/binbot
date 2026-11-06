@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     slack_signing_secret: str = ""
     slack_inbox_channel: str = "binjamin-inbox"  # name or ID; the Binjamin app must be in it
     slack_signups_channel: str = "binjamin-signups"  # every new sign-up is posted here; empty turns it off
+    # Slow or failed council lookups during sign-up are posted here, tagging these people
+    # (Slack mentions, e.g. "<@U0C2FMB5RHD> <@U0123CLAUDE>"). Empty channel turns it off.
+    slack_alerts_channel: str = "binjamin-inbox"
+    slack_alert_mention: str = "<@U0C2FMB5RHD>"
 
     public_base_url: str = "http://localhost:8000"
 

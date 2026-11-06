@@ -205,3 +205,41 @@ def test_every_sign_up_is_posted_to_the_signups_channel(client, db, slack, monke
         say(client, t, phone="+447700900555")
     assert [p["text"] for p in slack.posts if p["channel"] == "binjamin-signups"][-1] == \
         ":tada: New sign-up! That's 2 on Binny."
+
+
+def test_a_council_site_that_doesnt_answer_fails_fast_and_pings_the_team(client, db, slack, monkeypatch):
+    from app.adapters.base import AdapterError
+    from app.services import schedule, signup
+    asked_neighbours = []
+    monkeypatch.setattr(schedule, "fetch_collections", lambda council, prop: (_ for _ in ()).throw(
+        AdapterError("glasgow.gov.uk: The read operation timed out")))
+    monkeypatch.setattr(signup, "rescue_round", lambda db, prop: asked_neighbours.append(1) or False)
+    r = client.post("/api/signup/start", json={"postcode": "e83pb", "uprn": "10000002", "house_number": "12"})
+    assert r.status_code == 200
+    assert not asked_neighbours  # same site for the neighbours: don't wait through it twice more
+    [alert] = [p for p in slack.posts if p["channel"] == "binjamin-inbox"]
+    assert alert["text"].startswith(":hourglass: *Slow council lookup* <@U0C2FMB5RHD>")
+    assert "E8 · 0s · failed" in alert["text"] and "read operation timed out" in alert["text"]
+    assert "12" not in alert["text"].split("\n")[1]  # postcode district only, no house number
+
+
+def test_a_slow_lookup_that_works_pings_too(client, db, slack, monkeypatch):
+    from app.services import signup
+    monkeypatch.setattr(signup, "SLOW_LOOKUP_SECONDS", -1)  # every lookup counts as slow
+    client.post("/api/signup/start", json={"postcode": "e83pb", "uprn": "10000002", "house_number": "12"})
+    [alert] = [p for p in slack.posts if p["channel"] == "binjamin-inbox"]
+    assert "worked, slowly" in alert["text"]
+
+
+def test_unreachable_spots_sites_that_dont_answer():
+    from app.adapters.base import unreachable
+    assert unreachable("glasgow.gov.uk: The read operation timed out")
+    assert unreachable("X: timed out after 90s") and unreachable("403 Forbidden")
+    assert not unreachable("adapter returned no collections") and not unreachable(None)
+
+
+def test_stale_sign_up_buttons_and_share_links_dont_reach_the_team(client, db, slack):
+    _on(client)
+    assert say(client, "su:go:nomkt").startswith("You're already signed up")
+    assert say(client, "https://binjamin.uk/r/ifiy-la0").startswith("That's a share link")
+    assert not [p for p in slack.posts if p["channel"] == "binjamin-inbox"]

@@ -5,6 +5,7 @@ get seeded, or what turns reminders on applies to both.
 """
 import logging
 import secrets
+from time import monotonic
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -12,6 +13,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.adapters.base import unreachable
 from app.adapters.manual import expand_rule
 from app.api import schemas as S
 from app.core.config import get_settings
@@ -31,6 +33,11 @@ from app.services.schedule import refresh_round, resolve_property, round_has_cal
 from app.services.verify import rescue_round, verify_round
 
 log = logging.getLogger(__name__)
+
+
+# A council lookup slower than this (or failing) pings the team in Slack: someone was left
+# watching the spinner.
+SLOW_LOOKUP_SECONDS = 20
 
 
 @dataclass
@@ -68,6 +75,7 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
             user.referred_by_id = ref.id
     db.flush()
 
+    started = monotonic()
     source, error, shared = "manual", None, False
     if get_settings().demo_mode:
         source = "demo"
@@ -76,7 +84,9 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
         source, shared = "neighbours", True
     elif council.status != CouncilStatus.unsupported:
         res = refresh_round(db, prop, source="demo" if source == "demo" else "council")
-        if res.error and rescue_round(db, prop):
+        # A site that isn't answering won't answer for the neighbours either: don't make the
+        # resident wait through two more timeouts.
+        if res.error and not unreachable(res.error) and rescue_round(db, prop):
             source = "neighbours"  # this address failed; a neighbour's calendar worked
         elif res.error:
             error = res.error
@@ -88,6 +98,11 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
     if not error and not shared:  # neighbours reuse a round that was already checked
         log_checks(db, prop)
     db.commit()
+    secs = monotonic() - started
+    if not shared and (error or secs > SLOW_LOOKUP_SECONDS):
+        from app.services import inbox  # Slack: we look into it
+
+        inbox.alert_slow_lookup(prop, secs, source, error)
     return StartResult(user=user, prop=prop, source=source if not error else "manual",
                        error=error, shared=shared)
 

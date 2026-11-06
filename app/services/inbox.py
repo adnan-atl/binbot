@@ -208,6 +208,35 @@ def signup_card(db: Session, user: User, via: str) -> str:
     return f":tada: New sign-up! That's {total} on {get_settings().brand_name}."
 
 
+# ---- slow council lookups ---------------------------------------------------------------------
+
+def alert_slow_lookup(prop, secs: float, source: str, error: str | None) -> None:
+    """A sign-up's council lookup was slow or failed: tag the team in SLACK_ALERTS_CHANNEL with
+    what's needed to look into it (council, how long, the error, the postcode district, what the
+    resident got instead). Never the house number or phone number."""
+    s = get_settings()
+    if not enabled() or not s.slack_alerts_channel:
+        return
+    council = prop.council.name if prop.council else "unknown council"
+    adapter = prop.council.adapter if prop.council else ""
+    district = (prop.postcode or "").split(" ")[0]
+    outcome = ("failed: they were asked to add their bins by hand" if error
+               else "used a neighbour's calendar" if source == "neighbours" else "worked, slowly")
+    lines = [f":hourglass: *Slow council lookup* {s.slack_alert_mention}".rstrip(),
+             f"{council} · {district} · {secs:.0f}s · {outcome}"]
+    if error:
+        lines.append(f"Error: `{error[:200]}`")
+    if adapter:
+        lines.append(f"Scraper: {adapter}")
+    text = "\n".join(lines)
+    if s.demo_mode:
+        _api("chat.postMessage", channel=s.slack_alerts_channel, text=text, unfurl_links=False)
+    else:
+        threading.Thread(target=_api, args=("chat.postMessage",), daemon=True,
+                         kwargs={"channel": s.slack_alerts_channel, "text": text,
+                                 "unfurl_links": False}).start()
+
+
 def _street(user: User | None) -> str:
     """Street and postcode district, never the house number: 'Elm Road, E8'."""
     prop = user.property if user else None
