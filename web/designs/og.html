@@ -883,13 +883,14 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div class="pc-wrap"><img class="pc-binji" src="/static/binji-think.webp" alt="" width="359" height="480"><input id="pc" class="field" type="text" autocomplete="postal-code" placeholder="e.g. E8 3PB" aria-describedby="pc-err"></div>
 <span id="pc-err" class="error" hidden>Enter a UK postcode, like E8 3PB.</span>
 </div>
-<div id="house-wrap" style="display:flex;flex-direction:column;gap:8px" hidden>
-<label for="house" class="lbl">House number or name</label>
-<input id="house" class="field" type="text" autocomplete="address-line1" placeholder="e.g. 12 or Rose Cottage" style="text-transform:none;letter-spacing:0">
-</div>
 <div id="addr-wrap" style="display:flex;flex-direction:column;gap:8px" hidden>
 <label for="addr" class="lbl">Your address</label>
 <select id="addr" class="field" style="text-transform:none;letter-spacing:0;font-size:18px;appearance:auto"></select>
+</div>
+<div id="house-wrap" style="display:flex;flex-direction:column;gap:8px" hidden>
+<label for="house" class="lbl">House number or name</label>
+<input id="house" class="field" type="text" autocomplete="address-line1" placeholder="e.g. 12 or Rose Cottage" style="text-transform:none;letter-spacing:0" aria-describedby="house-err">
+<span id="house-err" class="error" hidden>Add your house number or name, so {{BRAND}} has the right home.</span>
 </div>
 <div id="ts" hidden></div>
 <div><button type="button" class="pill go" id="pc-go">Find my bin days</button></div>
@@ -1312,6 +1313,11 @@ Share to WhatsApp
   $('#pc').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPostcode(); });
   $('#house').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPostcode(); });
   $('#pc-go').addEventListener('click', submitPostcode);
+  $('#addr').addEventListener('change', function () {
+    var other = this.value === 'other';
+    $('#house-wrap').hidden = !other; $('#house-err').hidden = true;
+    if (other) setTimeout(function () { $('#house').focus(); }, 30);
+  });
   function submitPostcode() {
     var v = $('#pc').value.trim().toUpperCase().replace(/\s+/g, ' ');
     var ok = /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/.test(v);
@@ -1340,18 +1346,27 @@ Share to WhatsApp
           return;
         }
         sel.innerHTML = '<option value="">Pick your address…</option>' + p.addresses.map(function (a, i) {
-          return '<option value="' + i + '">' + esc(a.line) + '</option>'; }).join('');
+          return '<option value="' + i + '">' + esc(a.line) + '</option>'; }).join('') +
+          '<option value="other">My address isn\'t listed</option>';
         sel.dataset.list = JSON.stringify(p.addresses);
         wrap.hidden = false; done(); setTimeout(function () { sel.focus(); }, 30);
       }).catch(function (e) { track('postcode_lookup_failed'); $('#pc-err').textContent = e.message; $('#pc-err').hidden = false; done(); });
       return;
     }
     // Step B: address picked (or typed, when the list came back empty).
+    // We always need their exact home: picked from the list, or typed when it isn't there (or
+    // the list came back empty). Never just the postcode.
     var addr = null;
     if (!wrap.hidden) {
       if (!sel.value) { done(); sel.focus(); return; }
-      addr = JSON.parse(sel.dataset.list)[+sel.value];
+      if (sel.value !== 'other') addr = JSON.parse(sel.dataset.list)[+sel.value];
     }
+    if (!addr && !$('#house').value.trim()) {
+      $('#house-wrap').hidden = false; $('#house-err').hidden = false; done();
+      setTimeout(function () { $('#house').focus(); }, 30);
+      return;
+    }
+    $('#house-err').hidden = true;
     var ref = (location.search.match(/[?&]ref=([^&]+)/) || [])[1] || null;
     if (!ref) { try { ref = localStorage.getItem('binjamin_ref'); } catch (e) {} }
     var typed = $('#house').value.trim();
@@ -1419,7 +1434,7 @@ Share to WhatsApp
     }).then(done);
   }
   var ownLookup = null, shared = false, note = '';
-  $('#addr').addEventListener('change', function () { if (this.value) submitPostcode(); });
+  $('#addr').addEventListener('change', function () { if (this.value && this.value !== 'other') submitPostcode(); });
   // "These aren't my days": look this home up individually instead of reusing the street's round.
   document.addEventListener('click', function (e) {
     if (!e.target.closest('#c-own')) return;

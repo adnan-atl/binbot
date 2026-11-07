@@ -225,6 +225,34 @@ def signup_card(db: Session, user: User, via: str) -> str:
     return "\n".join(lines)
 
 
+# ---- address lookup down ----------------------------------------------------------------------
+
+_address_alert_at = 0.0
+
+
+def alert_address_lookup_failed(postcode: str, errors: list[str]) -> None:
+    """Every address provider errored (bad key, out of credit, outage), so residents get no
+    address list and have to type their house. Tag the team, at most once an hour. Postcode
+    district only."""
+    global _address_alert_at
+    import time
+
+    s = get_settings()
+    if not enabled() or not s.slack_alerts_channel or time.time() - _address_alert_at < 3600:
+        return
+    _address_alert_at = time.time()
+    district = (postcode or "").split(" ")[0]
+    text = "\n".join([f":house: *Address lookup failing* {s.slack_alert_mention}".rstrip(),
+                      f"No address list for {district}: residents are typing their house instead.",
+                      *[f"`{e}`" for e in errors]])
+    if s.demo_mode:
+        _api("chat.postMessage", channel=s.slack_alerts_channel, text=text, unfurl_links=False)
+    else:
+        threading.Thread(target=_api, args=("chat.postMessage",), daemon=True,
+                         kwargs={"channel": s.slack_alerts_channel, "text": text,
+                                 "unfurl_links": False}).start()
+
+
 # ---- slow council lookups ---------------------------------------------------------------------
 
 def alert_slow_lookup(prop, secs: float, source: str, error: str | None) -> None:

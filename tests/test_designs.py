@@ -94,6 +94,8 @@ def test_oat_last_step_sends_one_plain_message(client, monkeypatch):
     assert "Sending this message is how Binny knows the number is really yours." in page
     assert "Come back here" not in page
     assert "I'M BIN" not in page and "Say hello" not in page
+    # Their exact home, always: "not listed" lets them type it, and the house field is required
+    assert "My address isn\\'t listed" in page and 'id="house-err"' in page
     monkeypatch.delenv("META_DISPLAY_NUMBER")
     get_settings.cache_clear()
 

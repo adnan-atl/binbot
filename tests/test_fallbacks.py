@@ -151,9 +151,20 @@ def test_address_fallback_only_when_needed_and_never_crashes(monkeypatch):
     assert len(calls) == 1  # OS answered: the paid fallback isn't called
     geo._cache.clear()
 
-    # Both down: no exception, an empty list (the resident types a house number instead).
+    # Both down: no exception, an empty list (the resident types a house number instead),
+    # and the team hears about it, at most once an hour.
+    from app.services import inbox
+    alerts = []
+    monkeypatch.setattr(inbox, "_address_alert_at", 0.0)
+    monkeypatch.setattr(inbox, "enabled", lambda: True)
+    monkeypatch.setattr(inbox, "_api", lambda method, **kw: alerts.append(kw["text"]))
+    monkeypatch.setattr(inbox, "get_settings", lambda: type("S", (), {
+        "slack_alerts_channel": "alerts", "slack_alert_mention": "", "demo_mode": True})())
     monkeypatch.setattr(geo.httpx, "get", lambda url, **kw: _Resp(500, {}))
     assert geo.lookup_addresses("E8 3PB") == []
+    assert geo.lookup_addresses("E8 3PB") == []
+    assert len(alerts) == 1 and "Address lookup failing" in alerts[0] and "E8" in alerts[0]
+    assert "3PB" not in alerts[0]  # district only
     geo._cache.clear()
 
 

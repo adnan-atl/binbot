@@ -126,6 +126,7 @@ def lookup_addresses(postcode: str) -> list[AddressHit]:
 
 def _fetch_addresses(s, pc: str) -> list[AddressHit]:
     providers = [getattr(s, "address_provider", "none"), getattr(s, "address_fallback", "none")]
+    errors = []
     for name in dict.fromkeys(p for p in providers if p and p != "none"):
         fetch = _PROVIDERS.get(name)
         if fetch is None:
@@ -134,9 +135,14 @@ def _fetch_addresses(s, pc: str) -> list[AddressHit]:
             out = fetch(s, pc)
         except (httpx.HTTPError, ValueError, KeyError) as e:
             log.warning("address lookup: %s failed for %s: %s", name, pc, e)
+            errors.append(f"{name}: {str(e)[:120]}")
             continue
         if out:
             return out
+    if errors:  # every provider errored (not just "no addresses"): residents have to type it
+        from app.services import inbox
+
+        inbox.alert_address_lookup_failed(pc, errors)
     return []
 
 
