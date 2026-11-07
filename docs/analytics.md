@@ -98,6 +98,10 @@ At midnight (London) the worker posts the day just ended to `SLACK_ANALYTICS_CHA
 - **Headline**: visits, sign-ups started, switched on (website / WhatsApp), visit → switched on,
   active residents, and people stuck at "say hello". Who tapped "Say hello" on a phone vs a
   computer (the QR code), and how many of each then switched on.
+- **Alfred offers** (database): of those who gave their number today, how many opted out of
+  hearing about Alfred (website: "Don't tell me about other Alfred services"; WhatsApp: "No
+  feature updates"), the same for today's switch-ons, and how many of all active residents
+  Alfred can contact. Compared with last week.
 - **Website funnel**: unique visits at each step and the biggest drop.
 - **Where visits came from**: invite links, UTMs, referring sites, direct.
 - **Sharing and K-factor**: invite link clicks (`/r/<code>`), invited sign-ups and switch-ons,

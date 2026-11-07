@@ -83,6 +83,12 @@ class DbDay:
     reminders_replied: int = 0
     reminder_collections: int = 0
     not_understood: int = 0
+    # Alfred offers: of those who gave their number (and agreed to the terms) today, how many
+    # left offers on vs opted out ("Don't tell me about other services" / "No feature updates")
+    consented: int = 0
+    offers_out: int = 0
+    # ...and of those who switched on today
+    on_offers_out: int = 0
     councils: dict = field(default_factory=dict)  # name -> problems Counter
 
 
@@ -112,6 +118,14 @@ def db_day(db: Session, start: datetime, end: datetime) -> DbDay:
     d.started = len(new)
     d.started_invited = sum(1 for u in new if u.referred_by_id)
     d.switched_on, d.switched_on_invited = switched_on(db, start, end)
+    gave = db.scalars(select(User).where(User.consent_at >= start, User.consent_at < end)).all()
+    d.consented = len(gave)
+    d.offers_out = sum(1 for u in gave if u.marketing_consent_at is None)
+    on_phones = set(db.scalars(select(Outbox.to_phone).where(
+        Outbox.kind == "welcome", Outbox.created_at >= start, Outbox.created_at < end)).all())
+    if on_phones:
+        d.on_offers_out = db.scalar(select(func.count()).select_from(User).where(
+            User.phone_e164.in_(on_phones), User.marketing_consent_at.is_(None))) or 0
     d.stuck_at_hello = db.scalar(select(func.count()).select_from(User).where(
         User.hi_prompted_at >= start, User.hi_prompted_at < end,
         User.status == UserStatus.pending)) or 0
@@ -282,6 +296,23 @@ def build(db: Session, day: date) -> str:
     if ph and ph.get("hello"):
         lines.append("• Tapped say hello → switched on: " + ", ".join(
             f"{dev} {n_on}/{n} ({_pct(n_on, n)})" for dev, (n, n_on) in sorted(ph["hello"].items())))
+    lines.append("")
+
+    # Alfred offers: the opt-out on the phone step (website) / consent step (WhatsApp)
+    lines.append(f"*{s.parent_name} offers*")
+    if d.consented:
+        lines.append(f"• Opted out: *{d.offers_out}* of {d.consented} who gave their number "
+                     f"(*{_pct(d.offers_out, d.consented)}*)"
+                     + (f"  _(last week {_pct(w.offers_out, w.consented)})_" if w.consented else ""))
+    else:
+        lines.append("• Nobody gave their number today")
+    if d.switched_on:
+        lines.append(f"• Of today's switch-ons: {d.switched_on - d.on_offers_out} can hear about "
+                     f"{s.parent_name}, {d.on_offers_out} opted out")
+    reachable = db.scalar(select(func.count()).select_from(User).where(
+        User.status == UserStatus.active, User.marketing_consent_at.is_not(None))) or 0
+    lines.append(f"• All active residents: *{reachable}* of {active} can hear about "
+                 f"{s.parent_name} (*{_pct(reachable, active)}*)")
     if ph and ph["events"].get("hi_from_unexpected_number"):
         lines.append(f"• \"Hi\" from a number nobody typed: {ph['events']['hi_from_unexpected_number']}")
     lines.append("")

@@ -14,9 +14,10 @@ LONDON = R.LONDON
 TODAY = datetime.now(LONDON).date()
 
 
-def switch_on(client, phone, ref=None):
+def switch_on(client, phone, ref=None, offers=True):
     uid = signup(client, ref=ref)["user_id"]
-    client.post(f"/api/users/{uid}/phone", json={"phone": phone})
+    client.post(f"/api/users/{uid}/phone", json={"phone": phone, "consent": True,
+                                                  "marketing_consent": offers})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     return uid
 
@@ -28,7 +29,7 @@ def day(client, db):
     uid = switch_on(client, "07700900123")
     code = client.get(f"/api/users/{uid}/referral").json()["code"]
     client.get(f"/r/{code}", follow_redirects=False, headers={"user-agent": "Mozilla/5.0"})
-    switch_on(client, "07700900456", ref=code)
+    switch_on(client, "07700900456", ref=code, offers=False)
     first = db.scalar(select(Reminder).where(Reminder.user_id == uid).order_by(Reminder.send_at))
     first.send_at = datetime.now(LONDON) - timedelta(minutes=5)
     db.commit()
@@ -51,6 +52,7 @@ def test_database_numbers(day, db):
     assert d.invite_clicks == 1 and d.referrals == 1
     assert d.reminders_sent == 1 and d.reminders_replied == 1 and d.replies["done"] == 1
     assert d.councils["Hackney"]["lookups"] == 2
+    assert d.consented == 2 and d.offers_out == 1 and d.on_offers_out == 1
 
 
 def test_report_without_posthog(day, db):
@@ -61,6 +63,9 @@ def test_report_without_posthog(day, db):
     assert "not enough data yet" in text  # K-factor needs 10 switch-ons
     assert "Not available: set POSTHOG_PERSONAL_API_KEY" in text
     assert "Replied to: 100% (Done 1)" in text
+    assert "*Alfred offers*" in text and "Opted out: *1* of 2 who gave their number (*50%*)" in text
+    assert "Of today's switch-ons: 1 can hear about Alfred, 1 opted out" in text
+    assert "All active residents: *1* of 2 can hear about Alfred (*50%*)" in text
     assert "07700" not in text and "E8" not in text  # nobody's details
 
 
