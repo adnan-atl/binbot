@@ -18,8 +18,8 @@ from app.core.config import get_settings
 # Public pages: path -> (title, description). {brand} and {parent} are filled in.
 PAGES: dict[str, tuple[str, str]] = {
     "/": ("{brand} – free bin day reminders on WhatsApp",
-          "A free personal assistant that connects to your council's data and tells you which bin "
-          "to put out the night before collection. Works with 300+ UK councils."),
+          "{brand} is a free WhatsApp assistant that reminds you which bin to put out the night "
+          "before collection. Works with 300+ UK councils."),
     "/about": ("About {brand} – bin day reminders by {parent}",
                "{brand} is a free WhatsApp assistant made by {parent}. It reads your council's own "
                "collection calendar, keeps checking it for changes, and messages you the night "

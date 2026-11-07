@@ -185,7 +185,7 @@ def test_share_link_counts_people_not_link_previews_and_opens_the_site(client, d
 def test_home_page_has_a_link_preview(client):
     page = client.get("/").text
     assert 'property="og:image" content="http://localhost:8000/static/og.jpg?v=3"' in page
-    assert "connects to your council's data" in page
+    assert "free WhatsApp assistant that reminds you which bin" in page
 
 
 def test_every_home_design_has_the_link_preview_and_answers_head(client, monkeypatch):
@@ -193,6 +193,6 @@ def test_every_home_design_has_the_link_preview_and_answers_head(client, monkeyp
     monkeypatch.setenv("HOME_DESIGN", "silly")  # what binjamin.uk serves
     get_settings.cache_clear()
     page = client.get("/").text
-    assert page.count('property="og:image"') == 1 and "connects to your council" in page
+    assert page.count('property="og:image"') == 1 and "WhatsApp assistant" in page
     assert client.head("/").status_code == 200  # some link-preview fetchers check with HEAD
     get_settings.cache_clear()

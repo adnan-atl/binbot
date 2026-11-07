@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -44,8 +44,8 @@ PREVIEW_TAGS = """<meta name="description" content="{desc}">
 <meta property="og:image:height" content="1200">
 <meta property="og:image:alt" content="{{{{BRAND}}}}, a blue bin in a yellow hat and hi-vis vest, waving">
 <meta name="twitter:card" content="summary">
-""".format(desc="A free personal assistant that connects to your council&#39;s data and tells you which "
-                "bin to put out the night before collection.")
+""".format(desc="A free WhatsApp assistant that reminds you which bin to put out the night before "
+                "collection. Works with 300+ UK councils.")
 
 
 def render_index(page: Path | None = None) -> str:
@@ -97,6 +97,12 @@ if WEB.exists():
         name = get_settings().home_design
         page = WEB / "designs" / f"{name}.html"
         return page if name and re.fullmatch(r"[a-z0-9-]{1,40}", name) and page.is_file() else WEB / "index.html"
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon():
+        """Search engines and old browsers ask for /favicon.ico whatever the page links."""
+        return FileResponse(WEB / "favicon.ico", media_type="image/x-icon",
+                            headers={"Cache-Control": "public, max-age=86400"})
 
     @app.get("/robots.txt", include_in_schema=False, response_class=PlainTextResponse)
     def robots():
