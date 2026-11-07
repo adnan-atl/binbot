@@ -19,8 +19,9 @@ Note the spelling: binjamin.uk, not benjamin.uk (that's someone else's site).
 - `app/services/wa_signup.py` — sign-up inside WhatsApp. `app/services/inbox.py` — team Slack inbox.
 - `app/services/normalize.py` + `app/data/council_colours.json` — bin colours per council
   (341 of 343 checked; Google Sheet "Binjamin – council bin colours" is the working copy).
-- `web/designs/oat.html` — the main website (HOME_DESIGN=oat). `web/designs/og.html` must stay
-  identical to `silly.html` (the original page, kept at /d/og). Don't edit silly/og.
+- `web/designs/oat.html` — the main website (HOME_DESIGN=oat). `web/designs/og.html` is
+  based on `silly.html` (the original page, at /d/og) and gets the same updates as oat.
+  Don't edit silly.
 - `app/services/analytics.py` + `docs/analytics.md` — PostHog product analytics (site and server,
   one person per user id). Off without `POSTHOG_KEY`.
 - `docs/` — inbox playbook, WhatsApp templates, analytics events.

@@ -89,7 +89,8 @@ def test_oat_last_step_sends_one_plain_message(client, monkeypatch):
     assert f'id="t-go" href="{link}"' in page and "Turn on reminders</a>" in page
     assert "Last step: send a message to Binny to get started" in page
     assert f'id="hi-go" href="{link}"' in page and ">Open WhatsApp</a>" in page
-    assert "Press send" in page and "Come back here" in page
+    assert "Press send" in page and "Binny replies and your reminders start" in page
+    assert "Come back here" not in page
     assert "I'M BIN" not in page and "Say hello" not in page
     monkeypatch.delenv("META_DISPLAY_NUMBER")
     get_settings.cache_clear()
@@ -109,7 +110,10 @@ def test_silly_phone_step_consent_wording(client, monkeypatch):
 
 
 def test_the_original_page_lives_on_at_og(client):
-    # The first live page (silly) is kept as /d/og; oat is the main experience now
-    og, silly = client.get("/d/og"), client.get("/d/silly")
-    assert og.status_code == 200 and og.text == silly.text
+    # The first live page (silly) lives on at /d/og; oat is the main experience now
+    # /d/og started as a copy of silly and now gets the same updates as oat (silly stays as was)
+    og = client.get("/d/og")
+    assert og.status_code == 200 and "Turn on reminders</a>" in og.text
+    assert "Last step: send a message to Binny to get started" in og.text
+    assert "Keeps track of your council" in og.text and "I'M BIN" not in og.text
     assert client.get("/d/oat").status_code == 200
