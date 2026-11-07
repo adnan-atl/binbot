@@ -71,6 +71,8 @@ class Settings(BaseSettings):
     slack_signing_secret: str = ""
     slack_inbox_channel: str = "binjamin-inbox"  # name or ID; the Binjamin app must be in it
     slack_signups_channel: str = "binjamin-signups"  # every new sign-up is posted here; empty turns it off
+    # The nightly growth report goes here at midnight (services/daily_report.py); empty turns it off
+    slack_analytics_channel: str = "binjamin-analytics"
     # Slow or failed council lookups during sign-up are posted here, tagging these people
     # (Slack mentions, e.g. "<@U0C2FMB5RHD> <@U0123CLAUDE>"). Empty channel turns it off.
     slack_alerts_channel: str = "binjamin-inbox"
@@ -97,6 +99,12 @@ class Settings(BaseSettings):
     # (deploy/Caddyfile), so ad blockers don't drop them. Locally there's no Caddy: set this to
     # posthog_host to test the site's events.
     posthog_web_host: str = "/ingest"
+    # Reading from PostHog, for the nightly report's visits and website funnel
+    # (services/daily_report.py): a personal API key with read access to queries, and the
+    # project's number (in its address: eu.posthog.com/project/<id>). Either empty = the report
+    # goes out with the database numbers only.
+    posthog_personal_api_key: str = ""
+    posthog_project_id: str = ""
     # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.
     # Which page the home page (/) shows: a design in web/designs ("oat"; the original page is "og"), or empty for
     # web/index.html. Every design stays reachable at /d/<name>.

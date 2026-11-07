@@ -87,3 +87,27 @@ Every website event carries `design: oat`. Every server event carries `source: s
 
 Set `POSTHOG_KEY` and `POSTHOG_WEB_HOST=https://eu.i.posthog.com` in `.env` (there's no Caddy
 locally, so `/ingest` doesn't exist). PostHog drops events from headless browsers as bots.
+
+## Nightly report (#binjamin-analytics)
+
+At midnight (London) the worker posts the day just ended to `SLACK_ANALYTICS_CHANNEL`
+(`app/services/daily_report.py`). Every headline number is compared with the same day last week.
+
+- **Headline**: visits, sign-ups started, switched on (website / WhatsApp), visit → switched on,
+  active residents, and people stuck at "say hello".
+- **Website funnel**: unique visits at each step and the biggest drop.
+- **Where visits came from**: invite links, UTMs, referring sites, direct.
+- **Sharing and K-factor**: invite link clicks (`/r/<code>`), invited sign-ups and switch-ons,
+  share messages and share taps, referrals credited. K-factor = invited switch-ons ÷ all
+  switch-ons over 28 days (the steady-state viral coefficient: total = organic + K × total).
+  Shown once there are 10 switch-ons to go on.
+- **Engagement**: reminders sent and failed, reply rate (Done / Snooze / Wrong), pauses,
+  deletions, settings changes, not understood, asked for a human.
+- **Problem councils**: failed and slow (over 20s) lookups, bin days not found on the site,
+  wrong-day votes, failed reminders, and councils whose health check is failing.
+
+Sign-ups, invites, reminders and councils come from the database. Visits, the funnel, sources,
+share taps, pauses and deletions come from PostHog and need `POSTHOG_PERSONAL_API_KEY` (scope
+Query: read) and `POSTHOG_PROJECT_ID`; without them the report says so and sends the rest.
+Preview any day on the server: `docker compose -f deploy/docker-compose.prod.yml exec worker
+python -m app.services.daily_report 2026-11-07`.
