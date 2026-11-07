@@ -19,6 +19,7 @@ from app.models import (
     Referral,
     ChangeLog,
     CollectionEvent,
+    Outbox,
     Reminder,
     ReminderMode,
     ReminderStatus,
@@ -1001,6 +1002,13 @@ OPT_OUT_RE = re.compile(r"(please\s+)?(stop|unsubscribe|opt[ -]?out|cancel|end|q
                         r"(\s+please)?[\s.!]*", re.IGNORECASE)
 FALLBACK_TAIL = "Tap Settings to change your bins or reminder time."
 FALLBACK = f"{NOT_UNDERSTOOD[0]} {FALLBACK_TAIL}"
+# The not-understood reply isn't sent straight away: people often type in bursts, and a reply to
+# each half-sentence is spam. Binjamin waits until they've been quiet for FALLBACK_WAIT, answers
+# the whole burst once (send_fallbacks, run by the worker), and at most once per FALLBACK_EVERY.
+# Everything they send still goes to the team's inbox, so a person can pick it up.
+FALLBACK_WAIT = timedelta(seconds=60)
+FALLBACK_EVERY = timedelta(hours=24)
+FALLBACK_STALE = timedelta(minutes=30)  # the worker was down: too late to answer, leave it
 
 
 # Things people ask that Binjamin can't do, each with a reply that says so and points them the
@@ -1060,8 +1068,53 @@ def fallback_text(db: Session, user: User) -> str:
     """The not-understood reply, alternating between the two lines for each person."""
     n = db.scalar(select(func.count()).select_from(ChangeLog).where(
         ChangeLog.scope == "user", ChangeLog.scope_id == user.id,
-        ChangeLog.kind == "unrecognised")) or 1
-    return f"{NOT_UNDERSTOOD[(n - 1) % len(NOT_UNDERSTOOD)]} {FALLBACK_TAIL}"
+        ChangeLog.kind == "fallback_sent")) or 0
+    return f"{NOT_UNDERSTOOD[n % len(NOT_UNDERSTOOD)]} {FALLBACK_TAIL}"
+
+
+def _aware(d: datetime) -> datetime:
+    return d if d.tzinfo else d.replace(tzinfo=ZoneInfo("UTC"))
+
+
+def send_fallbacks(db: Session, now_utc: datetime | None = None) -> int:
+    """Answer bursts of messages Binjamin didn't understand, once each, after the person has been
+    quiet for FALLBACK_WAIT. Stays quiet when something they sent since got a proper answer, when
+    the team is talking to them, or when they already had a fallback in the last FALLBACK_EVERY.
+    Returns how many fallbacks went out."""
+    from app.services import inbox
+
+    now = now_utc or datetime.now(ZoneInfo("UTC"))
+    rows = db.scalars(select(ChangeLog).where(
+        ChangeLog.scope == "user", ChangeLog.kind == "unrecognised",
+        ChangeLog.detected_at >= now - FALLBACK_STALE)).all()
+    pending: dict[str, list[ChangeLog]] = {}
+    for r in rows:
+        if (r.diff or {}).get("pending"):
+            pending.setdefault(r.scope_id, []).append(r)
+    sent = 0
+    for user_id, burst in pending.items():
+        first = min(_aware(r.detected_at) for r in burst)
+        if now - max(_aware(r.detected_at) for r in burst) < FALLBACK_WAIT:
+            continue  # still typing
+        for r in burst:
+            r.diff = {k: v for k, v in r.diff.items() if k != "pending"}
+        user = db.get(User, user_id)
+        if user is None or not user.phone_e164:
+            continue
+        phone = user.phone_e164
+        answered = db.scalar(select(Outbox.id).where(
+            Outbox.to_phone == phone, Outbox.kind == "reply", Outbox.created_at >= first))
+        recent = db.scalar(select(ChangeLog.id).where(
+            ChangeLog.scope == "user", ChangeLog.scope_id == user_id,
+            ChangeLog.kind == "fallback_sent", ChangeLog.detected_at >= now - FALLBACK_EVERY))
+        if answered or recent or inbox.in_conversation(db, phone):
+            continue
+        send_reply(db, phone, fallback_text(db, user), kind="reply", buttons=[SETTINGS_BUTTON])
+        db.add(ChangeLog(scope="user", scope_id=user_id, kind="fallback_sent",
+                         diff={"messages": len(burst)}, detected_at=now))
+        sent += 1
+    db.commit()
+    return sent
 
 
 DELETE_CONFIRM = ("This deletes your account for good: your number, address, bins and reminders. "
@@ -1219,8 +1272,9 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     else:
         # Kept so we can see what people ask for that we don't handle yet. Deleted after
         # UNRECOGNISED_KEEP_DAYS by the worker (purge_unrecognised, daily).
-        db.add(ChangeLog(scope="user", scope_id=user.id, kind="unrecognised",
-                         diff={"text": text.strip()[:1000]}))
+        note = ChangeLog(scope="user", scope_id=user.id, kind="unrecognised",
+                         diff={"text": text.strip()[:1000]})
+        db.add(note)
         if inbox.in_conversation(db, phone):
             # The team is talking to them: this goes to the team, not the usual menu
             db.commit()
@@ -1231,9 +1285,11 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             reply = Reply(topic[0])
             to_inbox = "unrecognised" if topic[1] else None
         else:
-            db.flush()
-            reply = Reply(fallback_text(db, user), buttons=[SETTINGS_BUTTON])
-            to_inbox = "unrecognised"
+            # No reply yet: send_fallbacks answers once they've stopped typing (see FALLBACK_WAIT)
+            note.diff = {**note.diff, "pending": True}
+            db.commit()
+            inbox.post(db, phone, text, "unrecognised")
+            return ""
     if cmd in ("DONE", "SNOOZE") and last and len(words) == 1:
         # The reminder's template couldn't carry the referral news: it rides on this reply.
         news = referral_news(db, user)

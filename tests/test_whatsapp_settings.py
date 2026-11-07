@@ -1,16 +1,16 @@
 """Residents change their reminder time and bins over WhatsApp by tapping: a Settings menu, a
 time list and a bins list. Typed shortcuts (TIME 4pm, EVENING 7pm, DAY BEFORE, "turn off garden")
 still work."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.models import Outbox, Reminder, ReminderMode, ReminderStatus, User, UserBinSetting
+from app.models import ChangeLog, Outbox, Reminder, ReminderMode, ReminderStatus, User, UserBinSetting
 from app.providers import messaging
-from app.services.reminders import parse_time
+from app.services.reminders import parse_time, send_fallbacks
 from tests.test_flow import signup
 
 PHONE = "+447700900123"
@@ -216,13 +216,45 @@ def test_pause_and_resume_by_tapping(client, db, uid):
 
 # ---- fallback, copy -----------------------------------------------------------------------------
 
-def test_fallback_offers_the_settings_button(client, db, uid):
-    assert say(client, "blah blah") == ("I'm afraid that's beyond my bin grade. I'm just here for the "
-                                    "rubbish! Tap Settings to change your bins or reminder time.")
-    assert last_sent(db).endswith("\n[Settings]")
-    # the two lines take turns
-    assert say(client, "done").startswith("I'm just a humble bin butler. Rubbish is my speciality!")
-    assert say(client, "asdfgh").startswith("I'm afraid that's beyond my bin grade.")
+def _later(seconds):
+    return datetime.now(ZoneInfo("UTC")) + timedelta(seconds=seconds)
+
+
+def _replies(db):
+    db.expire_all()
+    return [o.body for o in db.scalars(select(Outbox).where(Outbox.kind == "reply")
+                                       .order_by(Outbox.created_at, Outbox.id))]
+
+
+def test_fallback_waits_until_they_stop_typing_then_answers_once(client, db, uid):
+    before = len(_replies(db))
+    assert say(client, "blah blah") == ""  # no instant reply
+    assert say(client, "and another thing") == ""
+    assert send_fallbacks(db, now_utc=_later(20)) == 0  # still within the wait
+    assert send_fallbacks(db, now_utc=_later(61)) == 1  # one reply for the whole burst
+    sent = _replies(db)[before:]
+    assert sent == ["I'm afraid that's beyond my bin grade. I'm just here for the rubbish! Tap "
+                    "Settings to change your bins or reminder time.\n[Settings]"]
+    assert send_fallbacks(db, now_utc=_later(120)) == 0  # never twice for the same burst
+
+
+def test_fallback_at_most_once_a_day(client, db, uid):
+    say(client, "blah blah")
+    assert send_fallbacks(db, now_utc=_later(61)) == 1
+    say(client, "asdfgh")
+    assert send_fallbacks(db, now_utc=_later(122)) == 0  # quiet: it's in the team's inbox
+    db.query(ChangeLog).filter(ChangeLog.kind == "fallback_sent").update(
+        {ChangeLog.detected_at: _later(-25 * 3600)})
+    db.commit()
+    say(client, "qwerty")
+    assert send_fallbacks(db, now_utc=_later(61)) == 1
+    assert _replies(db)[-1].startswith("I'm just a humble bin butler.")  # the lines take turns
+
+
+def test_no_fallback_when_a_later_message_made_sense(client, db, uid):
+    say(client, "hmm")
+    assert say(client, "settings")  # answered straight away
+    assert send_fallbacks(db, now_utc=_later(61)) == 0
 
 
 def test_no_old_off_on_copy_anywhere(client, db, uid):

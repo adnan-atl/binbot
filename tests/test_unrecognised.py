@@ -17,8 +17,8 @@ def kept(db):
 def test_messages_we_dont_understand_are_kept_then_purged(client, db, uid):  # noqa: F811
     say(client, "can you remind me about the glass box?")
     say(client, "settings")  # understood: not kept
-    assert [(r.scope, r.scope_id, r.diff) for r in kept(db)] == [
-        ("user", uid, {"text": "can you remind me about the glass box?"})]
+    assert [(r.scope, r.scope_id, r.diff["text"]) for r in kept(db)] == [
+        ("user", uid, "can you remind me about the glass box?")]
     assert purge_unrecognised(db) == 0
     later = datetime.now(timezone.utc) + timedelta(days=UNRECOGNISED_KEEP_DAYS + 1)
     assert purge_unrecognised(db, now_utc=later) == 1
