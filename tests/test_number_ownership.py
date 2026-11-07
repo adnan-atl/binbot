@@ -43,7 +43,7 @@ def test_turning_on_waits_for_hi_and_sends_nothing(client, db, live):
     assert res["status"] == "awaiting_hi" and res["scheduled"] == 0
     assert len(code) == 6 and code.isalnum() and code.isupper()
     # No code in the message: we know them by the number they message from
-    assert res["start_link"] == "https://wa.me/447700900999?text=" + quote("Hey Binny, I'M BIN")
+    assert res["start_link"] == "https://wa.me/447700900999?text=" + quote("Hi Binny, please start my bin reminders")
     assert code not in res["start_link"]
     user = db.get(User, uid)
     assert user.status == UserStatus.pending and user.start_code == code
@@ -157,6 +157,17 @@ def test_im_bin_from_the_typed_number_starts_reminders(client, db, live):
     db.expire_all()
     assert db.get(User, uid).status == UserStatus.active
     assert _say(client, "+447700900123", "Hey Binny, I'M BIN").startswith("Your reminders are already on")
+
+
+def test_the_plain_sign_up_message_starts_reminders(client, db, live):
+    from app.services.reminders import hi_text
+    uid = signup(client)["user_id"]
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    assert hi_text() == "Hi Binny, please start my bin reminders"
+    assert _say(client, "+447700900123", hi_text()).startswith("Binny here!")
+    db.expire_all()
+    assert db.get(User, uid).status == UserStatus.active
 
 
 def test_im_bin_from_another_number_claims_the_sign_up_by_postcode(client, db, live):

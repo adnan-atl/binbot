@@ -342,7 +342,7 @@ SIGNUP_NUDGE_TEXT = ("Your bin reminders are nearly ready. Tap Start reminders t
 
 
 def signup_nudges(db: Session, now_utc: datetime | None = None) -> int:
-    """Every few minutes: anyone who reached the say-hi step SIGNUP_NUDGE_MINUTES ago, typed a
+    """Every few minutes: anyone who reached the last step SIGNUP_NUDGE_MINUTES ago, typed a
     number and ticked the terms, but whose message never came, gets one nudge with a Start
     reminders button (META_SIGNUP_NUDGE_TEMPLATE). Tapping it is their hi. Without an approved
     template nothing is sent: free text to a number that hasn't messaged us wouldn't arrive."""
@@ -570,9 +570,10 @@ def send_welcome(db: Session, phone: str, user: User, via: str = "website") -> s
 
 
 def hi_text() -> str:
-    """What the say-hi button puts in their WhatsApp: no code to puzzle over. We know who they
-    are from the number they message from (the one they typed on the site)."""
-    return f"Hey {get_settings().brand_name}, I'M BIN"
+    """The message the website's last step puts in their WhatsApp, ready to send: plain words
+    saying what it does, no code to puzzle over. We know who they are from the number they
+    message from (the one they typed on the site)."""
+    return f"Hi {get_settings().brand_name}, please start my bin reminders"
 
 
 def start_link(code: str | None = None) -> str:
@@ -582,7 +583,9 @@ def start_link(code: str | None = None) -> str:
     return f"https://wa.me/{digits}?text={quote(hi_text())}"
 
 
-HI_RE = re.compile(r"\bI\s*['’]?\s*M\s+BIN\b", re.IGNORECASE)  # "I'M BIN", "im bin", "I’m Bin"
+# Their sign-up message: today's "please start my bin reminders", or "I'M BIN" from links and QR
+# codes made before (still out there in old tabs and screenshots).
+HI_RE = re.compile(r"\bstart\s+my\s+bin\s+reminders\b|\bI\s*['’]?\s*M\s+BIN\b", re.IGNORECASE)
 START_PAYLOAD = "START_REMINDERS"  # the Start reminders button on the sign-up nudge template
 
 

@@ -54,7 +54,7 @@ FUNNEL = [
     ("calendar_loaded", "Bin days found"),
     ("calendar_confirmed", "Confirmed bins"),
     ("phone_added", "Phone added"),
-    ("say_hello_tapped", "Tapped say hello"),
+    ("turn_on_tapped", "Tapped turn on reminders"),
 ]
 
 
@@ -212,7 +212,9 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
     span = f"timestamp >= toDateTime('{_ts(start)}') AND timestamp < toDateTime('{_ts(end)}')"
     try:
         counts = _hogql(
-            "SELECT if(event = 'screen_viewed', concat('screen_viewed:', toString(properties.screen)), event) AS e, "
+            # say_hello_tapped is the old name of turn_on_tapped (renamed Nov 2026): counted as one
+            "SELECT multiIf(event = 'screen_viewed', concat('screen_viewed:', toString(properties.screen)), "
+            "event = 'say_hello_tapped', 'turn_on_tapped', event) AS e, "
             "count(), uniq(properties.$session_id) "
             f"FROM events WHERE {span} GROUP BY e")
         sources = _hogql(
@@ -227,10 +229,10 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
                         f"event = 'calendar_failed' AND {span} GROUP BY 1")
         via = _hogql(f"SELECT toString(properties.via), count() FROM events WHERE "
                      f"event = 'reminders_switched_on' AND {span} GROUP BY 1")
-        # Who tapped "Say hello" on a phone or a computer, and whether they then switched on
-        # (any time since: the hi can come a while later)
+        # Who tapped "Turn on reminders" on a phone or a computer, and whether they then switched
+        # on (any time since: their message can come a while later)
         hello = _hogql(f"SELECT DISTINCT toString(person_id), toString(properties.on_computer) "
-                       f"FROM events WHERE event = 'say_hello_tapped' AND {span}")
+                       f"FROM events WHERE event IN ('turn_on_tapped', 'say_hello_tapped') AND {span}")
         on = {p for (p,) in _hogql(
             "SELECT DISTINCT toString(person_id) FROM events WHERE event = 'reminders_switched_on' "
             f"AND timestamp >= toDateTime('{_ts(start)}')")}
@@ -292,9 +294,9 @@ def build(db: Session, day: date) -> str:
         lines.append("   by " + ", ".join(f"{k_} {n}" for k_, n in sorted(ph["via"].items())))
     lines.append(f"• Active residents now: *{active}*")
     if d.stuck_at_hello:
-        lines.append(f"• Reached \"say hello\" but haven't messaged yet: {d.stuck_at_hello}")
+        lines.append(f"• Reached the last step but haven't messaged yet: {d.stuck_at_hello}")
     if ph and ph.get("hello"):
-        lines.append("• Tapped say hello → switched on: " + ", ".join(
+        lines.append("• Tapped turn on reminders → switched on: " + ", ".join(
             f"{dev} {n_on}/{n} ({_pct(n_on, n)})" for dev, (n, n_on) in sorted(ph["hello"].items())))
     lines.append("")
 

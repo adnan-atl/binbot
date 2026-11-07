@@ -618,6 +618,15 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 #hi-qr{grid-column:2}
 #hi-qr{width:232px;height:232px;padding:14px;background:#FFFFFF;border:1px solid #E5E5EA;border-radius:24px;box-sizing:content-box}
 .hi-web{font-size:15px;font-weight:500;color:#8A8A8E;text-decoration:underline;text-underline-offset:3px}
+/* The last step on a phone: three numbered steps, then the button that opens WhatsApp */
+.hi-phone{display:flex;flex-direction:column;gap:22px;margin-top:4px}
+.hi-phone[hidden]{display:none}
+.hi-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.hi-steps li{display:flex;align-items:center;gap:12px;font-size:18px;line-height:1.3;color:var(--ink)}
+.hi-steps b{font-weight:600}
+.hi-n{flex:none;width:30px;height:30px;border-radius:50%;background:#FFFFFF;border:1px solid #E5E5EA;display:inline-flex;align-items:center;justify-content:center;font-size:15px;font-weight:600}
+.hi-send{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#25D366}
+.hi-wait{margin:0;min-height:1.4em;font-size:15px;line-height:1.4;color:var(--grey);text-align:center}
 /* Time step: the button stays grey until a time is picked */
 #t-go[aria-disabled="true"]{background:#E5E5EA;color:#AEAEB2;box-shadow:none;pointer-events:none;cursor:default}
 .cta-wa{flex:none;margin-top:-1px;color:#0B0B0B}
@@ -1017,7 +1026,7 @@ button,input,select,textarea{font-family:inherit}
 <div class="times-wrap"><div role="group" aria-labelledby="time-l" id="times" style="margin-top:4px"></div></div>
 </div>
 <div class="t-go" style="display:flex;flex-direction:column;align-items:stretch;gap:12px">
-<a class="pill go" id="t-go" href="{{WA_HI_LINK}}" target="_blank" rel="noopener" aria-disabled="true" style="width:100%">Say hello to {{BRAND}}!</a>
+<a class="pill go" id="t-go" href="{{WA_HI_LINK}}" target="_blank" rel="noopener" aria-disabled="true" style="width:100%">Turn on reminders</a>
 </div>
 </div>
 </main>
@@ -1028,9 +1037,18 @@ button,input,select,textarea{font-family:inherit}
 <div data-bar></div>
 <main class="flow-main">
 <div class="col">
-<h1 class="h1" id="hi-h">Scan with your phone</h1>
-<p class="lede" id="hi-lede">Point your phone's camera at the code. WhatsApp opens with your message ready: send it, and {{BRAND}} replies straight away.</p>
-<div id="hi-desk" class="hi-desk">
+<h1 class="h1" id="hi-h">Last step: send a message to {{BRAND}} to get started</h1>
+<p class="lede" id="hi-lede">We'll open WhatsApp with a message ready. Just press send. That's how {{BRAND}} knows it's really you, and your reminders start straight away.</p>
+<div id="hi-phone" class="hi-phone">
+<ol class="hi-steps">
+<li><span class="hi-n">1</span><span>Tap <b>Open WhatsApp</b></span></li>
+<li><span class="hi-n">2</span>Press send <span class="hi-send" aria-label="(the green arrow button)"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#fff" d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg></span></li>
+<li><span class="hi-n">3</span>Come back here</li>
+</ol>
+<a class="pill go" id="hi-go" href="{{WA_HI_LINK}}" target="_blank" rel="noopener">Open WhatsApp</a>
+<p class="hi-wait" id="hi-wait" aria-live="polite"></p>
+</div>
+<div id="hi-desk" class="hi-desk" hidden>
 <div class="hi-row"><img class="hi-binji" src="/static/binji-phone.webp" alt="" width="453" height="560"><img id="hi-qr" alt="QR code that opens WhatsApp with your message ready" width="232" height="232"></div>
 <a id="hi-web" class="hi-web" href="https://wa.me/" target="_blank" rel="noopener">Or open WhatsApp on this computer</a>
 </div>
@@ -1870,21 +1888,23 @@ Share to WhatsApp
   });
 
   function to24(t) { var m = t.match(/(\d+):(\d+)(am|pm)/); var h = +m[1] % 12 + (m[3] === 'pm' ? 12 : 0); return (h < 10 ? '0' : '') + h + ':' + m[2]; }
-  // "Say hello to Binjamin!": a plain link to WhatsApp with "Hey Binjamin, I'M BIN" ready to send
-  // (the server fills in WA_HI_LINK). We know them by the number they message from, so there's
-  // no code. The tap also saves their time, then the page moves on to the invite step while
-  // WhatsApp opens. Without a business number (local, demo) it just turns reminders on.
+  // "Turn on reminders" saves their time, then shows the last step: send one message to
+  // Binjamin on WhatsApp ("Hi Binjamin, please start my bin reminders", ready to send; the server
+  // fills in WA_HI_LINK). Their message is what turns reminders on: it proves the number is
+  // theirs, and lets Binjamin reply without a paid template. We know them by the number they
+  // message from, so there's no code. Without a business number (local, demo) the button just
+  // turns reminders on.
   var WA_LIVE = /^https:\/\/wa\.me\//.test($('#t-go').getAttribute('href') || '');
   if (!WA_LIVE) { $('#t-go').setAttribute('href', '#binfluencer'); $('#t-go').removeAttribute('target'); }
-  // On a computer WhatsApp is usually on their phone, so instead of opening it here the button
-  // leads to a QR code of the same message to scan (the "hi" screen), which moves on by itself
-  // once their message arrives.
+  // The last step ("hi" screen) on a phone: numbered steps and an Open WhatsApp button. On a
+  // computer, where WhatsApp is usually on their phone: a QR code of the same message to scan.
+  // Either way it moves on by itself once their message arrives, and only then says "all set".
   var ON_COMPUTER = false;
   try { ON_COMPUTER = matchMedia('(hover: hover) and (pointer: fine)').matches && innerWidth > 600; } catch (e) {}
   $('#t-go').addEventListener('click', function (e) {
     if (!time) { e.preventDefault(); return; }
-    track('say_hello_tapped', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time), on_computer: ON_COMPUTER });
-    if (!WA_LIVE || ON_COMPUTER) e.preventDefault();  // stay on the page
+    track('turn_on_tapped', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time), on_computer: ON_COMPUTER });
+    e.preventDefault();  // stay on the page: WhatsApp opens from the last step
     var saved = (API.live && API.userId)
       ? api('POST', '/users/' + API.userId + '/reminders', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time) })
           .then(function () { return api('GET', '/users/' + API.userId + '/referral'); })
@@ -1892,24 +1912,53 @@ Share to WhatsApp
           .catch(function () {})
       : Promise.resolve();
     saved.then(function () {
-      if (WA_LIVE && ON_COMPUTER) { setupHi(); go('hi'); return; }
-      setTimeout(function () { go('binfluencer'); }, WA_LIVE ? 400 : 0);
+      if (WA_LIVE) { setupHi(); go('hi'); return; }
+      go('binfluencer');
     });
   });
-  var hiPoll = null;
+  var hiPoll = null, hiOpened = false, hiRetried = false;
   function setupHi(preview) {
     var href = $('#t-go').getAttribute('href');
     $('#hi-web').href = href;
-    $('#hi-qr').src = preview ? API.base + '/preview-qr.svg' : API.base + '/users/' + API.userId + '/start-qr.svg';
+    $('#hi-go').href = href;
+    $('#hi-desk').hidden = !ON_COMPUTER;
+    $('#hi-phone').hidden = ON_COMPUTER;
+    $('#hi-lede').textContent = ON_COMPUTER
+      ? "Scan the code with your phone's camera. WhatsApp opens with a message ready. Just press send. That's how " + BRAND + " knows it's really you, and your reminders start straight away."
+      : "We'll open WhatsApp with a message ready. Just press send. That's how " + BRAND + " knows it's really you, and your reminders start straight away.";
+    if (ON_COMPUTER) $('#hi-qr').src = preview ? API.base + '/preview-qr.svg' : API.base + '/users/' + API.userId + '/start-qr.svg';
+    hiOpened = false; hiRetried = false;
+    $('#hi-go').textContent = 'Open WhatsApp';
+    $('#hi-wait').textContent = '';
+    track('last_step_shown', { on_computer: ON_COMPUTER });
     clearInterval(hiPoll);
     if (preview || !API.userId) return;
-    hiPoll = setInterval(function () {
-      if (current !== 'hi') { if (current === 'binfluencer') clearInterval(hiPoll); return; }
-      api('GET', '/users/' + API.userId + '/status').then(function (r) {
-        if (r && r.status === 'active' && current === 'hi') { clearInterval(hiPoll); go('binfluencer'); }
-      }).catch(function () {});
-    }, 3000);
+    hiPoll = setInterval(checkHi, 3000);
   }
+  function checkHi() {
+    if (current !== 'hi') { if (current === 'binfluencer') clearInterval(hiPoll); return Promise.resolve(false); }
+    return api('GET', '/users/' + API.userId + '/status').then(function (r) {
+      if (r && r.status === 'active' && current === 'hi') { clearInterval(hiPoll); go('binfluencer'); return true; }
+      return false;
+    }).catch(function () { return false; });
+  }
+  $('#hi-go').addEventListener('click', function () {
+    hiOpened = true;
+    $('#hi-wait').textContent = 'Waiting for your message\u2026';
+    track('whatsapp_opened', { retry: hiRetried });
+  });
+  // Back from WhatsApp without sending it: say so plainly, and offer the button again.
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden || current !== 'hi' || !hiOpened || ON_COMPUTER || !API.userId) return;
+    setTimeout(function () {
+      checkHi().then(function (on) {
+        if (on || current !== 'hi') return;
+        $('#hi-wait').textContent = "Haven't sent it yet? Tap Open WhatsApp again and press send.";
+        $('#hi-go').textContent = 'Open WhatsApp again';
+        if (!hiRetried) { hiRetried = true; track('last_step_retry_shown'); }
+      });
+    }, 2500);  // give their message a moment to arrive
+  });
 
   // Binfluencer
   function renderBadge() {
@@ -1974,7 +2023,8 @@ Share to WhatsApp
 
   try { current = screenFromUrl(); history.replaceState({ s: current, sid: SID, n: 0 }, '', urlFor(current)); } catch (e) {}
   // Design preview: ?preview=<screen> opens that step straight away with sample content, e.g.
-  // /?preview=hi for the scan-to-say-hi step computers get. Nothing is saved.
+  // /?preview=hi for the last step (QR code on a computer, steps and a button on a phone).
+  // Nothing is saved.
   try {
     var pv = (location.search.match(/[?&]preview=([a-z]+)/) || [])[1];
     if (pv && document.querySelector('[data-screen="' + pv + '"]')) {

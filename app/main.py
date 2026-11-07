@@ -67,8 +67,9 @@ def render_index(page: Path | None = None) -> str:
     page = page.replace("{{POSTHOG_JSON}}", json.dumps(ph).replace("<", "\\u003c"))
     from app.services.reminders import start_link
 
-    # The "Say hello" button's WhatsApp link (same for everyone: no code in it). Empty without a
-    # business number (local, demo): the page then turns reminders on directly.
+    # The last step's WhatsApp link, with "Hi Binjamin, please start my bin reminders" ready to
+    # send (same for everyone: no code in it). Empty without a business number (local, demo):
+    # the page then turns reminders on directly.
     wa_hi = start_link() if s.meta_display_number else ""
     for token, value in (("WA_HI_LINK", wa_hi), ("PUBLIC_URL", s.public_base_url.rstrip("/")),
                          ("BRAND", s.brand_name), ("PARENT_NAME", s.parent_name),

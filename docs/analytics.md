@@ -49,7 +49,10 @@ Every website event carries `design: oat`. Every server event carries `source: s
 | `bins_edit_opened`, `bins_edited` | Editing bins on the confirm step | `bins` |
 | `calendar_confirmed` | "Yes, these are right" | `bins` |
 | `phone_invalid`, `phone_added`, `phone_failed` | Phone step | `offers_ok` (didn't tick "Don't tell me about other services") |
-| `say_hello_tapped` | "Say hello to Binjamin!" | `mode`, `time`, `on_computer` |
+| `turn_on_tapped` | "Turn on reminders" (time step). Was `say_hello_tapped` until Nov 2026 | `mode`, `time`, `on_computer` |
+| `last_step_shown` | The last step: "send a message to Binjamin" (QR code on a computer, steps and a button on a phone) | `on_computer` |
+| `whatsapp_opened` | "Open WhatsApp" on the last step (phone) | `retry` (tapped again after coming back without sending) |
+| `last_step_retry_shown` | Came back from WhatsApp without sending: "Haven't sent it yet?" (once per visit) | |
 | `whatsapp_web_opened` | "Or open WhatsApp on this computer" (QR screen) | |
 | `share_tapped` | Share step | `how`: whatsapp, copy_message, copy_link |
 
@@ -77,7 +80,9 @@ Every website event carries `design: oat`. Every server event carries `source: s
 ## Useful insights to build
 
 - **Sign-up funnel**: `$pageview` → `screen_viewed (postcode)` → `calendar_loaded` →
-  `calendar_confirmed` → `phone_added` → `say_hello_tapped` → `reminders_switched_on`.
+  `calendar_confirmed` → `phone_added` → `turn_on_tapped` → `last_step_shown` →
+  `whatsapp_opened` (phone) → `reminders_switched_on`. For dates before the rename, use
+  `say_hello_tapped` in place of `turn_on_tapped`.
 - **Activation by channel**: `reminders_switched_on` broken down by `via`.
 - **Weekly active residents**: unique people with `reminder_replied` or `menu_tapped`.
 - **Reminder engagement**: `reminder_replied` / `reminder_sent`, by `reply`.
@@ -96,7 +101,7 @@ At midnight (London) the worker posts the day just ended to `SLACK_ANALYTICS_CHA
 (`app/services/daily_report.py`). Every headline number is compared with the same day last week.
 
 - **Headline**: visits, sign-ups started, switched on (website / WhatsApp), visit → switched on,
-  active residents, and people stuck at "say hello". Who tapped "Say hello" on a phone vs a
+  active residents, and people stuck at the last step. Who tapped "Turn on reminders" on a phone vs a
   computer (the QR code), and how many of each then switched on.
 - **Alfred offers** (database): of those who gave their number today, how many opted out of
   hearing about Alfred (website: "Don't tell me about other Alfred services"; WhatsApp: "No

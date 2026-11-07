@@ -69,11 +69,30 @@ def test_silly_time_step_says_hello_and_computers_get_the_qr_step(client, monkey
     get_settings.cache_clear()
     page = client.get("/").text
     assert "{{" not in page and "Scan with your phone" in page  # the QR step, for computers
-    assert ('id="t-go" href="https://wa.me/447700900999?text=Hey%20Binny%2C%20I%27M%20BIN"' in page)
+    assert ('id="t-go" href="https://wa.me/447700900999?text=Hi%20Binny%2C%20please%20start%20my%20bin%20reminders"' in page)
     assert 'aria-disabled="true"' in page and "Say hello to Binny!" in page
     monkeypatch.delenv("META_DISPLAY_NUMBER")
     get_settings.cache_clear()
     assert 'id="t-go" href=""' in client.get("/").text  # local: no WhatsApp link
+
+
+def test_oat_last_step_sends_one_plain_message(client, monkeypatch):
+    """Oat (the live page): "Turn on reminders", then a last step on every device that asks for
+    one message to Binjamin, with plain words ready to send. No "I'm Bin" joke anywhere."""
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("HOME_DESIGN", "oat")
+    monkeypatch.setenv("META_DISPLAY_NUMBER", "+44 7700 900999")
+    get_settings.cache_clear()
+    page = client.get("/").text
+    link = "https://wa.me/447700900999?text=Hi%20Binny%2C%20please%20start%20my%20bin%20reminders"
+    assert f'id="t-go" href="{link}"' in page and "Turn on reminders</a>" in page
+    assert "Last step: send a message to Binny to get started" in page
+    assert f'id="hi-go" href="{link}"' in page and ">Open WhatsApp</a>" in page
+    assert "Press send" in page and "Come back here" in page
+    assert "I'M BIN" not in page and "Say hello" not in page
+    monkeypatch.delenv("META_DISPLAY_NUMBER")
+    get_settings.cache_clear()
 
 
 def test_silly_phone_step_consent_wording(client, monkeypatch):

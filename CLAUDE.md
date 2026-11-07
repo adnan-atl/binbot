@@ -32,6 +32,10 @@ Note the spelling: binjamin.uk, not benjamin.uk (that's someone else's site).
 - Bot messages say "the evening before"; marketing copy may say "the night before".
 - Not-understood messages: no instant reply. Wait for 60s of quiet, answer the burst once, at
   most once per 24h; everything still goes to the team inbox.
+- Sign-up ends with the resident messaging Binjamin first ("Hi Binjamin, please start my bin
+  reminders", pre-typed): it proves the number is theirs and opens WhatsApp's free 24h window,
+  so no template is needed. The website's last step explains this in plain words on every
+  device and only says "all set" once the message has arrived. No "I'm Bin" joke.
 - British English. Brand name comes from settings (`brand_name`), never hard-coded in copy.
 - Analytics stay cookieless (page memory only) with no autocapture or recording, and never
   carry a phone number, postcode, address or message text. Add new events to docs/analytics.md.

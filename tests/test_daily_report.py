@@ -73,7 +73,7 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
     fake = {"events": {"reminders_paused": 2, "account_deleted": 1},
             "sessions": {"$pageview": 40, "screen_viewed:postcode": 20, "postcode_looked_up": 18,
                          "calendar_loaded": 15, "calendar_confirmed": 14, "phone_added": 10,
-                         "say_hello_tapped": 8},
+                         "turn_on_tapped": 8},
             "sources": [("direct", 25), ("invite link", 15)], "shares": {"WhatsApp": 3},
             "calendar_failed": {"Glasgow City": 2}, "via": {"website": 2},
             "hello": {"phone": [4, 3], "computer": [2, 0]}}
@@ -89,7 +89,7 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
     assert "Paused 2" in text and "deleted 1" in text
     assert "*Glasgow City*: 2 bin days not found on the site" in text
     assert "Health check failing: " + glasgow.name in text
-    assert "Tapped say hello → switched on: computer 0/2 (0%), phone 3/4 (75%)" in text
+    assert "Tapped turn on reminders → switched on: computer 0/2 (0%), phone 3/4 (75%)" in text
 
 
 def test_k_factor(client, db):
