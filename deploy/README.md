@@ -133,6 +133,9 @@ After this, every push to main that passes the tests goes live by itself within 
 push with failing tests never deploys. Nothing logs in to the server: GitHub moves a `live` branch to
 the tested commit, and the server checks `live` every 2 minutes and rebuilds when it moves. If the
 new version doesn't come up healthy, it goes back to the previous one by itself.
+Every run (every 2 minutes, deploy or not) also checks that all containers are running and the
+site answers through Caddy: anything stopped is started again, and if that doesn't fix it the team
+gets one Slack alert in SLACK_ALERTS_CHANNEL (and another when it's back). Runs never overlap.
 
 On the server (browser SSH terminal):
 
