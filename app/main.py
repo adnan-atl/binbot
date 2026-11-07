@@ -60,6 +60,11 @@ def render_index(page: Path | None = None) -> str:
     brand_json = json.dumps(s.brand_name).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     page = page.replace("{{BRAND_JSON}}", brand_json)
     page = page.replace("{{TURNSTILE_SITE_KEY_JSON}}", json.dumps(s.turnstile_site_key).replace("<", "\\u003c"))
+    # Product analytics (services/analytics.py): only on designs that ask for it with this token
+    # (oat), so the original pages stay as they were. null = off.
+    ph = {"key": s.posthog_key, "host": s.posthog_web_host,
+          "ui": s.posthog_host.replace(".i.posthog.com", ".posthog.com")} if s.posthog_key else None
+    page = page.replace("{{POSTHOG_JSON}}", json.dumps(ph).replace("<", "\\u003c"))
     from app.services.reminders import start_link
 
     # The "Say hello" button's WhatsApp link (same for everyone: no code in it). Empty without a

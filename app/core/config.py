@@ -89,6 +89,14 @@ class Settings(BaseSettings):
     heartbeat_url: str = ""
     # Error alerts (sentry.io, EU region). Empty = off.
     sentry_dsn: str = ""
+    # Product analytics (PostHog, EU cloud; services/analytics.py). The project API key
+    # (phc_..., public by design: it can only send events). Empty = off, on the site and server.
+    posthog_key: str = ""
+    posthog_host: str = "https://eu.i.posthog.com"  # where the server sends its events
+    # Where the website sends its events: our own address, proxied by Caddy to PostHog
+    # (deploy/Caddyfile), so ad blockers don't drop them. Locally there's no Caddy: set this to
+    # posthog_host to test the site's events.
+    posthog_web_host: str = "/ingest"
     # Product name shown on the page and in WhatsApp messages. Change it here or with BRAND_NAME.
     # Which page the home page (/) shows: a design in web/designs ("oat"; the original page is "og"), or empty for
     # web/index.html. Every design stays reachable at /d/<name>.

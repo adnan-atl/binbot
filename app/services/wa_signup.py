@@ -23,7 +23,7 @@ from app.core.db import session_factory
 from app.core.guard import allow
 from app.models import ChangeLog, ReminderMode, User, UserStatus, now
 from app.providers.messaging import send_reply
-from app.services import geo, signup
+from app.services import analytics, geo, signup
 from app.services.normalize import bin_emoji, bin_name
 from app.services.reminders import DAY_BEFORE_TIMES, Reply, _clock, is_hi, parse_time, send_welcome
 
@@ -110,6 +110,7 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
         db.add(user)
         db.flush()
         ref = REF_RE.search(t)  # came from someone's personal invite: they get the credit
+        analytics.track(user, "signup_started", via="whatsapp", invite=bool(ref))
         if ref:
             referrer = db.scalar(select(User).where(User.referral_code == ref.group(1).lower()))
             if referrer is not None and referrer.id != user.id:

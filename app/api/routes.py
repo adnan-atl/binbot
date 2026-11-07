@@ -23,7 +23,7 @@ from app.models import (
     level_for,
     now,
 )
-from app.services import geo, signup, split
+from app.services import analytics, geo, signup, split
 from app.services.reminders import handle_inbound, rebuild_reminders, send_welcome, start_link
 from app.services.schedule import (
     get_or_create_council,
@@ -103,9 +103,11 @@ def signup_start(body: S.StartIn, request: Request, db: Session = Depends(get_db
     except geo.BadPostcode:
         raise HTTPException(400, "That doesn't look like a UK postcode")
     user = res.user
+    bins = _bins_out(db, user)
+    analytics.track(user, "signup_started", via="website", calendar=res.source,
+                    shared=bool(res.shared), calendar_error=bool(res.error), bins=len(bins))
     return S.StartOut(user_id=user.id, property_id=res.prop.id, council=res.prop.council.name,
-                      source=res.source, error=res.error, shared=res.shared,
-                      bins=_bins_out(db, user))
+                      source=res.source, error=res.error, shared=res.shared, bins=bins)
 
 
 # Shared with the WhatsApp sign-up: see services/signup.py

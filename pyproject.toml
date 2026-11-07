@@ -19,6 +19,7 @@ dependencies = [
   "sentry-sdk[fastapi]==2.70.0",  # error alerts; off unless SENTRY_DSN is set
   "yarl>=1.9",  # Birmingham's scraper imports it; the library doesn't declare it
   "segno>=1.6,<2",  # QR code for saying hi from a phone when signing up on a computer
+  "posthog>=7,<8",  # product analytics; off unless POSTHOG_KEY is set (services/analytics.py)
 ]
 
 [project.optional-dependencies]

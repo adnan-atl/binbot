@@ -21,7 +21,9 @@ Note the spelling: binjamin.uk, not benjamin.uk (that's someone else's site).
   (341 of 343 checked; Google Sheet "Binjamin – council bin colours" is the working copy).
 - `web/designs/oat.html` — the main website (HOME_DESIGN=oat). `web/designs/og.html` must stay
   identical to `silly.html` (the original page, kept at /d/og). Don't edit silly/og.
-- `docs/` — inbox playbook, WhatsApp templates.
+- `app/services/analytics.py` + `docs/analytics.md` — PostHog product analytics (site and server,
+  one person per user id). Off without `POSTHOG_KEY`.
+- `docs/` — inbox playbook, WhatsApp templates, analytics events.
 
 ## Product rules (don't break these)
 - Never guess a bin colour. Only use the council's own words; if unsure, leave it blank.
@@ -31,6 +33,8 @@ Note the spelling: binjamin.uk, not benjamin.uk (that's someone else's site).
 - Not-understood messages: no instant reply. Wait for 60s of quiet, answer the burst once, at
   most once per 24h; everything still goes to the team inbox.
 - British English. Brand name comes from settings (`brand_name`), never hard-coded in copy.
+- Analytics stay cookieless (page memory only) with no autocapture or recording, and never
+  carry a phone number, postcode, address or message text. Add new events to docs/analytics.md.
 
 ## Working conventions
 - Commit messages end with the Co-Authored-By / Claude-Session trailers the session gives you.

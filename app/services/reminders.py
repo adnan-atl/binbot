@@ -27,6 +27,7 @@ from app.models import (
     UserBinSetting,
     UserStatus,
 )
+from app.services import analytics
 from app.services.normalize import bin_tag, describe_rule, is_daily
 from app.providers.messaging import get_provider, send_contact, send_message, send_reply, send_template_batch, uses_template
 
@@ -120,6 +121,7 @@ def credit_referral(db: Session, user: User) -> None:
         return
     db.add(Referral(referrer_id=ref_id, referred_id=user.id))
     db.flush()
+    analytics.track(ref_id, "referral_credited")
 
 
 def referral_news(db: Session, user: User) -> tuple[str, list[Referral]] | None:
@@ -207,6 +209,7 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
             else:
                 r.status = ReminderStatus.failed
                 gave_up.append((r, row.error))
+                analytics.track(r.user_id, "reminder_failed")
         else:
             r.status = ReminderStatus.sent
             r.sent_at = now_utc
@@ -215,6 +218,10 @@ def dispatch_due(db: Session, now_utc: datetime | None = None) -> int:
             if news_rows:
                 _mark_announced(news_rows, now_utc)
             sent += 1
+            u = db.get(User, r.user_id)
+            analytics.track(u, "reminder_sent", bins=len(r.bins or []), mode=u.reminder_mode.value,
+                            time=u.reminder_time, retried=bool(r.attempts),
+                            with_news=bool(news_rows))
     db.commit()
     if gave_up:
         from app.services import inbox
@@ -296,6 +303,7 @@ def send_share(db: Session, phone: str, user: User, kind: str, intro: str = SHAR
     if get_provider().name == "meta":
         time.sleep(0.7)  # keep them in order
     send_message(db, phone, share_message(user), kind=kind)
+    analytics.track(user, "share_message_sent", trigger=kind)
 
 
 def share_nudges(db: Session, now_utc: datetime | None = None) -> int:
@@ -554,6 +562,9 @@ def send_welcome(db: Session, phone: str, user: User, via: str = "website") -> s
     from app.services import inbox as _inbox
 
     _inbox.announce_signup(db, user, via)  # every sign-up gets one welcome: the Slack tracker
+    analytics.track(user, "reminders_switched_on", via=via, mode=user.reminder_mode.value,
+                    time=user.reminder_time,
+                    bins=sum(1 for b in user.bin_settings if b.enabled))
     return welcome_message(db, user)
 
 
@@ -757,6 +768,7 @@ def bins_menu(db: Session, user: User) -> Reply:
 def _set_time(db: Session, user: User, mode: ReminderMode, hhmm: str) -> Reply:
     user.reminder_mode, user.reminder_time = mode, hhmm
     rebuild_reminders(db, user)
+    analytics.track(user, "reminder_time_changed", mode=mode.value, time=hhmm)
     tail = _next_reminder(db, user) if user.status == UserStatus.active else _OFF_NOTE
     return Reply(f"Done. I'll remind you {_when(user)} at {_clock(hhmm)}.{tail}")
 
@@ -768,6 +780,8 @@ def _set_bin(db: Session, user: User, b: UserBinSetting, on: bool) -> Reply:
     b.enabled = on
     db.flush()
     rebuild_reminders(db, user)
+    analytics.track(user, "bin_switched_on" if on else "bin_switched_off",
+                    category=b.category.value)
     if on:
         tail = _next_reminder(db, user, b.label) if user.status == UserStatus.active else _OFF_NOTE
         return Reply(f"{b.label} is back on.{tail}", buttons=after)
@@ -780,6 +794,7 @@ def _set_bin(db: Session, user: User, b: UserBinSetting, on: bool) -> Reply:
 def _pause(db: Session, user: User) -> Reply:
     user.status = UserStatus.stopped
     rebuild_reminders(db, user)
+    analytics.track(user, "reminders_paused")
     return Reply("Reminders are off. Reply START or tap Turn reminders on when you want them back.",
                  buttons=[("menu:resume", "Turn reminders on")])
 
@@ -787,6 +802,7 @@ def _pause(db: Session, user: User) -> Reply:
 def _resume(db: Session, user: User) -> Reply:
     user.status = UserStatus.active
     rebuild_reminders(db, user)
+    analytics.track(user, "reminders_resumed")
     return Reply(f"Reminders are back on.{_next_reminder(db, user)}")
 
 
@@ -808,6 +824,7 @@ def _tap(db: Session, user: User, tap: str) -> Reply | None:
     """A tapped button or list row: stable ids, never trusted blindly (bins must be the sender's)."""
     kind, _, arg = tap.partition(":")
     if kind == "menu":
+        analytics.track(user, "menu_tapped", item=arg)
         return {"settings": lambda: settings_menu(db, user), "time": lambda: time_menu(user),
                 "bins": lambda: bins_menu(db, user), "pause": lambda: _pause(db, user),
                 "resume": lambda: _resume(db, user),
@@ -1138,6 +1155,7 @@ def _erase(db: Session, user: User, phone: str, text: str) -> str | None:
         from app.services.retention import delete_account
 
         send_reply(db, phone, DELETED, kind="reply")
+        analytics.track(user, "account_deleted", via="whatsapp")
         delete_account(db, user)  # also removes the messages we sent, this one included
         db.commit()
         return DELETED
@@ -1164,6 +1182,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         send_reply(db, phone, inbox.HANDED_OVER, kind="reply")
         db.commit()
         inbox.post(db, phone, text, "human")
+        analytics.track(db.scalar(select(User.id).where(User.phone_e164 == phone)),
+                        "asked_for_human")
         return inbox.HANDED_OVER
     user = db.scalar(select(User).where(User.phone_e164 == phone))
     from app.services import wa_signup
@@ -1282,6 +1302,7 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             inbox.post(db, phone, text, "unrecognised")
             return ""
         topic = topic_reply(user, text)
+        analytics.track(user, "message_not_understood", pointed_elsewhere=topic is not None)
         if topic is not None:  # something we can't do, but can point them the right way
             reply = Reply(topic[0])
             to_inbox = "unrecognised" if topic[1] else None
@@ -1291,6 +1312,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
             db.commit()
             inbox.post(db, phone, text, "unrecognised")
             return ""
+    if cmd in ("DONE", "SNOOZE", "WRONG") and len(words) == 1 and latest is not None:
+        analytics.track(user, "reminder_replied", reply=cmd.lower())
     if cmd in ("DONE", "SNOOZE") and last and len(words) == 1:
         # The reminder's template couldn't carry the referral news: it rides on this reply.
         news = referral_news(db, user)
@@ -1300,6 +1323,7 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
     send_reply(db, phone, reply.text, kind="reply", buttons=reply.buttons,
                list_button=reply.list_button, sections=reply.sections)
     if reply.share:
+        analytics.track(user, "share_message_sent", trigger="asked")
         real = get_provider().name == "meta"
         import time as _time
         if real:

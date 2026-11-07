@@ -798,7 +798,7 @@ button,input,select,textarea{font-family:inherit}
 <div class="page-card">
 <main class="page-main legal">
 <h1 class="h1">Privacy</h1>
-<p class="updated">Last updated 4 November 2026</p>
+<p class="updated">Last updated 7 November 2026</p>
 
 <h2 class="h2">Who we are</h2>
 <p>{{BRAND}} is run by Alfred Wholesale Limited (company number 16293586), 9 Thorney Leys Park, Witney, OX28 4GE. We decide how your information is used, which makes us the data controller. Questions about your data: <a href="mailto:privacy@alfred.co.uk">privacy@alfred.co.uk</a>.</p>
@@ -819,9 +819,10 @@ button,input,select,textarea{font-family:inherit}
 <li>To find your bin days on your council's website, and keep checking them for changes.</li>
 <li>To send your reminders, and tell you when your dates move.</li>
 <li>To keep {{BRAND}} working: fixing errors and stopping spam.</li>
+<li>To see how {{BRAND}} is used, so we can make it better: which pages and sign-up steps people use, and what they do with their reminders. This is tied to a random ID, never your number or address.</li>
 <li>To tell you about other {{PARENT_NAME}} services, unless you ticked "Don't tell me about other {{PARENT_NAME}} services". You can opt out any time.</li>
 </ul>
-<p>We use your information to provide the service you signed up for, and for our legitimate interests in keeping it secure and telling you about similar {{PARENT_NAME}} services. We never sell your data or share it for third-party marketing.</p>
+<p>We use your information to provide the service you signed up for, and for our legitimate interests in keeping it secure, improving it, and telling you about similar {{PARENT_NAME}} services. We never sell your data or share it for third-party marketing.</p>
 
 <h2 class="h2">Who we share it with</h2>
 <p>Only the companies that help us run {{BRAND}}:</p>
@@ -832,6 +833,7 @@ button,input,select,textarea{font-family:inherit}
 <li>Your council, whose website we check using your address.</li>
 <li>Cloudflare, to check website visitors are human.</li>
 <li>Sentry, for error reports, with phone numbers and addresses removed first.</li>
+<li>PostHog, in the EU, to measure how {{BRAND}} is used. It gets a random ID and what was used, never your number or address.</li>
 <li>Google Fonts, which supplies the website's fonts and sees your IP address.</li>
 </ul>
 <p>If a provider handles your data outside the UK, it does so under approved safeguards, such as the UK's international data transfer agreements.</p>
@@ -851,7 +853,7 @@ button,input,select,textarea{font-family:inherit}
 <p>You can ask to see the data we hold about you, correct it, delete it, or object to how we use it. If you're unhappy with how we've handled your data, you can complain to the Information Commissioner's Office at <a href="https://ico.org.uk" target="_blank" rel="noopener">ico.org.uk</a>.</p>
 
 <h2 class="h2">Cookies</h2>
-<p>The website doesn't use advertising or tracking cookies. Cloudflare's human check may store what it needs to work.</p>
+<p>The website doesn't use advertising or tracking cookies. We count visits and sign-up steps without storing anything on your device, so each visit is counted on its own. Cloudflare's human check may store what it needs to work.</p>
 
 <h2 class="h2">Changes</h2>
 <p>If we change this policy, we'll update this page and the date at the top.</p>
@@ -1080,6 +1082,46 @@ Share to WhatsApp
 (function () {
   var BRAND = {{BRAND_JSON}};  // set by the server from BRAND_NAME
   var TS_KEY = {{TURNSTILE_SITE_KEY_JSON}};  // Cloudflare Turnstile; empty = no check
+  // ---- Product analytics (PostHog, EU). The server fills PH from POSTHOG_KEY; null = off.
+  // Cookieless: everything stays in page memory (no cookies, no browser storage), so each visit
+  // starts fresh. No autocapture and no session recording: only the named events below, and
+  // never what someone types (postcode, address, phone). Once sign-up starts, the visit is tied
+  // to the resident's user id, so the server's WhatsApp events line up with it (docs/analytics.md).
+  var PH = {{POSTHOG_JSON}};
+  var phQueue = [], phUser = null;
+  function ph() { return PH && window.posthog && window.posthog.__loaded ? window.posthog : null; }
+  function track(name, props) {
+    if (!PH) return;
+    try { if (ph()) ph().capture(name, props || {}); else phQueue.push([name, props || {}]); } catch (e) {}
+  }
+  function trackUser(id) {
+    if (!PH || !id || id === phUser) return;
+    phUser = id;
+    try { if (ph()) ph().identify(id); } catch (e) {}
+  }
+  if (PH) {
+    var phScript = document.createElement('script');
+    phScript.async = true; phScript.crossOrigin = 'anonymous';
+    // Through our own /ingest (Caddy passes it on to PostHog), so ad blockers don't drop it
+    phScript.src = (PH.host.charAt(0) === '/' ? PH.host : PH.host.replace('.i.posthog.com', '-assets.i.posthog.com')) + '/static/array.js';
+    phScript.onload = function () {
+      try {
+        window.posthog.init(PH.key, {
+          api_host: PH.host, ui_host: PH.ui, defaults: '2026-08-30',
+          persistence: 'memory', person_profiles: 'identified_only',
+          autocapture: false, capture_dead_clicks: false, rageclick: false, enable_heatmaps: false,
+          disable_session_recording: true, disable_surveys: true, capture_exceptions: false,
+          capture_pageview: 'history_change', capture_pageleave: true,
+          loaded: function (p) {
+            p.register({ design: 'oat' });
+            if (phUser) p.identify(phUser);
+            phQueue.splice(0).forEach(function (q) { p.capture(q[0], q[1]); });
+          }
+        });
+      } catch (e) {}
+    };
+    document.head.appendChild(phScript);
+  }
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var esc = function (t) { return String(t).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); };
 
@@ -1102,6 +1144,7 @@ Share to WhatsApp
     document.body.style.background = '#FFFFFF';
     window.scrollTo(0, 0);
     clearInterval(timer);
+    track('screen_viewed', { screen: target });
     if (target === 'parsing') runParsing();
     if (target === 'confirm') renderConfirm();
     if (target === 'reminders') renderReminders();
@@ -1307,7 +1350,7 @@ Share to WhatsApp
     var ok = /^[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}$/.test(v);
     $('#pc-err').hidden = ok;
     $('#pc').setAttribute('aria-invalid', ok ? 'false' : 'true');
-    if (!ok) return;
+    if (!ok) { track('postcode_invalid'); return; }
     if (!API.live) { postcode = v; go('parsing'); return; }
     var btn = $('#pc-go'); btn.disabled = true; btn.textContent = 'Looking up…';
     var done = function () { btn.disabled = false; btn.textContent = 'Find my bin days'; };
@@ -1323,6 +1366,7 @@ Share to WhatsApp
       // next step reuses it instead of asking the council, so it loads in a moment.
       ensureHuman().then(function () { return api('GET', '/postcode/' + encodeURIComponent(v) + '?addresses=true'); }).then(function (p) {
         API.council = p.council;
+        track('postcode_looked_up', { council: p.council || null, addresses: (p.addresses || []).length });
         if (!p.addresses || !p.addresses.length) {
           // The address service had nothing for this postcode: ask for the house instead.
           $('#house-wrap').hidden = false; done(); setTimeout(function () { $('#house').focus(); }, 30);
@@ -1332,7 +1376,7 @@ Share to WhatsApp
           return '<option value="' + i + '">' + esc(a.line) + '</option>'; }).join('');
         sel.dataset.list = JSON.stringify(p.addresses);
         wrap.hidden = false; done(); setTimeout(function () { sel.focus(); }, 30);
-      }).catch(function (e) { $('#pc-err').textContent = e.message; $('#pc-err').hidden = false; done(); });
+      }).catch(function (e) { track('postcode_lookup_failed'); $('#pc-err').textContent = e.message; $('#pc-err').hidden = false; done(); });
       return;
     }
     // Step B: address picked (or typed, when the list came back empty).
@@ -1346,6 +1390,7 @@ Share to WhatsApp
     var typed = $('#house').value.trim();
     var body = { uprn: addr && addr.uprn, house_number: (addr && addr.house_number) || typed || null, address_line: (addr && addr.line) || (typed ? typed + ', ' + v : null) };
     var picking = ownLookup === 'picking' && API.userId;
+    track('address_confirmed', { from_list: !!addr, invite: !!ref, own_lookup: !!picking });
     var req = ensureHuman().then(function () { return picking
       ? api('POST', '/users/' + API.userId + '/own-calendar', body)
       : api('POST', '/signup/start', Object.assign({ postcode: v, referral_code: ref }, body)); });
@@ -1373,6 +1418,7 @@ Share to WhatsApp
     });
     go('parsing');
     req.then(function (j) {
+      trackUser(j.user_id);
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
       note = j.shared && j.error ? j.error : '';
       PSTEPS[0].subDone = j.council || PSTEPS[0].subDone;
@@ -1389,6 +1435,7 @@ Share to WhatsApp
       if (!j) return;
       fetching = false;
       calendarFailed = !bins.length;
+      track(calendarFailed ? 'calendar_failed' : 'calendar_loaded', { council: API.council || null, bins: bins.length, shared: shared });
       var dayNames = []; bins.forEach(function (b) { b.days.forEach(function (d) { if (dayNames.indexOf(d) < 0) dayNames.push(d); }); });
       // Nothing from the council or the street: no fake checklist of ticks, straight to
       // adding bins by hand.
@@ -1398,6 +1445,7 @@ Share to WhatsApp
       if (current === 'parsing') runParsing(); else go('parsing');
     }).catch(function (e) {
       fetching = false;
+      track('signup_failed');
       // Back to the postcode entry the loader came from, rather than a second copy of it.
       if (entry() && entry().n > 0) history.back(); else go('postcode');
       $('#pc-err').textContent = e.message; $('#pc-err').hidden = false;
@@ -1408,6 +1456,7 @@ Share to WhatsApp
   // "These aren't my days": look this home up individually instead of reusing the street's round.
   document.addEventListener('click', function (e) {
     if (!e.target.closest('#c-own')) return;
+    track('not_my_days_tapped');
     ownLookup = 'start'; go('postcode', { replace: true }); setTimeout(submitPostcode, 60);
   });
 
@@ -1419,11 +1468,12 @@ Share to WhatsApp
     var ok = /^07\d{9}$/.test(d);
     $('#tel-err').hidden = ok;
     $('#tel').setAttribute('aria-invalid', ok ? 'false' : 'true');
-    if (!ok) return;
+    if (!ok) { track('phone_invalid'); return; }
     phone = '+44 ' + d.slice(1, 5) + ' ' + d.slice(5);
     if (!API.live || !API.userId) { go('reminders'); return; }
-    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true, marketing_consent: !$('#no-offers').checked }).then(function () { go('reminders'); })
-      .catch(function (e) { $('#tel-err').textContent = e.message; $('#tel-err').hidden = false; });
+    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true, marketing_consent: !$('#no-offers').checked }).then(function () {
+      track('phone_added', { offers_ok: !$('#no-offers').checked }); go('reminders'); })
+      .catch(function (e) { track('phone_failed'); $('#tel-err').textContent = e.message; $('#tel-err').hidden = false; });
   }
   $('#tel-go').addEventListener('click', submitPhone);
   $('#tel').addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPhone(); });
@@ -1669,15 +1719,15 @@ Share to WhatsApp
   $('#c-cards').addEventListener('input', function (e) {
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
   });
-  $('#c-edit').addEventListener('click', function () { editing = true; openBin = null; renderConfirm(); });
+  $('#c-edit').addEventListener('click', function () { track('bins_edit_opened'); editing = true; openBin = null; renderConfirm(); });
   document.addEventListener('click', function (e) {
     var y = e.target.closest('#c-yes'); if (!y || !y.dataset.missing) return;
     e.preventDefault(); e.stopImmediatePropagation(); editing = true;
     var gap = bins.filter(function (b) { return b.on !== false && !b.days.length; })[0]; openBin = gap ? gap.id : null;  // open the first bin missing a day
     renderConfirm(); window.scrollTo(0, 0);
   }, true);
-  $('#c-save').addEventListener('click', function () { editing = false; adding = null; saveBins(); renderConfirm(); window.scrollTo(0, 0); });
-  $('#c-view').addEventListener('click', function (e) { var y = e.target.closest('#c-yes'); if (y && !y.dataset.missing) saveBins(); });
+  $('#c-save').addEventListener('click', function () { track('bins_edited', { bins: bins.length }); editing = false; adding = null; saveBins(); renderConfirm(); window.scrollTo(0, 0); });
+  $('#c-view').addEventListener('click', function (e) { var y = e.target.closest('#c-yes'); if (y && !y.dataset.missing) { track('calendar_confirmed', { bins: bins.length }); saveBins(); } });
   // Add a bin: type, then day(s), then how often
   var TYPES = [
     { id: 'rec', name: 'Recycling', kind: 'Blue bin', color: '#2F6FEB', shape: 'wheelie' },
@@ -1831,6 +1881,7 @@ Share to WhatsApp
   try { ON_COMPUTER = matchMedia('(hover: hover) and (pointer: fine)').matches && innerWidth > 600; } catch (e) {}
   $('#t-go').addEventListener('click', function (e) {
     if (!time) { e.preventDefault(); return; }
+    track('say_hello_tapped', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time), on_computer: ON_COMPUTER });
     if (!WA_LIVE || ON_COMPUTER) e.preventDefault();  // stay on the page
     var saved = (API.live && API.userId)
       ? api('POST', '/users/' + API.userId + '/reminders', { mode: when === 'night' ? 'night_before' : 'morning_of', time: to24(time) })
@@ -1912,6 +1963,11 @@ Share to WhatsApp
     catch (err) { fallbackCopy(text); done(); }
   }
   $('#copy').addEventListener('click', function () { copyText('https://' + link, this, 'Copy link only', 'Link copied to clipboard'); });
+  // Sharing: which way people pass Binjamin on (the link itself is tracked by the server)
+  $('#wa-share').addEventListener('click', function () { track('share_tapped', { how: 'whatsapp' }); });
+  $('#wa-bubble').addEventListener('click', function () { track('share_tapped', { how: 'copy_message' }); });
+  $('#copy').addEventListener('click', function () { track('share_tapped', { how: 'copy_link' }); });
+  $('#hi-web').addEventListener('click', function () { track('whatsapp_web_opened'); });
   renderMsgs();
 
   try { current = screenFromUrl(); history.replaceState({ s: current, sid: SID, n: 0 }, '', urlFor(current)); } catch (e) {}

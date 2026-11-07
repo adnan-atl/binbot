@@ -2,11 +2,29 @@
 # the DNS A record must point at this server and ports 80 and 443 must be open.
 {$DOMAIN} {
 	encode gzip
-	reverse_proxy api:8000 {
-		# A deploy restarts the api for a few seconds: hold requests until it's back instead of
-		# failing them, so visitors see a slower load rather than an error.
-		lb_try_duration 30s
-		lb_try_interval 500ms
+	# Product analytics: the website sends its PostHog events to /ingest on our own domain and
+	# Caddy passes them on to PostHog's EU cloud, so ad blockers don't drop them
+	# (docs/analytics.md). Nothing is sent unless POSTHOG_KEY is set.
+	handle_path /ingest/static/* {
+		rewrite * /static{path}
+		reverse_proxy https://eu-assets.i.posthog.com:443 {
+			header_up Host eu-assets.i.posthog.com
+			header_down -Access-Control-Allow-Origin
+		}
+	}
+	handle_path /ingest/* {
+		reverse_proxy https://eu.i.posthog.com:443 {
+			header_up Host eu.i.posthog.com
+			header_down -Access-Control-Allow-Origin
+		}
+	}
+	handle {
+		reverse_proxy api:8000 {
+			# A deploy restarts the api for a few seconds: hold requests until it's back instead of
+			# failing them, so visitors see a slower load rather than an error.
+			lb_try_duration 30s
+			lb_try_interval 500ms
+		}
 	}
 	# Still down after that: a friendly page that refreshes itself, never a blank one.
 	handle_errors 502 503 504 {
