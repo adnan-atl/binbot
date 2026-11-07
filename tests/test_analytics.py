@@ -118,3 +118,10 @@ def test_caddy_passes_ingest_on_to_posthog():
     assert caddy.count("{") == caddy.count("}")
     # the site itself is still served, inside a handle so /ingest never reaches it
     assert "handle {\n\t\treverse_proxy api:8000" in caddy
+
+
+def test_hi_from_a_number_nobody_typed(client, events):
+    from app.services.reminders import hi_text
+
+    say(client, hi_text())
+    assert names(events) == ["signup_started", "hi_from_unexpected_number"]

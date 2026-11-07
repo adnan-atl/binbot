@@ -364,6 +364,7 @@ def signup_nudges(db: Session, now_utc: datetime | None = None) -> int:
                                buttons=[START_PAYLOAD])
     for u in users:
         u.signup_nudged_at = now_utc  # once, whether or not it got through
+        analytics.track(u, "signup_nudge_sent")
     db.commit()
     return sum(1 for r in rows if not r.error)
 

@@ -70,7 +70,8 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
                          "calendar_loaded": 15, "calendar_confirmed": 14, "phone_added": 10,
                          "say_hello_tapped": 8},
             "sources": [("direct", 25), ("invite link", 15)], "shares": {"WhatsApp": 3},
-            "calendar_failed": {"Glasgow City": 2}, "via": {"website": 2}}
+            "calendar_failed": {"Glasgow City": 2}, "via": {"website": 2},
+            "hello": {"phone": [4, 3], "computer": [2, 0]}}
     monkeypatch.setattr(R, "posthog_day", lambda s, e: fake)
     glasgow = db.scalar(select(Council).where(Council.name == "Hackney"))
     glasgow.status = CouncilStatus.broken
@@ -83,6 +84,7 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
     assert "Paused 2" in text and "deleted 1" in text
     assert "*Glasgow City*: 2 bin days not found on the site" in text
     assert "Health check failing: " + glasgow.name in text
+    assert "Tapped say hello → switched on: computer 0/2 (0%), phone 3/4 (75%)" in text
 
 
 def test_k_factor(client, db):

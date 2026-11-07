@@ -213,15 +213,27 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
                         f"event = 'calendar_failed' AND {span} GROUP BY 1")
         via = _hogql(f"SELECT toString(properties.via), count() FROM events WHERE "
                      f"event = 'reminders_switched_on' AND {span} GROUP BY 1")
+        # Who tapped "Say hello" on a phone or a computer, and whether they then switched on
+        # (any time since: the hi can come a while later)
+        hello = _hogql(f"SELECT DISTINCT toString(person_id), toString(properties.on_computer) "
+                       f"FROM events WHERE event = 'say_hello_tapped' AND {span}")
+        on = {p for (p,) in _hogql(
+            "SELECT DISTINCT toString(person_id) FROM events WHERE event = 'reminders_switched_on' "
+            f"AND timestamp >= toDateTime('{_ts(start)}')")}
     except Exception:
         log.warning("daily report: PostHog query failed", exc_info=True)
         return None
+    by_device: dict[str, list[int]] = {}
+    for person, computer in hello:
+        dev = by_device.setdefault("computer" if computer in ("true", "1") else "phone", [0, 0])
+        dev[0] += 1
+        dev[1] += person in on
     events = {e: int(n) for e, n, _ in counts}
     sessions = {e: int(u) for e, _, u in counts}
     return {"events": events, "sessions": sessions, "sources": [(a, int(b)) for a, b in sources],
             "shares": {SHARE_HOW.get(a, a or "?"): int(b) for a, b in shares},
             "calendar_failed": {a or "Unknown council": int(b) for a, b in failed},
-            "via": {a or "?": int(b) for a, b in via}}
+            "via": {a or "?": int(b) for a, b in via}, "hello": by_device}
 
 
 # ---- the message ----------------------------------------------------------------------------
@@ -267,6 +279,11 @@ def build(db: Session, day: date) -> str:
     lines.append(f"• Active residents now: *{active}*")
     if d.stuck_at_hello:
         lines.append(f"• Reached \"say hello\" but haven't messaged yet: {d.stuck_at_hello}")
+    if ph and ph.get("hello"):
+        lines.append("• Tapped say hello → switched on: " + ", ".join(
+            f"{dev} {n_on}/{n} ({_pct(n_on, n)})" for dev, (n, n_on) in sorted(ph["hello"].items())))
+    if ph and ph["events"].get("hi_from_unexpected_number"):
+        lines.append(f"• \"Hi\" from a number nobody typed: {ph['events']['hi_from_unexpected_number']}")
     lines.append("")
 
     # Funnel

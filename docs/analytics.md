@@ -71,6 +71,8 @@ Every website event carries `design: oat`. Every server event carries `source: s
 | `message_not_understood` | A message the bot couldn't handle (no text sent) | `pointed_elsewhere` |
 | `asked_for_human` | "Talk to a human" | |
 | `account_deleted` | DELETE YES | `via` |
+| `hi_from_unexpected_number` | The website's "hi" arrived from a number nobody typed on the site | |
+| `signup_nudge_sent` | The one "nearly ready" nudge to someone who never sent their hi | |
 
 ## Useful insights to build
 
@@ -94,7 +96,8 @@ At midnight (London) the worker posts the day just ended to `SLACK_ANALYTICS_CHA
 (`app/services/daily_report.py`). Every headline number is compared with the same day last week.
 
 - **Headline**: visits, sign-ups started, switched on (website / WhatsApp), visit → switched on,
-  active residents, and people stuck at "say hello".
+  active residents, and people stuck at "say hello". Who tapped "Say hello" on a phone vs a
+  computer (the QR code), and how many of each then switched on.
 - **Website funnel**: unique visits at each step and the biggest drop.
 - **Where visits came from**: invite links, UTMs, referring sites, direct.
 - **Sharing and K-factor**: invite link clicks (`/r/<code>`), invited sign-ups and switch-ons,

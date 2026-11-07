@@ -118,6 +118,7 @@ def handle(db: Session, phone: str, text: str, user: User | None) -> str | None:
             user.wa_step = "postcode"
             return _send(db, phone, Reply(greeting()))
         if is_hi(t):  # the website's hi, but from a number nobody typed there
+            analytics.track(user, "hi_from_unexpected_number")
             user.wa_step = "claim"
             return _send(db, phone, Reply(CLAIM))
         if _looks_like_postcode(t):  # they led with it: skip the hello
