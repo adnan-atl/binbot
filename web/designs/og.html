@@ -614,15 +614,27 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 #hi-qr{grid-column:2}
 #hi-qr{width:232px;height:232px;padding:14px;background:#FFFFFF;border:1px solid #E5E5EA;border-radius:24px;box-sizing:content-box}
 .hi-web{font-size:15px;font-weight:500;color:#8A8A8E;text-decoration:underline;text-underline-offset:3px}
-/* The last step on a phone: three numbered steps, then the button that opens WhatsApp */
-.hi-phone{display:flex;flex-direction:column;gap:22px;margin-top:4px}
+/* The last step: three steps in a card (step 2 shows the message, already written), then the
+   Open WhatsApp button on a phone or the QR code on a computer, then why we ask */
+.hi-card{list-style:none;margin:0;padding:6px 20px;background:#FFFFFF;border-radius:24px;box-shadow:0 1px 2px rgba(48,35,35,.06),0 8px 24px rgba(48,35,35,.06)}
+.hi-step{display:flex;align-items:flex-start;gap:14px;padding:16px 0}
+.hi-step + .hi-step{border-top:1px solid #EEE9E1}
+.hi-n{flex:none;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#FFFFFF;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;margin-top:1px}
+.hi-txt{flex:1;min-width:0;font-size:18px;line-height:1.35;font-weight:500;color:var(--ink)}
+.hi-txt b{font-weight:700}
+.hi-txt small{display:block;margin-top:2px;font-size:15px;font-weight:400;color:var(--grey)}
+.hi-msg{display:flex;align-items:center;gap:8px;margin-top:12px;padding:8px;background:#EFE7DD;border-radius:16px}
+.hi-msg-b{flex:1;min-width:0;background:#FFFFFF;border-radius:12px;padding:9px 12px;font-size:15px;line-height:1.35;font-weight:400;color:#111B21}
+.hi-send{flex:none;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#25D366;box-shadow:0 0 0 3px rgba(37,211,102,.25)}
+.hi-phone{display:flex;flex-direction:column;gap:10px}
 .hi-phone[hidden]{display:none}
-.hi-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
-.hi-steps li{display:flex;align-items:center;gap:12px;font-size:18px;line-height:1.3;color:var(--ink)}
-.hi-steps b{font-weight:600}
-.hi-n{flex:none;width:30px;height:30px;border-radius:50%;background:#FFFFFF;border:1px solid #E5E5EA;display:inline-flex;align-items:center;justify-content:center;font-size:15px;font-weight:600}
-.hi-send{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:#25D366}
 .hi-wait{margin:0;min-height:1.4em;font-size:15px;line-height:1.4;color:var(--grey);text-align:center}
+.hi-wait:empty{min-height:0}
+.hi-why{margin:0;font-size:14px;line-height:1.45;color:var(--soft);text-align:center;text-wrap:pretty}
+.hi-why svg{display:inline-block;vertical-align:-2px;margin-right:5px}
+/* computer: the QR code sits in step 1 */
+.hi-step .hi-desk{align-items:flex-start;gap:10px;margin-top:12px}
+.hi-step #hi-qr{width:168px;height:168px;padding:10px;border-radius:18px}
 /* Time step: the button stays grey until a time is picked */
 #t-go[aria-disabled="true"]{background:#E5E5EA;color:#AEAEB2;box-shadow:none;pointer-events:none;cursor:default}
 .cta-wa{flex:none;margin-top:-1px;color:#0B0B0B}
@@ -972,20 +984,19 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <main class="flow-main">
 <div class="col">
 <h1 class="h1" id="hi-h">Last step: send a message to {{BRAND}} to get started</h1>
-<p class="lede" id="hi-lede">We'll open WhatsApp with a message ready. Just press send. That's how {{BRAND}} knows it's really you, and your reminders start straight away.</p>
-<div id="hi-phone" class="hi-phone">
-<ol class="hi-steps">
-<li><span class="hi-n">1</span><span>Tap <b>Open WhatsApp</b></span></li>
-<li><span class="hi-n">2</span>Press send <span class="hi-send" aria-label="(the green arrow button)"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#fff" d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg></span></li>
-<li><span class="hi-n">3</span><span>{{BRAND}} replies and your reminders start</span></li>
+<ol class="hi-card" aria-label="How to finish">
+<li class="hi-step"><span class="hi-n">1</span><div class="hi-txt"><span id="hi-s1">Tap <b>Open WhatsApp</b></span>
+<div id="hi-desk" class="hi-desk" hidden><img id="hi-qr" alt="QR code that opens WhatsApp with your message ready" width="168" height="168">
+<a id="hi-web" class="hi-web" href="https://wa.me/" target="_blank" rel="noopener">Or open WhatsApp on this computer</a></div></div></li>
+<li class="hi-step"><span class="hi-n">2</span><div class="hi-txt">Press send<small>The message is already written for you</small>
+<div class="hi-msg" aria-hidden="true"><span class="hi-msg-b">Hi {{BRAND}}, please start my bin reminders</span><span class="hi-send"><svg viewBox="0 0 24 24" width="15" height="15"><path fill="#fff" d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12.6 2-12.6 2z"/></svg></span></div></div></li>
+<li class="hi-step"><span class="hi-n">3</span><div class="hi-txt">{{BRAND}} replies and your reminders start</div></li>
 </ol>
+<div id="hi-phone" class="hi-phone">
 <a class="pill go" id="hi-go" href="{{WA_HI_LINK}}" target="_blank" rel="noopener">Open WhatsApp</a>
 <p class="hi-wait" id="hi-wait" aria-live="polite"></p>
 </div>
-<div id="hi-desk" class="hi-desk" hidden>
-<div class="hi-row"><img class="hi-binji" src="/static/binji-phone.webp" alt="" width="453" height="560"><img id="hi-qr" alt="QR code that opens WhatsApp with your message ready" width="232" height="232"></div>
-<a id="hi-web" class="hi-web" href="https://wa.me/" target="_blank" rel="noopener">Or open WhatsApp on this computer</a>
-</div>
+<p class="hi-why"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M17 9h-1V7a4 4 0 0 0-8 0v2H7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2zm-7-2a2 2 0 0 1 4 0v2h-4z"/></svg>Sending this message is how {{BRAND}} knows the number is really yours.</p>
 </div>
 </main>
 </section>
@@ -1859,9 +1870,7 @@ Share to WhatsApp
     $('#hi-go').href = href;
     $('#hi-desk').hidden = !ON_COMPUTER;
     $('#hi-phone').hidden = ON_COMPUTER;
-    $('#hi-lede').textContent = ON_COMPUTER
-      ? "Scan the code with your phone's camera. WhatsApp opens with a message ready. Just press send. That's how " + BRAND + " knows it's really you, and your reminders start straight away."
-      : "We'll open WhatsApp with a message ready. Just press send. That's how " + BRAND + " knows it's really you, and your reminders start straight away.";
+    $('#hi-s1').innerHTML = ON_COMPUTER ? 'Scan this code with your phone\'s camera' : 'Tap <b>Open WhatsApp</b>';
     if (ON_COMPUTER) $('#hi-qr').src = preview ? API.base + '/preview-qr.svg' : API.base + '/users/' + API.userId + '/start-qr.svg';
     hiOpened = false; hiRetried = false;
     $('#hi-go').textContent = 'Open WhatsApp';

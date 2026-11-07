@@ -90,6 +90,8 @@ def test_oat_last_step_sends_one_plain_message(client, monkeypatch):
     assert "Last step: send a message to Binny to get started" in page
     assert f'id="hi-go" href="{link}"' in page and ">Open WhatsApp</a>" in page
     assert "Press send" in page and "Binny replies and your reminders start" in page
+    assert "The message is already written for you" in page
+    assert "Sending this message is how Binny knows the number is really yours." in page
     assert "Come back here" not in page
     assert "I'M BIN" not in page and "Say hello" not in page
     monkeypatch.delenv("META_DISPLAY_NUMBER")
