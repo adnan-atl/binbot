@@ -94,7 +94,7 @@ def test_whatsapp_sign_up_is_tracked(client, events):
     assert names(events) == ["signup_started"] and events[0][2]["via"] == "whatsapp"
 
 
-def test_website_gets_posthog_only_on_oat(client, monkeypatch):
+def test_website_gets_posthog_on_oat_and_og_tagged_by_design(client, monkeypatch):
     from app.main import WEB, render_index
 
     assert '<script>' in render_index(WEB / "designs" / "oat.html")
@@ -105,8 +105,11 @@ def test_website_gets_posthog_only_on_oat(client, monkeypatch):
     assert '"key": "phc_test"' in oat and '"host": "/ingest"' in oat
     assert '"ui": "https://eu.posthog.com"' in oat
     assert "persistence: 'memory'" in oat and "autocapture: false" in oat
-    for other in ("og", "silly"):  # the original page stays as it was
-        assert "posthog" not in render_index(WEB / "designs" / f"{other}.html").lower()
+    assert "var DESIGN = 'oat';" in oat and "signup_design: DESIGN" in oat
+    og = render_index(WEB / "designs" / "og.html")  # /d/og: same events, tagged og
+    assert '"key": "phc_test"' in og and "var DESIGN = 'og';" in og and "autocapture: false" in og
+    assert "PostHog, in the EU" in og  # its privacy page says so
+    assert "posthog" not in render_index(WEB / "designs" / "silly.html").lower()  # untouched
 
 
 def test_caddy_passes_ingest_on_to_posthog():

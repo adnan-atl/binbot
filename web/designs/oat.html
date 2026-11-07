@@ -1108,6 +1108,9 @@ Share to WhatsApp
   // never what someone types (postcode, address, phone). Once sign-up starts, the visit is tied
   // to the resident's user id, so the server's WhatsApp events line up with it (docs/analytics.md).
   var PH = {{POSTHOG_JSON}};
+  // Which version of the site this is, on every event: oat (binjamin.uk) or og (/d/og). Also
+  // saved once on the person (signup_design), so their WhatsApp events can be split by it too.
+  var DESIGN = 'oat';
   var phQueue = [], phUser = null;
   function ph() { return PH && window.posthog && window.posthog.__loaded ? window.posthog : null; }
   function track(name, props) {
@@ -1117,7 +1120,7 @@ Share to WhatsApp
   function trackUser(id) {
     if (!PH || !id || id === phUser) return;
     phUser = id;
-    try { if (ph()) ph().identify(id); } catch (e) {}
+    try { if (ph()) ph().identify(id, {}, { signup_design: DESIGN }); } catch (e) {}
   }
   if (PH) {
     var phScript = document.createElement('script');
@@ -1133,8 +1136,8 @@ Share to WhatsApp
           disable_session_recording: true, disable_surveys: true, capture_exceptions: false,
           capture_pageview: 'history_change', capture_pageleave: true,
           loaded: function (p) {
-            p.register({ design: 'oat' });
-            if (phUser) p.identify(phUser);
+            p.register({ design: DESIGN });
+            if (phUser) p.identify(phUser, {}, { signup_design: DESIGN });
             phQueue.splice(0).forEach(function (q) { p.capture(q[0], q[1]); });
           }
         });

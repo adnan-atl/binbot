@@ -233,6 +233,13 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
         # on (any time since: their message can come a while later)
         hello = _hogql(f"SELECT DISTINCT toString(person_id), toString(properties.on_computer) "
                        f"FROM events WHERE event IN ('turn_on_tapped', 'say_hello_tapped') AND {span}")
+        # Which version of the site (design: oat = binjamin.uk, og = /d/og): visits from each,
+        # and switch-ons by the version the person signed up on (person property signup_design;
+        # empty for people who signed up entirely in WhatsApp)
+        site_visits = _hogql(f"SELECT toString(properties.design), uniq(properties.$session_id) "
+                             f"FROM events WHERE event = '$pageview' AND {span} GROUP BY 1")
+        site_on = _hogql(f"SELECT toString(person.properties.signup_design), count() FROM events "
+                         f"WHERE event = 'reminders_switched_on' AND {span} GROUP BY 1")
         on = {p for (p,) in _hogql(
             "SELECT DISTINCT toString(person_id) FROM events WHERE event = 'reminders_switched_on' "
             f"AND timestamp >= toDateTime('{_ts(start)}')")}
@@ -249,7 +256,19 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
     return {"events": events, "sessions": sessions, "sources": [(a, int(b)) for a, b in sources],
             "shares": {SHARE_HOW.get(a, a or "?"): int(b) for a, b in shares},
             "calendar_failed": {a or "Unknown council": int(b) for a, b in failed},
-            "via": {a or "?": int(b) for a, b in via}, "hello": by_device}
+            "via": {a or "?": int(b) for a, b in via}, "hello": by_device,
+            "sites": _sites(site_visits, site_on)}
+
+
+def _sites(visits: list, on: list) -> dict[str, list[int]]:
+    """{site: [visits, switched on]} with readable names; WhatsApp-only sign-ups have no site."""
+    names = {"oat": "binjamin.uk", "og": "/d/og", "": "WhatsApp only"}
+    out: dict[str, list[int]] = {}
+    for d, n in visits:
+        out.setdefault(names.get(d or "", d), [0, 0])[0] += int(n)
+    for d, n in on:
+        out.setdefault(names.get(d or "", d), [0, 0])[1] += int(n)
+    return out
 
 
 # ---- the message ----------------------------------------------------------------------------
@@ -292,6 +311,10 @@ def build(db: Session, day: date) -> str:
                  + (f"  ·  visit → switched on: *{_pct(d.switched_on, visits)}*" if visits else ""))
     if ph and ph["via"]:
         lines.append("   by " + ", ".join(f"{k_} {n}" for k_, n in sorted(ph["via"].items())))
+    if ph and ph.get("sites"):
+        lines.append("• By site: " + ", ".join(
+            f"{site} {v} visits → {n_on} switched on" if site != "WhatsApp only" else f"{site} {n_on} switched on"
+            for site, (v, n_on) in sorted(ph["sites"].items(), key=lambda kv: -kv[1][0])))
     lines.append(f"• Active residents now: *{active}*")
     if d.stuck_at_hello:
         lines.append(f"• Reached the last step but haven't messaged yet: {d.stuck_at_hello}")

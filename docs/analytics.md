@@ -6,7 +6,8 @@ in `deploy/.env.production`.
 
 ## How it's set up
 
-- **Website** (`web/designs/oat.html` only; og/silly are untouched): PostHog's script, loaded
+- **Website** (`web/designs/oat.html` at binjamin.uk and `web/designs/og.html` at /d/og; silly is
+  untouched): PostHog's script, loaded
   through our own `/ingest` path. Caddy passes `/ingest` on to `eu.i.posthog.com`
   (`deploy/Caddyfile`), so ad blockers don't drop the events.
 - **Server** (`app/services/analytics.py`): the official Python SDK, batched in a background
@@ -30,8 +31,12 @@ in `deploy/.env.production`.
 
 ## Events
 
-Every website event carries `design: oat`. Every server event carries `source: server`,
-`council` and `referred` (joined from someone's link).
+Every website event carries `design`: `oat` (binjamin.uk) or `og` (/d/og), so the two versions
+can be shown together or split. When sign-up starts, the person also gets `signup_design` (set
+once), so server events (switched on, reminders, shares) can be broken down by the version they
+signed up on: in PostHog, break down by the person property `signup_design`. Empty means they
+signed up entirely in WhatsApp. Every server event carries `source: server`, `council` and
+`referred` (joined from someone's link).
 
 ### Website: visit and sign-up funnel
 
@@ -101,7 +106,8 @@ At midnight (London) the worker posts the day just ended to `SLACK_ANALYTICS_CHA
 (`app/services/daily_report.py`). Every headline number is compared with the same day last week.
 
 - **Headline**: visits, sign-ups started, switched on (website / WhatsApp), visit → switched on,
-  active residents, and people stuck at the last step. Who tapped "Turn on reminders" on a phone vs a
+  active residents, visits and switch-ons by site (binjamin.uk, /d/og, WhatsApp only), and
+  people stuck at the last step. Who tapped "Turn on reminders" on a phone vs a
   computer (the QR code), and how many of each then switched on.
 - **Alfred offers** (database): of those who gave their number today, how many opted out of
   hearing about Alfred (website: "Don't tell me about other Alfred services"; WhatsApp: "No
