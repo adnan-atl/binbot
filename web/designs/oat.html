@@ -701,7 +701,11 @@ button,input,select,textarea{font-family:inherit}
 .lockup-by{font-family:"DM Serif Display",Georgia,"Times New Roman",serif;font-weight:400;font-size:18px;line-height:1;color:var(--ink);opacity:.75;text-decoration:none;white-space:nowrap}
 .lockup-by:hover,.lockup-by:focus-visible{opacity:1;text-decoration:underline;text-underline-offset:3px}
 @media (min-width:601px){.lockup-name{font-size:30px}.lockup-by{font-size:21px}}
-.bar .lockup-by{font-size:16px;margin-left:2px;align-self:center}
+/* Flow steps: the logo, with "by Alfred" under Binjamin */
+.bar-brand{display:flex;align-items:center;gap:10px}
+.bar-names{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.bar .logo b{line-height:1}
+.bar .lockup-by{font-size:15px;line-height:1}
 .logo b{font-family:"DM Sans",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif !important;font-weight:800 !important;letter-spacing:-0.03em !important}
 /* the iPhone mockup keeps the phone's own font */
 .phone-outline,.phone-outline *{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif}
@@ -1098,11 +1102,10 @@ Share to WhatsApp
 <header class="bar">
 <div style="display:flex;align-items:center;gap:6px">
 <button type="button" class="back" data-back aria-label="Back"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></button>
-<a class="logo" href="/" aria-label="{{BRAND}} home">
-<span class="logo-mark"><img src="/static/binji-logo.png?v=3" alt="" width="38" height="38"></span>
-<span><b>{{BRAND}}</b></span>
-</a>
-<a class="lockup-by" href="{{PARENT_URL}}" target="_blank" rel="noopener">by {{PARENT_NAME}}</a>
+<span class="bar-brand">
+<a class="logo-mark" href="/" tabindex="-1" aria-hidden="true"><img src="/static/binji-logo.png?v=3" alt="" width="38" height="38"></a>
+<span class="bar-names"><a class="logo" href="/" aria-label="{{BRAND}} home"><b>{{BRAND}}</b></a><a class="lockup-by" href="{{PARENT_URL}}" target="_blank" rel="noopener">by {{PARENT_NAME}}</a></span>
+</span>
 </div>
 <span class="step-of"></span>
 </header>
