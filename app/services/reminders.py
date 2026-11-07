@@ -257,12 +257,13 @@ def share_message(user: User) -> str:
     Same words as the website's share screen."""
     s = get_settings()
     return (f"\U0001F3A9 Thought you might like this little gem!\n\n{s.brand_name} is a free WhatsApp "
-            f"assistant that reminds you which bin to put out the night before collection. Knows "
-            f"your council's schedule, so you don't have to!\n\nTakes a minute to set up: "
+            f"assistant that reminds you which bin to put out the night before collection. Keeps "
+            f"track of your council's schedule, so you don't have to.\n\nTakes a minute to set up: "
             f"{share_link(user)}")
 
 
-SHARE_INTRO = "Help your community and become a certified Binfluencer \U0001F606 Forward my next message to your street's group chat or a friend."
+SHARE_INTRO = ("Help your community and become a certified Binfluencer. Copy & Paste my next "
+               "message to your street's group chat or a friend.")
 
 
 def share_text(user: User) -> str:

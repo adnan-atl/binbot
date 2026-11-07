@@ -184,7 +184,7 @@ def test_fourth_welcome_message_asks_them_to_share(client, db, live):
                                                  "marketing_consent": True})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
     reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
-    assert ("Help your community and become a certified Binfluencer \U0001F606 Forward my next "
+    assert ("Help your community and become a certified Binfluencer. Copy & Paste my next "
             "message to your street's group chat or a friend.") in reply
     db.expire_all()
     # then the message to forward, on its own, with their tracked website link (no contact card)
@@ -192,7 +192,8 @@ def test_fourth_welcome_message_asks_them_to_share(client, db, live):
     code = db.get(User, uid).referral_code
     assert share.body.startswith("\U0001F3A9 Thought you might like this little gem!\n\nBinny is a "
                                  "free WhatsApp assistant that reminds you which bin to put out "
-                                 "the night before collection. Knows your council's schedule")
+                                 "the night before collection. Keeps track of your council's "
+                                 "schedule, so you don't have to.")
     assert share.body.endswith(f"/r/{code}")
     assert not db.scalars(select(Outbox).where(Outbox.kind == "welcome_card")).all()
     assert db.get(User, uid).share_nudged_at  # no second share nudge later
