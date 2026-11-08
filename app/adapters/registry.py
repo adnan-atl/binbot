@@ -234,7 +234,8 @@ CUSTOM: dict[str, AdapterSpec] = {
         needs_postcode=True, needs_house_number=True,
         note="Street lookup; the street comes from the address, the number picks the row."),
     # Cotswold: the library module drives a browser (~27s, fragile). This asks the council's
-    # Salesforce site directly (~3s). Tried after the library module, when that one fails.
+    # Salesforce site directly (~3s), so it goes first (CUSTOM_FIRST); the browser one is the
+    # fallback if the council changes its site.
     "E07000079": AdapterSpec(
         module="BinBotCotswoldDirect", gss_code="E07000079", name="Cotswold",
         url="https://community.cotswold.gov.uk/s/waste-collection-enquiry",
@@ -298,11 +299,18 @@ def _alternates() -> dict[str, list[AdapterSpec]]:
     return out
 
 
+# Councils where our own scraper beats the library's, so it's tried first.
+CUSTOM_FIRST = {"E07000079"}  # Cotswold: ~3s without a browser vs ~27s with one
+
+
 def candidates(gss_code: str, name: str | None = None) -> list[AdapterSpec]:
-    """Scrapers to try for a council, best first: ours (CUSTOM), the primary library
-    module, then any other module that serves it. Fetching walks this list until one works."""
+    """Scrapers to try for a council, best first: the primary library module (or ours, for
+    CUSTOM_FIRST councils), then the other, then any other module that serves it. Fetching
+    walks this list until one works."""
     first = spec_for(gss_code, name)
     out = [first] if first else []
+    if gss_code in CUSTOM_FIRST and gss_code in CUSTOM:
+        out.insert(0, CUSTOM[gss_code])
     for spec in [CUSTOM.get(gss_code), *_alternates().get(gss_code, [])]:
         if spec and spec.module not in {s.module for s in out}:
             out.append(spec)

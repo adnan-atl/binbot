@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.base import (AdapterError, LookupInput, NoCollectionsForAddress, RawCollection,
                                unreachable)
-from app.adapters.registry import candidates, library_version, spec_for
+from app.adapters.registry import CUSTOM_FIRST, candidates, library_version, spec_for
 from app.adapters.ukbcd import UKBCDAdapter
 from app.core.config import get_settings
 from app.models import (
@@ -184,6 +184,8 @@ def fetch_collections(council: Council, prop: Property) -> list[RawCollection]:
         raise AdapterError("no adapter for council", retryable=False)
     full = LookupInput(postcode=prop.postcode, uprn=prop.uprn, house_number=prop.house_number,
                        address_line=getattr(prop, "address_line", None))
+    if getattr(council, "gss_code", None) in CUSTOM_FIRST and len(adapters) > 1:
+        return _hedged(adapters[0], adapters[1], full)
     first: AdapterError | None = None
     for adapter in adapters:
         try:
@@ -194,6 +196,47 @@ def fetch_collections(council: Council, prop: Property) -> list[RawCollection]:
             if unreachable(str(e)):
                 break  # the council's site isn't answering: another scraper hits the same site
     raise first
+
+
+HEDGE_AFTER_SECONDS = 8
+
+
+def _hedged(fast: UKBCDAdapter, backup: UKBCDAdapter, full: LookupInput) -> list[RawCollection]:
+    """Our quick scraper first; if it hasn't answered within HEDGE_AFTER_SECONDS (or fails),
+    start the library's browser scraper too, and take whichever comes back first with dates.
+    One result is recorded, whichever wins; the other is ignored. Racing both from the start
+    would tie up a browser session (~27s) on every lookup for the rare case the quick one is
+    slow, so the browser only starts when it's needed."""
+    import concurrent.futures as cf
+
+    ex = cf.ThreadPoolExecutor(max_workers=2)
+    try:
+        running = {ex.submit(_fetch_one, fast, full): fast}
+        done, _ = cf.wait(running, timeout=HEDGE_AFTER_SECONDS)
+        errors: list[AdapterError] = []
+        for f in done:
+            try:
+                return f.result()
+            except AdapterError as e:
+                errors.append(e)
+                if isinstance(e, NoCollectionsForAddress) or unreachable(str(e)):
+                    raise  # the council answered "nothing here", or isn't answering at all
+        running[ex.submit(_fetch_one, backup, full)] = backup
+        pending = {f for f in running if not f.done()}
+        while pending:
+            done, pending = cf.wait(pending, return_when=cf.FIRST_COMPLETED)
+            for f in done:
+                try:
+                    items = f.result()
+                    if running[f] is backup:
+                        log.info("fetch: %s was slow or failed; %s answered", fast.name, backup.name)
+                    return items
+                except AdapterError as e:
+                    errors.append(e)
+                    log.info("fetch: %s failed for %s: %s", running[f].name, full.postcode, e)
+        raise errors[0]
+    finally:
+        ex.shutdown(wait=False)  # a slower loser finishes on its own; its result is dropped
 
 
 def _fetch_one(adapter: UKBCDAdapter, full: LookupInput) -> list[RawCollection]:

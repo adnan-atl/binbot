@@ -287,8 +287,8 @@ def _rbkc_street(lookup: LookupInput, streets: list[str]) -> str:
 # community page, with fixed sleeps: ~27s a lookup, and it breaks if the page is slow. This asks
 # the same Salesforce site directly, the way the page itself does, in ~2-3s: start the
 # "WebFormAlloyWasteCollectionEnquiry" flow as a guest, look the address up, press Next, and
-# read the table the flow returns. Used as the fallback when the browser scraper fails
-# (registry.CUSTOM puts it after the library module).
+# read the table the flow returns. Tried first (registry.CUSTOM_FIRST); the browser scraper is
+# the fallback if the council changes its site.
 
 COTSWOLD = "https://community.cotswold.gov.uk"
 COTSWOLD_PAGE = "/s/waste-collection-enquiry"
@@ -441,7 +441,7 @@ OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
-    "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM: fallback for the browser one
+    "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
 
 # Same weakness upstream, not yet reproduced against a live page: LondonBoroughLewisham,

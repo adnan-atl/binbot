@@ -80,6 +80,75 @@ def test_picks_the_right_house():
     assert _cotswold_pick(recs, "7", None) is None
 
 
-def test_it_is_the_fallback_after_the_browser_scraper():
+def test_it_goes_first_and_the_browser_scraper_is_the_fallback():
     mods = [s.module for s in candidates("E07000079", "Cotswold")]
-    assert mods[0] == "CotswoldDistrictCouncil" and "BinBotCotswoldDirect" in mods
+    assert mods[:2] == ["BinBotCotswoldDirect", "CotswoldDistrictCouncil"]
+
+
+def _fake(name, delay=0.0, items=None, error=None, calls=None):
+    import time
+
+    from app.adapters.base import RawCollection
+
+    class A:
+        def __init__(self):
+            self.name = name
+
+    a = A()
+
+    def run(adapter, full):
+        calls.append(name)
+        time.sleep(delay)
+        if error:
+            raise error
+        return items or [RawCollection(name, date(2026, 11, 20))]
+    return a, run
+
+
+@pytest.fixture
+def hedge(monkeypatch):
+    from app.services import schedule
+    monkeypatch.setattr(schedule, "HEDGE_AFTER_SECONDS", 0.2)
+    state = {"calls": [], "runs": {}}
+    monkeypatch.setattr(schedule, "_fetch_one", lambda adapter, full: state["runs"][adapter.name](adapter, full))
+    return schedule, state
+
+
+def _setup(state, *specs):
+    out = []
+    for name, kw in specs:
+        a, run = _fake(name, calls=state["calls"], **kw)
+        state["runs"][name] = run
+        out.append(a)
+    return out
+
+
+def test_quick_answer_never_starts_the_browser(hedge):
+    schedule, state = hedge
+    fast, slow = _setup(state, ("direct", {}), ("browser", {}))
+    items = schedule._hedged(fast, slow, LookupInput(postcode="GL8 8AQ", house_number="26"))
+    assert items[0].label == "direct" and state["calls"] == ["direct"]
+
+
+def test_slow_quick_one_starts_the_browser_and_the_first_answer_wins(hedge):
+    schedule, state = hedge
+    fast, slow = _setup(state, ("direct", {"delay": 0.6}), ("browser", {"delay": 0.05}))
+    items = schedule._hedged(fast, slow, LookupInput(postcode="GL8 8AQ", house_number="26"))
+    assert items[0].label == "browser"  # one result recorded: the first back
+    assert state["calls"] == ["direct", "browser"]
+
+
+def test_failed_quick_one_falls_back_to_the_browser(hedge):
+    from app.adapters.base import AdapterError
+
+    schedule, state = hedge
+    fast, slow = _setup(state, ("direct", {"error": AdapterError("site changed")}), ("browser", {}))
+    assert schedule._hedged(fast, slow, LookupInput(postcode="GL8 8AQ"))[0].label == "browser"
+
+
+def test_address_the_council_doesnt_list_doesnt_start_the_browser(hedge):
+    schedule, state = hedge
+    fast, slow = _setup(state, ("direct", {"error": NoCollectionsForAddress("none")}), ("browser", {}))
+    with pytest.raises(NoCollectionsForAddress):
+        schedule._hedged(fast, slow, LookupInput(postcode="GL8 8AQ"))
+    assert state["calls"] == ["direct"]
