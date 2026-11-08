@@ -75,7 +75,10 @@ def test_bad_token_refused(remote, monkeypatch):
 
 
 def test_service_down_is_retryable(monkeypatch):
+    from app.scraper import client
+
     monkeypatch.setattr(get_settings(), "scraper_url", "http://scraper:8100")
+    monkeypatch.setattr(client, "RECONNECT_FOR_SECONDS", 0)  # don't wait out a "restart"
 
     def down(*a, **k):
         raise httpx.ConnectError("refused")
