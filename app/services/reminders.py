@@ -307,8 +307,9 @@ def send_share(db: Session, phone: str, user: User, kind: str, intro: str = SHAR
 
 
 def share_nudges(db: Session, now_utc: datetime | None = None) -> int:
-    """Daily (late morning): the share nudge for everyone whose first reminded collection was
-    yesterday or before and who hasn't had it (didn't tap Done). Goes as the
+    """Sunday 7:30pm: the share nudge for everyone whose first reminded collection has been and
+    gone and who hasn't had it yet (didn't tap Done), so it lands the first Sunday evening after
+    Binjamin has done its job, when people are messaging and thinking about the week ahead. Goes as the
     META_SHARE_TEMPLATE template; without one (Meta still reviewing it) nobody is sent anything
     and they stay in the queue. Returns how many were sent."""
     now_utc = now_utc or datetime.now(ZoneInfo("UTC"))
@@ -490,9 +491,11 @@ def welcome_share(user: User) -> str | None:
     """The fourth welcome message: asks them to forward the next one (share_message, with their
     tracked link) to neighbours or the street group. Only for people who didn't opt out of
     hearing from us, and only once there's a business number. It counts as their one share
-    nudge (share_nudges)."""
+    nudge (share_nudges). Off unless SHARE_IN_WELCOME: asking before Binjamin has reminded them
+    of anything was too soon (they share after their first Done, or on Sunday evening)."""
     s = get_settings()
-    if not re.sub(r"\D", "", s.meta_display_number) or user.marketing_consent_at is None:
+    if not s.share_in_welcome or not re.sub(r"\D", "", s.meta_display_number) \
+            or user.marketing_consent_at is None:
         return None
     return SHARE_INTRO
 

@@ -188,8 +188,25 @@ def test_claim_with_no_matching_sign_up_carries_on_as_a_whatsapp_sign_up(client,
     assert _say(client, "+447700900888", "E8 1AA").startswith("Which one is your home?")
 
 
-def test_fourth_welcome_message_asks_them_to_share(client, db, live):
+def test_welcome_doesnt_ask_them_to_share(client, db, live):
+    """Too soon: they share after Binjamin has reminded them (first Done, or Sunday evening)."""
     from app.models import Outbox
+    uid = signup(client)["user_id"]
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True,
+                                                 "marketing_consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    reply = _say(client, "+447700900123", "Hey Binny, I'M BIN")
+    assert "Binfluencer" not in reply and "Thought you might like" not in reply
+    db.expire_all()
+    assert not db.scalars(select(Outbox).where(Outbox.kind == "welcome_share")).all()
+    assert db.get(User, uid).share_nudged_at is None  # still due their one share nudge
+
+
+def test_fourth_welcome_message_asks_them_to_share_when_switched_on(client, db, live, monkeypatch):
+    from app.core.config import get_settings
+    from app.models import Outbox
+    monkeypatch.setenv("SHARE_IN_WELCOME", "true")
+    get_settings.cache_clear()
     uid = signup(client)["user_id"]
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True,
                                                  "marketing_consent": True})

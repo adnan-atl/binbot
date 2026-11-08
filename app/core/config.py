@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # background so the next sign-ups from the street load instantly (services/prefetch.py).
     # 0 = off.
     prefetch_neighbours: int = 6
+    # Ask people to share in the WhatsApp welcome? Off: people share once Binjamin has done
+    # something for them (after their first Done, or the Sunday-evening nudge).
+    share_in_welcome: bool = False
     # Splitting a postcode round moves residents and messages them. Until it's been watched
     # on real councils, only log what it would do ("would_split" in change_log).
     split_dry_run: bool = True

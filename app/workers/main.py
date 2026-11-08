@@ -42,7 +42,8 @@ def main():
     sched.add_job(_with_db(daily_report.run), "cron", hour=0, minute=0, id="daily_report",
                   misfire_grace_time=3600, coalesce=True)  # still sent if the worker was busy
     sched.add_job(_with_db(purge_inactive), "cron", hour=5, minute=10, id="retention")
-    sched.add_job(_with_db(share_nudges), "cron", hour=11, minute=7, id="share")
+    # Sunday evening: people are messaging and planning the week (services/reminders.share_nudges)
+    sched.add_job(_with_db(share_nudges), "cron", day_of_week="sun", hour=19, minute=30, id="share")
     sched.add_job(_with_db(signup_nudges), "interval", minutes=3, id="signup-nudge")
     sched.add_job(_with_db(send_fallbacks), "interval", seconds=15, id="fallbacks")
     log.info("worker up")
