@@ -66,7 +66,7 @@ signed up entirely in WhatsApp. Every server event carries `source: server`, `co
 | Event | When | Properties |
 |---|---|---|
 | `signup_started` | Website address step, or first message from a new number | `via` (website / whatsapp), website: `calendar`, `shared`, `calendar_error`, `bins`; WhatsApp: `invite` |
-| `reminders_switched_on` | The welcome goes out (sign-up finished) | `via`, `mode`, `time`, `bins` |
+| `reminders_switched_on` | The welcome goes out (sign-up finished) | `via`, `mode`, `time`, `bins`, `offers_ok` (can hear about Alfred) |
 | `referral_credited` | A friend they invited switched on (on the referrer) | |
 | `reminder_sent` | A reminder reached WhatsApp | `bins`, `mode`, `time`, `retried`, `with_news` |
 | `reminder_failed` | Gave up on a reminder | |

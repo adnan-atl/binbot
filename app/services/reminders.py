@@ -570,7 +570,7 @@ def send_welcome(db: Session, phone: str, user: User, via: str = "website") -> s
 
     _inbox.announce_signup(db, user, via)  # every sign-up gets one welcome: the Slack tracker
     analytics.track(user, "reminders_switched_on", via=via, mode=user.reminder_mode.value,
-                    time=user.reminder_time,
+                    time=user.reminder_time, offers_ok=user.marketing_consent_at is not None,
                     bins=sum(1 for b in user.bin_settings if b.enabled))
     return welcome_message(db, user)
 

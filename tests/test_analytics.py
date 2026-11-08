@@ -65,6 +65,7 @@ def test_a_residents_journey(client, db, events):
     by = {e: p for e, _, p in events}
     assert by["signup_started"]["via"] == "website" and by["signup_started"]["council"] == "Hackney"
     assert by["reminders_switched_on"]["mode"] == "night_before"
+    assert by["reminders_switched_on"]["offers_ok"] is False  # didn't tick yes to offers
     assert by["reminder_replied"]["reply"] == "done"
     assert by["reminder_sent"]["bins"] >= 1
 
