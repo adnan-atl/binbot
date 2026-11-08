@@ -101,6 +101,12 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
     secs = monotonic() - started
     user.lookup_seconds, user.lookup_source = round(secs, 1), "manual" if error else source
     db.commit()
+    if source == "council" and not error:
+        # A fresh lookup means nobody nearby is set up yet: get the neighbouring postcodes'
+        # calendars ready in the background, so the rest of the street loads instantly.
+        from app.services import prefetch
+
+        prefetch.start(prop.id)
     if not shared and (error or secs > SLOW_LOOKUP_SECONDS):
         from app.services import inbox  # Slack: we look into it
 

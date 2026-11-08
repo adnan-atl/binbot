@@ -60,6 +60,11 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
         .where(Snapshot.ok.is_(True)).group_by(Snapshot.round_key).subquery()
     )
     stale_keys = set(db.scalars(select(last_ok.c.round_key).where(last_ok.c.at < cutoff)).all())
+    # Rounds fetched ahead for neighbours (services/prefetch.py) that nobody has joined yet
+    # aren't worth re-checking every week: they're refreshed once someone signs up there.
+    joined = set(db.scalars(select(Property.round_key).join(User, User.property_id == Property.id)).all())
+    by_resident = set(db.scalars(select(Snapshot.round_key).where(Snapshot.source != "prefetch")).all())
+    stale_keys = {k for k in stale_keys if k in joined or k in by_resident}
     # Rounds with users but no good snapshot at all.
     never = set(db.scalars(
         select(Property.round_key).join(User, User.property_id == Property.id)

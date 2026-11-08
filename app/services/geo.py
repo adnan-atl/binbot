@@ -102,7 +102,7 @@ def os_door(dpa: dict) -> str | None:
     return num or name or _paon(dpa.get("ADDRESS", ""))
 
 
-def lookup_addresses(postcode: str) -> list[AddressHit]:
+def lookup_addresses(postcode: str, paid_ok: bool = True) -> list[AddressHit]:
     """
     Addresses with UPRNs for a postcode, from ADDRESS_PROVIDER, then ADDRESS_FALLBACK when
     the first errors (outage, rate limit, bad key) or has nothing for the postcode (a new
@@ -118,14 +118,21 @@ def lookup_addresses(postcode: str) -> list[AddressHit]:
         from app.services.demo import demo_addresses
 
         return demo_addresses(pc)
+    if not paid_ok:  # background work (prefetch): the free provider only, never the paid one
+        return _cached("addr-free", pc, lambda: _fetch_addresses(s, pc, paid_ok=False))
     out = _cached("addr", pc, lambda: _fetch_addresses(s, pc))
     if not out:
         _cache.pop(("addr", pc), None)  # don't remember "nothing" (provider down, no key yet)
     return out
 
 
-def _fetch_addresses(s, pc: str) -> list[AddressHit]:
+PAID_PROVIDERS = {"ideal_postcodes"}
+
+
+def _fetch_addresses(s, pc: str, paid_ok: bool = True) -> list[AddressHit]:
     providers = [getattr(s, "address_provider", "none"), getattr(s, "address_fallback", "none")]
+    if not paid_ok:
+        providers = [p for p in providers if p not in PAID_PROVIDERS]
     errors = []
     for name in dict.fromkeys(p for p in providers if p and p != "none"):
         fetch = _PROVIDERS.get(name)
