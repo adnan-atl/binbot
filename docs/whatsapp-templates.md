@@ -137,18 +137,18 @@ riding on the Done / Snooze reply. Once approved, set `META_REMINDER_NEWS_TEMPLA
 
 ---
 
-## 4. Share with neighbours: `bin_share`
+## 4. Share with neighbours: `bin_share_sunday`
 
-Sent once, the day after someone's first reminded collection (11am), unless they already got the
-link by tapping **Done** on a reminder (that one goes free, inside the chat window). Only to
-people who didn't opt out of updates at sign-up. Until it's approved, leave
+Sent once, at 7:30pm on the first Sunday after someone's first reminded collection, unless they
+already got the link by tapping **Done** on a reminder (that one goes free, inside the chat
+window). Only to people who didn't opt out of updates at sign-up. Until it's approved, leave
 `META_SHARE_TEMPLATE` empty: the Done path still works, and everyone waiting gets the template
-on the first morning after you set it.
+on the first Sunday evening after you set it.
 
 | Field | Value |
 |---|---|
 | Category | **Marketing** (it promotes the service, so Meta will file it there anyway) |
-| Name | `bin_share` |
+| Name | `bin_share_sunday` |
 | Language | **English (UK)** |
 | Header | none |
 | Footer | none |
@@ -157,7 +157,7 @@ on the first morning after you set it.
 **Body** (copy exactly):
 
 ```
-Hope that made bin day easier. If you want to share {{1}} with neighbours or friends, send them this link: {{2}} 🔗
+Hope {{1}} made bin day a bit easier this week 🎩 Know a neighbour who always forgets theirs? Pop this link in your street's group chat or send it to a friend: {{2}} 🔗
 ```
 
 (Meta won't accept a template that ends with a variable, hence the emoji after the link.)
@@ -169,7 +169,7 @@ Hope that made bin day easier. If you want to share {{1}} with neighbours or fri
 | `{{1}}` | the product name | `Binjamin` |
 | `{{2}}` | their invite link (counts the tap, then opens the website) | `https://binjamin.uk/r/ab12cd34` |
 
-Once approved, set `META_SHARE_TEMPLATE=bin_share` in the server's `.env` and restart.
+Once approved, set `META_SHARE_TEMPLATE=bin_share_sunday` in the server's `.env` and restart.
 
 ---
 

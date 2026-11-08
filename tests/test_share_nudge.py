@@ -60,7 +60,7 @@ def test_day_after_the_first_collection_if_they_never_tapped_done(client, db):
     next_day = same_day + timedelta(days=1)
     assert share_nudges(db, now_utc=next_day) == 1
     [msg] = _shares(db)
-    assert msg.body.startswith("Hope that made bin day easier. If you want to share Binny")
+    assert msg.body.startswith("Hope Binny made bin day a bit easier this week")
     assert share_nudges(db, now_utc=next_day + timedelta(days=1)) == 0
 
 
