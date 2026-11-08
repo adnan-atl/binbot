@@ -281,10 +281,167 @@ def _rbkc_street(lookup: LookupInput, streets: list[str]) -> str:
     raise MissingInput("house_number")  # postcode spans streets: need the exact address
 
 
+
+# ---- Cotswold (no browser) ---------------------------------------------------------
+# The library's CotswoldDistrictCouncil drives a real browser through the council's Salesforce
+# community page, with fixed sleeps: ~27s a lookup, and it breaks if the page is slow. This asks
+# the same Salesforce site directly, the way the page itself does, in ~2-3s: start the
+# "WebFormAlloyWasteCollectionEnquiry" flow as a guest, look the address up, press Next, and
+# read the table the flow returns. Used as the fallback when the browser scraper fails
+# (registry.CUSTOM puts it after the library module).
+
+COTSWOLD = "https://community.cotswold.gov.uk"
+COTSWOLD_PAGE = "/s/waste-collection-enquiry"
+COTSWOLD_FLOW = "WebFormAlloyWasteCollectionEnquiry"
+_APP = "siteforce:communityApp"
+
+
+def _cotswold_context(http: httpx.Client) -> dict:
+    """The page's Aura context (framework id + app version), read from its HTML."""
+    html = http.get(COTSWOLD + COTSWOLD_PAGE).text
+    fw = re.search(r'fwuid%22%3A%22([^%]+)%22|"fwuid":"([^"]+)"', html)
+    app = re.search(r'APPLICATION@markup://siteforce:communityApp(?:%22%3A%22|":")([^%"]+)', html)
+    if not fw or not app:
+        raise AdapterError("cotswold: couldn't read the page's framework id (site changed?)")
+    return {"mode": "PROD", "fwuid": fw.group(1) or fw.group(2), "app": _APP,
+            "loaded": {f"APPLICATION@markup://{_APP}": app.group(1)},
+            "dn": [], "globals": {}, "uad": False}
+
+
+def _aura(http: httpx.Client, ctx: dict, descriptor: str, params: dict) -> dict:
+    import json
+
+    body = {"message": json.dumps({"actions": [{"id": "1;a", "descriptor": descriptor,
+                                                "callingDescriptor": "UNKNOWN", "params": params}]}),
+            "aura.context": json.dumps(ctx), "aura.pageURI": COTSWOLD_PAGE, "aura.token": "null"}
+    r = http.post(COTSWOLD + "/s/sfsites/aura?r=1", data=body)
+    r.raise_for_status()
+    action = json.loads(r.text.removeprefix("while(1);"))["actions"][0]
+    if action.get("state") != "SUCCESS":
+        raise AdapterError(f"cotswold: {descriptor.rsplit('$', 1)[-1]} failed: "
+                           f"{str(action.get('error'))[:200]}")
+    return action.get("returnValue") or {}
+
+
+def _cotswold_pick(records: list[dict], house: str | None, line: str | None) -> dict | None:
+    """The council's record for this home: by house number or name, else the address line."""
+    def name(r):
+        return ((r.get("fields") or {}).get("Name") or {}).get("value") or ""
+    house = (house or "").strip().upper()
+    first = (line or "").split(",")[0].strip().upper()
+    for r in records:
+        n = name(r).upper()
+        if first and re.match(rf"^{re.escape(first)}([\s,]|$)", n):
+            return r
+    if house:  # "26 LONG STREET" before "FLAT 2, 26 LONG STREET"
+        for pattern in (rf"^{re.escape(house)}[\s,]", rf",\s*{re.escape(house)}[\s,]"):
+            for r in records:
+                if re.search(pattern, name(r).upper()):
+                    return r
+    return None
+
+
+def _find_value(node, key: str):
+    """The value of the flow output/screen field called `key`, anywhere in the response."""
+    if isinstance(node, dict):
+        if node.get("name") == key and isinstance(node.get("value"), str):
+            return node["value"]
+        for v in node.values():
+            found = _find_value(v, key)
+            if found is not None:
+                return found
+    elif isinstance(node, list):
+        for v in node:
+            found = _find_value(v, key)
+            if found is not None:
+                return found
+    return None
+
+
+def _cotswold_date(text: str, today: date) -> date | None:
+    t = text.strip().lower()
+    if t == "today":
+        return today
+    if t == "tomorrow":
+        return today + timedelta(days=1)
+    try:
+        d = datetime.strptime(re.sub(r"[^\w\s,]", "", text).strip(), "%a, %d %B").date()
+    except ValueError:
+        return None
+    d = d.replace(year=today.year)
+    return d.replace(year=today.year + 1) if d < today else d
+
+
+def cotswold_direct(lookup: LookupInput, *, client: httpx.Client | None = None,
+                    today: date | None = None) -> list[RawCollection]:
+    import json
+
+    today = today or date.today()
+    house = lookup.house_number or (lookup.address_line or "").split(",")[0] or None
+    if not house:
+        raise MissingInput("house_number")
+    http = client or httpx.Client(headers={"User-Agent": UA}, timeout=30, follow_redirects=True)
+    try:
+        ctx = _cotswold_context(http)
+        started = _aura(http, ctx, "aura://FlowRuntimeConnectController/ACTION$startFlow", {
+            "flowDevName": COTSWOLD_FLOW, "enableTrace": False, "enableRollbackMode": False,
+            "debugAsUserId": "", "useLatestSubflow": False, "isBuilderDebug": False,
+            "arguments": json.dumps([{"name": "vClientCode", "type": "String",
+                                      "supportsRecordId": False, "value": "CDC"}])})
+        state = (started.get("response") or {}).get("serializedEncodedState")
+        record = None
+        for q in (f"{house} {lookup.postcode}", lookup.postcode):
+            found = _aura(http, ctx, "aura://LookupController/ACTION$lookup", {
+                "objectApiName": "Case", "fieldApiName": "Property__c", "pageParam": 1,
+                "pageSize": 50, "q": q, "searchType": "TypeAhead", "targetApiName": "Property__c",
+                "body": {"sourceRecord": {"apiName": "Case", "fields": {"Id": None}}}})
+            records = [r for res in (found.get("lookupResults") or {}).values()
+                       for r in (res.get("records") or [])]
+            record = _cotswold_pick(records, lookup.house_number, lookup.address_line)
+            if record:
+                break
+        if record is None:
+            raise NoCollectionsForAddress(f"cotswold: no property matching {house}, {lookup.postcode}")
+        rid = record.get("id") or record["fields"]["Id"]["value"]
+        rname = record["fields"]["Name"]["value"]
+        fields = [{"field": "FlowStages1.currentStage", "value": None, "isVisible": False},
+                  {"field": "FlowStages1.stages", "value": None, "isVisible": False},
+                  {"field": "Property.recordId", "value": rid, "isVisible": True},
+                  {"field": "Property.recordIds", "value": [rid], "isVisible": True},
+                  {"field": "Property.recordName", "value": rname, "isVisible": True}]
+        action, resp = "NEXT", {}
+        for _ in range(6):  # NEXT, then CONTINUE_AFTER_COMMIT until the result screen
+            out = _aura(http, ctx, "aura://FlowRuntimeConnectController/ACTION$navigateFlow", {
+                "request": {"action": action, "serializedState": state, "fields": fields,
+                            "uiElementVisited": True, "enableTrace": False, "lcErrors": {},
+                            "isBuilderDebug": False}})
+            resp = out.get("response") or {}
+            status = resp.get("interviewStatus")
+            if status == "Error":
+                raise AdapterError("cotswold: the council's form returned an error for this address")
+            if status != "NEEDS_COMMIT":
+                break
+            state, action, fields = resp.get("serializedEncodedState"), "CONTINUE_AFTER_COMMIT", []
+        rows = json.loads(_find_value(resp, "dataJson") or "[]")
+    except httpx.HTTPError as e:
+        raise AdapterError(f"community.cotswold.gov.uk: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    items = []
+    for row in rows:
+        label, when = (row.get("col1") or "").strip(), _cotswold_date(row.get("col2") or "", today)
+        if label and when:
+            items.append(RawCollection(label, when))
+    if not items:
+        raise NoCollectionsForAddress("cotswold: no collections listed for this address")
+    return items
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
+    "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM: fallback for the browser one
 }
 
 # Same weakness upstream, not yet reproduced against a live page: LondonBoroughLewisham,

@@ -233,6 +233,13 @@ CUSTOM: dict[str, AdapterSpec] = {
         name="Kensington and Chelsea", url="https://www.rbkc.gov.uk/bincollections/default.aspx",
         needs_postcode=True, needs_house_number=True,
         note="Street lookup; the street comes from the address, the number picks the row."),
+    # Cotswold: the library module drives a browser (~27s, fragile). This asks the council's
+    # Salesforce site directly (~3s). Tried after the library module, when that one fails.
+    "E07000079": AdapterSpec(
+        module="BinBotCotswoldDirect", gss_code="E07000079", name="Cotswold",
+        url="https://community.cotswold.gov.uk/s/waste-collection-enquiry",
+        needs_postcode=True, needs_house_number=True,
+        note="Salesforce flow, no browser: address lookup, then the flow's collection table."),
 }
 
 
