@@ -1029,6 +1029,18 @@ OPT_OUT_RE = re.compile(r"(please\s+)?(stop|unsubscribe|opt[ -]?out|cancel|end|q
                         r"sending( me)?( messages)?|reminders|the reminders|my reminders))*"
                         r"(\s+please)?[\s.!]*", re.IGNORECASE)
 FALLBACK_TAIL = "Tap Settings to change your bins or reminder time."
+# Acknowledgements that need no reply at all (and aren't worth the team's attention).
+ACK_RE = re.compile(r"(ok(ay|ey|ie|i)?|o\.k\.?|k+|alright|all right|cool|got it|noted|sure|fine|"
+                    r"will do|roger|sounds good|no worries|np|yep|yup|kk)", re.IGNORECASE)
+
+
+def is_ack(text: str) -> bool:
+    """'Ok', 'ok!', 'Got it 👍', or just emoji: an acknowledgement, not a question."""
+    t = (text or "").strip()
+    if t and not re.search(r"[A-Za-z0-9]", t):
+        return True  # only emoji / punctuation
+    words = re.sub(r"[^\w\s.']", " ", t).strip(" .!")
+    return bool(ACK_RE.fullmatch(re.sub(r"\s+", " ", words)))
 FALLBACK = f"{NOT_UNDERSTOOD[0]} {FALLBACK_TAIL}"
 # The not-understood reply isn't sent straight away: people often type in bursts, and a reply to
 # each half-sentence is spam. Binjamin waits until they've been quiet for FALLBACK_WAIT, answers
@@ -1300,6 +1312,10 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         reply = Reply("Thanks, noted. If your home's days are different, tap \"These aren't my "
                       f"days\" in {get_settings().brand_name} to set your own.")
         to_inbox = "wrong_day"
+    elif is_ack(text):
+        # "Ok", "👍", "got it": nothing to answer, nothing for the team. A reply would only annoy.
+        db.commit()
+        return ""
     else:
         # Kept so we can see what people ask for that we don't handle yet. Deleted after
         # UNRECOGNISED_KEEP_DAYS by the worker (purge_unrecognised, daily).

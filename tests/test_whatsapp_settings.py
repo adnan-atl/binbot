@@ -364,3 +364,18 @@ def test_share_from_settings_sends_the_link_message_then_the_card(client, db, ui
     assert db.scalar(select(Outbox).where(Outbox.kind == "share_card")).body.startswith("[Contact card: Binny")
     assert say(client, "share").startswith("Forward my next message")
     get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("text", ["Ok", "ok!", "Okay", "OK 👍", "👍", "👍🏻👍🏻", "Got it", "k", "Cool.", "noted"])
+def test_acknowledgements_get_no_reply_and_dont_bother_the_team(client, db, uid, text):
+    before = len(_replies(db))
+    assert say(client, text) == ""
+    assert send_fallbacks(db, now_utc=_later(61)) == 0
+    assert len(_replies(db)) == before
+    db.expire_all()
+    assert not db.scalars(select(ChangeLog).where(ChangeLog.kind == "unrecognised")).all()
+
+
+def test_a_real_question_still_counts(client, db, uid):
+    assert say(client, "ok but can you do glass?") == ""  # waits, then the one fallback
+    assert send_fallbacks(db, now_utc=_later(61)) == 1
