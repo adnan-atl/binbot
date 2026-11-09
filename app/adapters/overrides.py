@@ -950,6 +950,92 @@ def ipswich(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[
     raise NoCollectionsForAddress(f"ipswich: street not found for {lookup.postcode}")
 
 
+# ---- Chelmsford -----------------------------------------------------------------------------
+# The council's address search still names each home's round ("Tuesday B") and links its
+# calendar page, but that page no longer offers an .ics file (the library fails with "Could not
+# find collection ICS file"): the dates are now listed on the page, a month at a time
+# ("Tuesday 3 November: food waste, brown bin, paper sack, plastic and cartons bag").
+CHELMSFORD = "https://www.chelmsford.gov.uk/bins-and-recycling/check-your-kerbside-collection-day/"
+CHELMSFORD_NAMES = {"green box": "Green box (glass and cans)"}
+_CHELMSFORD_DAY = re.compile(r"^\s*[A-Za-z]+day\s+(\d{1,2})\s+([A-Za-z]+)\s*:\s*(.+)$")
+
+
+def chelmsford_round(html: str, house: str | None, line: str | None) -> str | None:
+    """The calendar link for this home from the search results: its own row, else the one
+    link every listed home shares."""
+    rows = []
+    table = BeautifulSoup(html, "html.parser").find("table")
+    for tr in (table.find_all("tr") if table else []):
+        cells = tr.find_all("td")
+        a = tr.find("a", href=lambda h: h and "collection-calendar" in h)
+        if len(cells) >= 2 and a:
+            rows.append((cells[0].get_text(" ", strip=True), a["href"]))
+    parts = [p.strip() for p in (line or "").split(",")]
+    want = _norm_street(" ".join(parts[:2])) if len(parts) > 1 else ""
+    firsts = [(_norm_street(address.split(",")[0]), href) for address, href in rows]
+    for hits in ([h for f, h in firsts if want and f == want],
+                 [h for f, h in firsts if house and f.split(" ")[0] == _norm_street(house)],
+                 [h for _, h in firsts]):
+        if len(set(hits)) == 1:
+            return hits[0]
+    return None
+
+
+def chelmsford_calendar(html: str, today: date) -> list[RawCollection]:
+    soup = BeautifulSoup(html, "html.parser")
+    out, year = [], today.year
+    for el in soup.find_all(["h2", "h3", "li"]):
+        text = el.get_text(" ", strip=True)
+        if el.name != "li":
+            m = re.fullmatch(r"[A-Za-z]+\s+(\d{4})", text)
+            if m:
+                year = int(m.group(1))
+            continue
+        m = _CHELMSFORD_DAY.match(text)
+        if not m:
+            continue
+        try:
+            when = datetime.strptime(f"{m.group(1)} {m.group(2)} {year}", "%d %B %Y").date()
+        except ValueError:
+            continue
+        for item in m.group(3).split(","):
+            name = item.strip().rstrip(".")
+            if name:
+                out.append(RawCollection(CHELMSFORD_NAMES.get(name.lower(), name[:1].upper() + name[1:]), when))
+    return out
+
+
+def chelmsford(lookup: LookupInput, *, client: httpx.Client | None = None,
+               today: date | None = None) -> list[RawCollection]:
+    today = today or date.today()
+    http = client or httpx.Client(headers={"User-Agent": SOUTH_HAMS_UA}, timeout=30,
+                                  follow_redirects=True)
+    try:
+        page = http.get(CHELMSFORD)
+        page.raise_for_status()
+        box = BeautifulSoup(page.text, "html.parser").find("input", id=re.compile(r"^\d+_keyword$"))
+        if box is None:
+            raise AdapterError("chelmsford.gov.uk: postcode search not found (page changed)",
+                               retryable=False)
+        found = http.get(CHELMSFORD, params={box["id"]: lookup.postcode})
+        found.raise_for_status()
+        href = chelmsford_round(found.text, lookup.house_number, lookup.address_line)
+        if not href:
+            raise NoCollectionsForAddress(f"chelmsford.gov.uk: no collection round found for "
+                                          f"{lookup.house_number or ''} {lookup.postcode}".strip())
+        cal = http.get(httpx.URL(CHELMSFORD).join(href))
+        cal.raise_for_status()
+    except httpx.HTTPError as e:
+        raise AdapterError(f"chelmsford.gov.uk: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    items = [c for c in chelmsford_calendar(cal.text, today) if c.date >= today]
+    if not items:
+        raise NoCollectionsForAddress("chelmsford.gov.uk: the round's calendar lists no upcoming dates")
+    return items
+
+
 # ---- Library modules that want the street where we pass the house number ---------------------
 # Their scraper is fine; only its input differs. Rewrite the lookup before the module runs.
 
@@ -980,6 +1066,7 @@ OVERRIDES = {
     "EastHertsCouncil": east_herts,
     "TorbayCouncil": torbay,
     "IpswichBoroughCouncil": ipswich,
+    "ChelmsfordCityCouncil": chelmsford,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
     "BinBotSomersetDirect": somerset_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
