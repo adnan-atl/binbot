@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Tried when the main provider errors or returns nothing for a postcode.
     address_fallback: str = "ideal_postcodes"  # none | os_places | ideal_postcodes
     os_places_api_key: str = ""
+    os_places_per_minute: int = 45  # OS allows 50/min on our plan; keep a margin
     ideal_postcodes_api_key: str = ""
 
     # Council scraping

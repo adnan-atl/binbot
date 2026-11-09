@@ -1,7 +1,9 @@
 """Postcode -> council (GSS code) and postcode -> addresses (UPRN)."""
 import logging
 import re
+import threading
 import time
+from collections import deque
 from dataclasses import dataclass
 
 import httpx
@@ -119,7 +121,7 @@ def lookup_addresses(postcode: str, paid_ok: bool = True) -> list[AddressHit]:
 
         return demo_addresses(pc)
     if not paid_ok:  # background work (prefetch): the free provider only, never the paid one
-        return _cached("addr-free", pc, lambda: _fetch_addresses(s, pc, paid_ok=False))
+        return _cached("addr-free", pc, lambda: _fetch_addresses(s, pc, paid_ok=False, background=True))
     out = _cached("addr", pc, lambda: _fetch_addresses(s, pc))
     if not out:
         _cache.pop(("addr", pc), None)  # don't remember "nothing" (provider down, no key yet)
@@ -134,8 +136,35 @@ def _redact(text: str) -> str:
     return re.sub(r"((?:api_)?key=)[^&'\"\s]+", r"\1***", text)
 
 
+# OS Places allows 50 lookups a minute on our plan, for everything at once (429 beyond that).
+# Count them here so sign-ups never queue behind background work: background lookups (the
+# neighbour prefetch) only run while the last minute is under half the budget.
+_os_calls: deque = deque()
+_os_lock = threading.Lock()
+
+
+def os_slot(background: bool = False, wait: float = 3.0) -> bool:
+    """Take one OS lookup from this minute's budget. Sign-ups wait up to `wait` seconds for
+    one; background work never waits, it just skips."""
+    limit = max(1, getattr(get_settings(), "os_places_per_minute", 45))
+    cap = limit // 2 if background else limit
+    deadline = time.monotonic() + (0 if background else wait)
+    while True:
+        with _os_lock:
+            now = time.monotonic()
+            while _os_calls and now - _os_calls[0] > 60:
+                _os_calls.popleft()
+            if len(_os_calls) < cap:
+                _os_calls.append(now)
+                return True
+            free_at = _os_calls[0] + 60
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(min(0.25, max(0.0, free_at - time.monotonic())))
+
+
 def _fetch_addresses(s, pc: str, paid_ok: bool = True, errors: list[str] | None = None,
-                     alert: bool = True) -> list[AddressHit]:
+                     alert: bool = True, background: bool = False) -> list[AddressHit]:
     providers = [getattr(s, "address_provider", "none"), getattr(s, "address_fallback", "none")]
     if not paid_ok:
         providers = [p for p in providers if p not in PAID_PROVIDERS]
@@ -143,6 +172,11 @@ def _fetch_addresses(s, pc: str, paid_ok: bool = True, errors: list[str] | None 
     for name in dict.fromkeys(p for p in providers if p and p != "none"):
         fetch = _PROVIDERS.get(name)
         if fetch is None:
+            continue
+        if name == "os_places" and getattr(s, "os_places_api_key", "") and not os_slot(background):
+            if background:
+                return []  # busy minute: leave the neighbour for later, sign-ups come first
+            errors.append("os_places: our per-minute budget is used up")
             continue
         try:
             out = fetch(s, pc)
