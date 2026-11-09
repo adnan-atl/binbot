@@ -443,17 +443,21 @@ def cotswold_direct(lookup: LookupInput, *, client: httpx.Client | None = None,
 # Upstream (SouthHamsDistrictCouncil) opens the session with python-requests' own user agent,
 # then posts as Chrome, and calls .json() on whatever comes back: when the council's site
 # answers with anything else (an error page, an empty body) a resident sees "JSONDecodeError"
-# and is sent to add their bins by hand. Same two calls here, as one consistent browser, with
+# and is sent to add their bins by hand. Same two calls here, as one consistent client, with
 # a readable error that says what the site actually sent (a 403/5xx counts as unreachable, so
 # the proxy fallback can try).
 
+# South Hams' firewall refuses a server that claims to be Chrome (HTTP 403 on the first page)
+# but lets a plainly named client in. Checked from our server, Nov 2026.
+SOUTH_HAMS_UA = "Binjamin/1.0 (+https://binjamin.uk)"
 SOUTH_HAMS = "https://waste.southhams.gov.uk/mycollections"
 
 
 def south_hams(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
     if not lookup.uprn:
         raise MissingInput("uprn")
-    http = client or httpx.Client(headers={"User-Agent": UA}, timeout=30, follow_redirects=True)
+    http = client or httpx.Client(headers={"User-Agent": SOUTH_HAMS_UA}, timeout=30,
+                                  follow_redirects=True)
     try:
         page = http.get(SOUTH_HAMS)
         token = http.cookies.get("fcc_session_cookie")
@@ -559,11 +563,87 @@ def somerset_direct(lookup: LookupInput, *, client: httpx.Client | None = None) 
     return itouchvision(lookup, SOMERSET_IDS, "somerset (iTouchVision)", client=client)
 
 
+# ---- Westminster ----------------------------------------------------------------------------
+# Westminster publishes collection days per street (USRN), not per home. The library module
+# takes its "uprn" argument as the street's USRN, but we pass the home's UPRN, so every lookup
+# asked for a street that doesn't exist and got a 404. This finds the street the way
+# Kensington's does (the street name in the resident's address, else the postcode's address
+# list), takes its USRN from the council's street list and reads the same tables.
+WESTMINSTER = "https://transact.westminster.gov.uk/env"
+_WM_DAYS = {d[:3]: i for d, i in WEEKDAYS.items()}
+
+
+def westminster_days(text: str) -> set[int]:
+    """'Mon - Fri' / 'Sat, Sun' / 'Tue, Fri' / 'Wed' -> weekday numbers."""
+    out: set[int] = set()
+    for part in re.split(r"[,&]", (text or "").lower()):
+        m = re.match(r"\s*([a-z]{3})[a-z]*\s*(?:[-\u2013]\s*([a-z]{3})[a-z]*)?\s*$", part)
+        if not m or m.group(1) not in _WM_DAYS:
+            continue
+        a = _WM_DAYS[m.group(1)]
+        b = _WM_DAYS.get(m.group(2) or "", a)
+        out.update(range(a, b + 1) if a <= b else [*range(a, 7), *range(0, b + 1)])
+    return out
+
+
+def westminster_services(html: str) -> dict[str, set[int]]:
+    """{service: weekdays} from a street report: rubbish (table 1) and recycling (table 2)."""
+    tables = BeautifulSoup(html, "html.parser").find_all("table")
+    services: dict[str, set[int]] = {}
+    for i, table in enumerate(tables[:2]):
+        for tr in table.find_all("tr")[1:]:
+            cells = [td.get_text(" ", strip=True) for td in tr.find_all("td")]
+            if i == 0 and len(cells) >= 4:
+                name, days = "Rubbish Collection", westminster_days(cells[1]) | westminster_days(cells[3])
+            elif i == 1 and len(cells) >= 6:
+                if "business" in cells[1].lower():
+                    continue  # commercial blue bags, not residents
+                name = cells[1] or "Recycling Collection"
+                days = westminster_days(cells[3]) | westminster_days(cells[5])
+            else:
+                continue
+            if days:
+                services.setdefault(name, set()).update(days)
+    return services
+
+
+def westminster(lookup: LookupInput, *, client: httpx.Client | None = None,
+                today: date | None = None) -> list[RawCollection]:
+    today = today or date.today()
+    http = client or httpx.Client(headers={"User-Agent": UA}, timeout=30, follow_redirects=True)
+    try:
+        page = http.get(f"{WESTMINSTER}/streetsearch.aspx")
+        page.raise_for_status()
+        select = BeautifulSoup(page.text, "html.parser").find("select", {"id": "dlstreets"})
+        if select is None:
+            raise AdapterError("westminster.gov.uk: street list not found (page changed)",
+                               retryable=False)
+        usrns: dict[str, str] = {}
+        for o in select.find_all("option"):
+            if o.get("value", "").strip() and o.get_text(strip=True):
+                usrns.setdefault(o.get_text(strip=True), o["value"].strip())
+        street = _rbkc_street(lookup, list(usrns))
+        r = http.get(f"{WESTMINSTER}/streetreport.aspx", params={"USRN": usrns[street]})
+        r.raise_for_status()
+    except httpx.HTTPError as e:
+        raise AdapterError(f"westminster.gov.uk: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    out = [RawCollection(name, d) for name, days in westminster_services(r.text).items()
+           for n in range(1, 7 * WEEKS_AHEAD + 1)
+           for d in [today + timedelta(days=n)] if d.weekday() in days]
+    if not out:
+        raise NoCollectionsForAddress(f"westminster.gov.uk lists no residential collections on {street}")
+    return sorted(out, key=lambda c: (c.date, c.label))
+
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
     "SouthHamsDistrictCouncil": south_hams,
+    "WestminsterCityCouncil": westminster,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
     "BinBotSomersetDirect": somerset_direct,  # registry.CUSTOM_FIRST: before the browser one
 }

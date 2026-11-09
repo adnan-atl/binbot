@@ -1,11 +1,11 @@
-"""South Hams: same two calls as the library, one consistent browser, readable errors."""
+"""South Hams: same two calls as the library, one consistent client, readable errors."""
 import json
 
 import httpx
 import pytest
 
 from app.adapters.base import AdapterError, LookupInput, unreachable
-from app.adapters.overrides import south_hams
+from app.adapters.overrides import SOUTH_HAMS_UA, south_hams
 
 TILE = ('<div class="collectionDiv"><h3>Refuse Collection Service</h3><div class="detWrap">'
         'Collected fortnightly on Tuesday. Your next scheduled collection is tomorrow, '
@@ -42,3 +42,8 @@ def test_blocked_counts_as_unreachable_so_the_proxy_can_try():
     with pytest.raises(AdapterError) as got:
         south_hams(LookupInput(postcode="TQ9 5NE", uprn="123"), client=c)
     assert unreachable(str(got.value))
+
+
+def test_does_not_claim_to_be_chrome():
+    # The council's firewall answers 403 to a server calling itself Chrome, 200 to this
+    assert "Chrome" not in SOUTH_HAMS_UA and "Mozilla" not in SOUTH_HAMS_UA
