@@ -241,6 +241,14 @@ CUSTOM: dict[str, AdapterSpec] = {
         url="https://community.cotswold.gov.uk/s/waste-collection-enquiry",
         needs_postcode=True, needs_house_number=True,
         note="Salesforce flow, no browser: address lookup, then the flow's collection table."),
+    # Somerset: moved to iTouchVision's portal (Nov 2026); the library module still drives
+    # the old somerset.gov.uk form in a browser and times out. This asks the portal directly
+    # by UPRN (~1s) and goes first (CUSTOM_FIRST); the browser one stays as the fallback.
+    "E06000066": AdapterSpec(
+        module="BinBotSomersetDirect", gss_code="E06000066", name="Somerset",
+        url="https://iportal.itouchvision.com/icollectionday/collection-day/",
+        needs_uprn=True, needs_postcode=True, requires=frozenset({"uprn"}),
+        note="iTouchVision portal, no browser: one encrypted request by UPRN."),
 }
 
 
@@ -300,7 +308,7 @@ def _alternates() -> dict[str, list[AdapterSpec]]:
 
 
 # Councils where our own scraper beats the library's, so it's tried first.
-CUSTOM_FIRST = {"E07000079"}  # Cotswold: ~3s without a browser vs ~27s with one
+CUSTOM_FIRST = {"E07000079", "E06000066"}  # Cotswold, Somerset: no browser, seconds not ~30s
 
 
 def candidates(gss_code: str, name: str | None = None) -> list[AdapterSpec]:

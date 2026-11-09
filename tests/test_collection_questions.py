@@ -12,7 +12,7 @@ PHONE = "+447700900123"
 
 
 @pytest.fixture
-def uid(client):
+def uid(client, midday):
     uid = signup(client)["user_id"]  # demo round: Tuesdays
     client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
     client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
@@ -28,7 +28,7 @@ def _first(db, uid):
     return db.scalar(select(Reminder).where(Reminder.user_id == uid).order_by(Reminder.send_at))
 
 
-def test_next_collection(client, db, uid):
+def test_next_collection(client, db, uid, midday):
     r = _first(db, uid)
     names = [b["label"] for b in r.bins]
     day = r.collection_date.strftime("%a %-d %b")

@@ -5,6 +5,7 @@ here instead of waiting for a library release. Key = library module name. Remove
 entry once upstream catches up; the health check will tell you if the library version
 starts working again.
 """
+import json
 import re
 from datetime import date, datetime, timedelta
 
@@ -495,12 +496,76 @@ def south_hams(lookup: LookupInput, *, client: httpx.Client | None = None) -> li
         raise NoCollectionsForAddress("southhams.gov.uk: no collections listed for this address")
     return items
 
+# ---- iTouchVision portal (Somerset) ---------------------------------------------------------
+# Somerset moved its bin-day lookup to iTouchVision's portal in November 2026, so the library's
+# browser scraper (it drives the old somerset.gov.uk form) waits for a page that no longer
+# exists and times out. The portal's own page asks one endpoint, with the UPRN in an
+# AES-encrypted header. The key and IV are the portal's public ones, the same the library's
+# Newport and Buckinghamshire scrapers use; each council has its own client and council id.
+ITOUCH_URL = "https://iweb.itouchvision.com/portal/itouchvision/kmbd/collectionDay"
+ITOUCH_KEY = bytes.fromhex("F57E76482EE3DC3336495DEDEEF3962671B054FE353E815145E29C5689F72FEC")
+ITOUCH_IV = bytes.fromhex("2CBF4FC35C69B82362D393A4F0B9971A")
+SOMERSET_IDS = {"P_CLIENT_ID": 129, "P_COUNCIL_ID": 34493}
+
+
+def itouch_crypt(data: bytes, encrypt: bool) -> bytes:
+    from cryptography.hazmat.primitives import padding
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+    cipher = Cipher(algorithms.AES(ITOUCH_KEY), modes.CBC(ITOUCH_IV))
+    if encrypt:
+        pad, enc = padding.PKCS7(128).padder(), cipher.encryptor()
+        return enc.update(pad.update(data) + pad.finalize()) + enc.finalize()
+    dec, unpad = cipher.decryptor(), padding.PKCS7(128).unpadder()
+    return unpad.update(dec.update(data) + dec.finalize()) + unpad.finalize()
+
+
+def itouchvision(lookup: LookupInput, ids: dict, site: str, *,
+                 client: httpx.Client | None = None) -> list[RawCollection]:
+    """Next collection per bin from an iTouchVision council, by UPRN, without a browser."""
+    if not lookup.uprn:
+        raise MissingInput("uprn")
+    payload = json.dumps({"P_UPRN": str(lookup.uprn), **ids, "P_LANG_CODE": "EN"}).encode()
+    http = client or httpx.Client(headers={"User-Agent": UA}, timeout=30)
+    try:
+        r = http.get(ITOUCH_URL, headers={
+            "P_PARAMETER": itouch_crypt(payload, encrypt=True).hex(),
+            "Origin": "https://iportal.itouchvision.com",
+            "Referer": "https://iportal.itouchvision.com/"})
+    except httpx.HTTPError as e:
+        raise AdapterError(f"{site}: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    try:
+        result = json.loads(itouch_crypt(bytes.fromhex(r.text.strip()), encrypt=False))
+    except ValueError:  # not hex, bad padding or not JSON: an error page, not our data
+        snippet = re.sub(r"\s+", " ", r.text[:120]).strip() or "an empty reply"
+        raise AdapterError(f"{site}: HTTP {r.status_code}, unreadable reply ({snippet})")
+    items = []
+    for row in result.get("collectionDay") or []:
+        try:
+            when = datetime.strptime(str(row.get("collectionDay", "")), "%d-%m-%Y").date()
+        except ValueError:
+            continue
+        if (row.get("binType") or "").strip():
+            items.append(RawCollection(row["binType"].strip(), when))
+    if not items:
+        raise NoCollectionsForAddress(f"{site}: no collections listed for this address")
+    return items
+
+
+def somerset_direct(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+    return itouchvision(lookup, SOMERSET_IDS, "somerset (iTouchVision)", client=client)
+
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
     "SouthHamsDistrictCouncil": south_hams,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
+    "BinBotSomersetDirect": somerset_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
 
 # Same weakness upstream, not yet reproduced against a live page: LondonBoroughLewisham,

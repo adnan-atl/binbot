@@ -34,3 +34,21 @@ def db():
     s = dbmod.session_factory()()
     yield s
     s.close()
+
+
+@pytest.fixture
+def midday(monkeypatch):
+    """Pin the reminders clock to 12:00 today. Tests that read the 'next up' message or the
+    welcome otherwise fail after 7pm on the evening before a collection, when tomorrow's
+    reminder time has already passed (the app is right; the test assumed daytime)."""
+    from datetime import datetime as real_dt
+
+    from app.services import reminders
+
+    class Midday(real_dt):
+        @classmethod
+        def now(cls, tz=None):
+            n = real_dt.now(tz)
+            return n.replace(hour=12, minute=0, second=0, microsecond=0)
+
+    monkeypatch.setattr(reminders, "datetime", Midday)

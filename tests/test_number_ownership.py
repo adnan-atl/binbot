@@ -54,7 +54,7 @@ def test_turning_on_waits_for_hi_and_sends_nothing(client, db, live):
     assert again["start_code"] == code
 
 
-def test_hi_from_the_typed_number_starts_reminders_and_sends_the_welcome(client, db, live):
+def test_hi_from_the_typed_number_starts_reminders_and_sends_the_welcome(client, db, live, midday):
     uid, res = _turn_on(client)
     reply = _say(client, "+447700900123", f"Hi Binny, start my reminders {res['start_code']}")
     assert reply.startswith("Binny here!")
