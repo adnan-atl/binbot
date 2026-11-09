@@ -129,11 +129,17 @@ def lookup_addresses(postcode: str, paid_ok: bool = True) -> list[AddressHit]:
 PAID_PROVIDERS = {"ideal_postcodes"}
 
 
-def _fetch_addresses(s, pc: str, paid_ok: bool = True) -> list[AddressHit]:
+def _redact(text: str) -> str:
+    """Error text without API keys (httpx errors quote the whole URL, key and all)."""
+    return re.sub(r"((?:api_)?key=)[^&'\"\s]+", r"\1***", text)
+
+
+def _fetch_addresses(s, pc: str, paid_ok: bool = True, errors: list[str] | None = None,
+                     alert: bool = True) -> list[AddressHit]:
     providers = [getattr(s, "address_provider", "none"), getattr(s, "address_fallback", "none")]
     if not paid_ok:
         providers = [p for p in providers if p not in PAID_PROVIDERS]
-    errors = []
+    errors = [] if errors is None else errors
     for name in dict.fromkeys(p for p in providers if p and p != "none"):
         fetch = _PROVIDERS.get(name)
         if fetch is None:
@@ -141,12 +147,12 @@ def _fetch_addresses(s, pc: str, paid_ok: bool = True) -> list[AddressHit]:
         try:
             out = fetch(s, pc)
         except (httpx.HTTPError, ValueError, KeyError) as e:
-            log.warning("address lookup: %s failed for %s: %s", name, pc, e)
-            errors.append(f"{name}: {str(e)[:120]}")
+            log.warning("address lookup: %s failed for %s: %s", name, pc, _redact(str(e)))
+            errors.append(f"{name}: {_redact(str(e))[:120]}")
             continue
         if out:
             return out
-    if errors:  # every provider errored (not just "no addresses"): residents have to type it
+    if errors and alert:  # every provider errored (not "no addresses"): residents have to type it
         from app.services import inbox
 
         inbox.alert_address_lookup_failed(pc, errors)

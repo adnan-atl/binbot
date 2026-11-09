@@ -54,7 +54,7 @@ def test_check_tries_the_scrapers_in_order(monkeypatch):
     specs = [AdapterSpec(module="Fast", gss_code="X", name="X", url=""),
              AdapterSpec(module="Browser", gss_code="X", name="X", url="")]
     monkeypatch.setattr(ds, "candidates", lambda g, n: specs)
-    monkeypatch.setattr(ds.geo, "lookup_addresses", lambda pc, paid_ok=True:
+    monkeypatch.setattr(ds, "_addresses", lambda pc:
                         [AddressHit(uprn="1", line="1 A Road", house_number="1")])
     from datetime import date
     monkeypatch.setattr(ds, "UKBCDAdapter", _adapter({"Fast": AdapterError("site changed"),
@@ -66,9 +66,9 @@ def test_check_tries_the_scrapers_in_order(monkeypatch):
 def test_check_reports_what_went_wrong(monkeypatch):
     from app.adapters.registry import AdapterSpec
     monkeypatch.setattr(ds, "candidates", lambda g, n: [AdapterSpec(module="M", gss_code="X", name="X", url="")])
-    monkeypatch.setattr(ds.geo, "lookup_addresses", lambda pc, paid_ok=True: [])
+    monkeypatch.setattr(ds, "_addresses", lambda pc: [])
     assert ds.check({"outcode": "A1", "gss": "X", "council": "X", "postcode": "A1 1AA"})["result"] == "no address list"
-    monkeypatch.setattr(ds.geo, "lookup_addresses", lambda pc, paid_ok=True:
+    monkeypatch.setattr(ds, "_addresses", lambda pc:
                         [AddressHit(uprn=str(i), line=f"{i} Road", house_number=str(i)) for i in range(3)])
     monkeypatch.setattr(ds, "UKBCDAdapter", _adapter({"M": NoCollectionsForAddress("adapter returned no collections")}))
     assert ds.check({"outcode": "A1", "gss": "X", "council": "X", "postcode": "A1 1AA"})["result"] == "no collections listed"
@@ -88,3 +88,26 @@ def test_summary_groups_failures_by_council():
 def test_candidate_outcodes_cover_the_country():
     ocs = ds.candidate_outcodes()
     assert {"GL8", "SW1A", "EC1A", "W1D", "BT1", "ZE1", "M1"} <= set(ocs)
+
+
+def test_address_lookups_wait_out_rate_limits(monkeypatch):
+    monkeypatch.setattr(ds, "ADDRESS_GAP", 0)
+    monkeypatch.setattr(ds.time, "sleep", lambda s: None)
+    calls = []
+
+    def fetch(s, pc, paid_ok=True, errors=None, alert=True):
+        calls.append((paid_ok, alert))
+        if len(calls) < 3:
+            errors.append("os_places: Client error '429 Too Many Requests'")
+            return []
+        return [AddressHit(uprn="1", line="1 A Road", house_number="1")]
+
+    monkeypatch.setattr(ds.geo, "_fetch_addresses", fetch)
+    assert ds._addresses("GL8 1AA")[0].uprn == "1"
+    assert calls == [(False, False)] * 3  # free provider only, no Slack alert, retried
+
+
+def test_api_keys_never_reach_the_logs():
+    from app.services.geo import _redact
+    msg = "Client error '429' for url 'https://api.os.uk/search/places/v1/postcode?postcode=GU47&key=SECRET123&dataset=DPA'"
+    assert "SECRET123" not in _redact(msg) and "key=***" in _redact(msg)

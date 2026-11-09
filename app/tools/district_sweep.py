@@ -2,6 +2,7 @@
 looked up the way a sign-up would, to find areas that fail before a resident does.
 
     docker exec -d binny-api-1 python -m app.tools.district_sweep    # ~1.5-2 hours, background
+    (the address list is throttled to ~1 a second so real sign-ups keep theirs: ~70 min minimum)
     docker exec binny-api-1 cat /tmp/district_sweep.progress          # how far it's got
     docker exec binny-api-1 cat /tmp/district_sweep.txt               # the summary when done
 
@@ -23,6 +24,7 @@ import json
 import random
 import string
 import sys
+import threading
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -45,6 +47,11 @@ LETTERED = [("EC", 1, 4), ("WC", 1, 2), ("W", 1, 1), ("SW", 1, 1), ("SE", 1, 1),
             ("N", 1, 1), ("NW", 1, 1)]
 SAMPLES = 3  # random postcodes per district: finds the councils a district straddles
 WORKERS = 8
+# The address service (Ordnance Survey) is shared with real sign-ups and rate-limits bursts:
+# one lookup every ADDRESS_GAP seconds leaves them plenty of room.
+ADDRESS_GAP = 1.2
+_address_lock = threading.Lock()
+_last_address = [0.0]
 OUT = Path("/tmp")
 
 
@@ -103,8 +110,29 @@ def find_targets() -> list[dict]:
     return targets
 
 
+def _addresses(pc: str) -> list:
+    """The free address list, throttled, waiting out the service's rate limit (429) rather
+    than recording a false 'no address list'."""
+    s = get_settings()
+    for attempt in range(4):
+        with _address_lock:
+            wait = _last_address[0] + ADDRESS_GAP - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            _last_address[0] = time.monotonic()
+        errors: list[str] = []
+        hits = geo._fetch_addresses(s, geo.normalise_postcode(pc), paid_ok=False,
+                                    errors=errors, alert=False)
+        if hits or not any("429" in e for e in errors):
+            if errors and not hits:
+                raise RuntimeError(errors[-1])
+            return hits
+        time.sleep(15 * (attempt + 1))  # rate-limited: back off, then try again
+    raise RuntimeError("address service kept rate-limiting (429)")
+
+
 def _pick_addresses(pc: str) -> list:
-    hits = [a for a in geo.lookup_addresses(pc, paid_ok=False) if a.uprn]
+    hits = [a for a in _addresses(pc) if a.uprn]
     if not hits:
         return []
     mid = len(hits) // 2
@@ -157,6 +185,15 @@ def check(t: dict) -> dict:
     return row
 
 
+def _write_csv(rows: list[dict]) -> None:
+    with open(OUT / "district_sweep.csv", "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=["council", "gss", "outcode", "postcode", "result",
+                                           "scraper", "secs", "error"])
+        w.writeheader()
+        for r in sorted(rows, key=lambda r: (r["council"], r["outcode"])):
+            w.writerow({k: r.get(k, "") for k in w.fieldnames})
+
+
 def _progress(text: str) -> None:
     (OUT / "district_sweep.progress").write_text(text + "\n")
 
@@ -203,13 +240,10 @@ def main(limit: int | None = None) -> None:
             if len(rows) % 10 == 0:
                 _progress(f"checked {len(rows)}/{len(targets)} "
                           f"({round((time.monotonic() - t0) / 60)} min)")
+            if len(rows) % 100 == 0:
+                _write_csv(rows)  # partial results, in case it's stopped
     rows.sort(key=lambda r: (r["council"], r["outcode"]))
-    with open(OUT / "district_sweep.csv", "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=["council", "gss", "outcode", "postcode", "result",
-                                           "scraper", "secs", "error"])
-        w.writeheader()
-        for r in rows:
-            w.writerow({k: r.get(k, "") for k in w.fieldnames})
+    _write_csv(rows)
     text = summarise(rows) + f"\n_({round((time.monotonic() - t0) / 60)} min)_"
     (OUT / "district_sweep.txt").write_text(text)
     _progress(f"done: {len(rows)} checked")
