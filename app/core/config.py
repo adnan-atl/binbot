@@ -37,8 +37,10 @@ class Settings(BaseSettings):
     horizon_days: int = 90  # how far ahead we keep events
     # After a fresh council lookup, fetch this many neighbouring postcodes' calendars in the
     # background so the next sign-ups from the street load instantly (services/prefetch.py).
-    # 0 = off.
-    prefetch_neighbours: int = 6
+    # 0 = off. Off by default: each neighbour costs an OS Places lookup, and the OS trial is
+    # capped at 2,000 lookups in total. Turn on (PREFETCH_NEIGHBOURS=6) once addresses come
+    # from a source without that cap.
+    prefetch_neighbours: int = 0
     # Ask people to share in the WhatsApp welcome? Off: people share once Binjamin has done
     # something for them (after their first Done, or the Sunday-evening nudge).
     share_in_welcome: bool = False
