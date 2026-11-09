@@ -877,6 +877,79 @@ def torbay(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[R
     return items
 
 
+# ---- Ipswich --------------------------------------------------------------------------------
+# Ipswich looks collections up by street name, and the library takes the street from its
+# "house number" argument, so our house number found nothing. The street comes from the address;
+# long roads are split into stretches ("Norwich Road: Valley Road to Railway Bridge", "... (odd
+# numbers only)"), narrowed by the house number's parity. If stretches still differ, we don't guess.
+IPSWICH = "https://app.ipswich.gov.uk/bin-collection/"
+
+
+def ipswich_calendar(html: str) -> list[RawCollection]:
+    out = []
+    grid = BeautifulSoup(html, "html.parser").find("dl", class_="ibc-calendar-grid")
+    for div in (grid.find_all("div", recursive=False) if grid else []):
+        dt = div.find("dt", class_="ibc-calendar-entry")
+        dd = div.find("dd", class_="ibc-calendar-entry__details")
+        if not (dt and dd):
+            continue
+        day = dt.find("div", class_="ibc-calendar-entry__date")
+        month = dt.find("div", class_="ibc-calendar-entry__month")
+        num = re.match(r"\s*(\d{1,2})", day.get_text(" ") if day else "")
+        try:
+            when = datetime.strptime(f"{num.group(1)} {month.get_text(strip=True)}", "%d %B %Y").date()
+        except (AttributeError, ValueError):
+            continue
+        out += [RawCollection(li.get_text(" ", strip=True), when) for li in dd.find_all("li")
+                if li.get_text(strip=True)]
+    return out
+
+
+def _ipswich_stretches(html: str, street: str) -> list[tuple[str, str]]:
+    soup = BeautifulSoup(html, "html.parser")
+    return [(a.get_text(" ", strip=True), a["href"]) for a in soup.find_all("a", href=True)
+            if "/bin-collection/weeks/" in a["href"]
+            and _norm_street(a.get_text(" ", strip=True).split(":")[0]) == _norm_street(street)]
+
+
+def ipswich(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+    lines = address_lines(lookup)
+    n = re.findall(r"\d+", lookup.house_number or "")
+    http = client or httpx.Client(headers={"User-Agent": SOUTH_HAMS_UA}, timeout=30,
+                                  follow_redirects=True)
+    try:
+        for street in dict.fromkeys(p for line in lines for p in street_parts(line)):
+            r = http.post(IPSWICH, data={"street-name": street, "submit-button": ""})
+            r.raise_for_status()
+            items = ipswich_calendar(r.text)
+            if items:
+                return items
+            stretches = _ipswich_stretches(r.text, street)
+            if not stretches:
+                continue
+            if n:
+                side = "odd" if int(n[-1]) % 2 else "even"
+                fits = [s for s in stretches if f"{'even' if side == 'odd' else 'odd'} numbers only"
+                        not in s[0].lower()]
+                stretches = fits or stretches
+            calendars = []
+            for _, href in stretches[:8]:
+                page = http.get(httpx.URL(IPSWICH).join(href))
+                page.raise_for_status()
+                calendars.append(ipswich_calendar(page.text))
+            distinct = {tuple((c.label, c.date) for c in cal) for cal in calendars if cal}
+            if len(distinct) == 1:
+                return next(cal for cal in calendars if cal)
+            raise AdapterError(f"ipswich: {street} has {len(stretches)} stretches with different days",
+                               retryable=False)
+    except httpx.HTTPError as e:
+        raise AdapterError(f"ipswich: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    raise NoCollectionsForAddress(f"ipswich: street not found for {lookup.postcode}")
+
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
@@ -886,6 +959,7 @@ OVERRIDES = {
     "CastlepointDistrictCouncil": castle_point,
     "EastHertsCouncil": east_herts,
     "TorbayCouncil": torbay,
+    "IpswichBoroughCouncil": ipswich,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
     "BinBotSomersetDirect": somerset_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
