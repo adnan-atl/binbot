@@ -411,8 +411,13 @@ def build(db: Session, day: date) -> str:
         flagged.append((score, f"• *{name}*: {what}{of}"))
     for _, line in sorted(flagged, key=lambda x: -x[0])[:8]:
         lines.append(line)
+    # Only councils someone relies on: the nightly check only re-tests those, so a council whose
+    # one failed sign-up never came back would otherwise stay "failing" here for ever.
+    served = select(Property.council_id).join(User, User.property_id == Property.id).where(
+        User.status == UserStatus.active)
     broken = db.scalars(select(Council.name).where(
-        Council.status.in_((CouncilStatus.broken, CouncilStatus.degraded))).order_by(Council.name)).all()
+        Council.status.in_((CouncilStatus.broken, CouncilStatus.degraded)),
+        Council.id.in_(served)).order_by(Council.name)).all()
     if broken:
         lines.append(f"• Health check failing: {', '.join(broken[:12])}"
                      + (f" and {len(broken) - 12} more" if len(broken) > 12 else ""))

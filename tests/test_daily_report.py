@@ -81,6 +81,8 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
     monkeypatch.setattr(R, "posthog_day", lambda s, e: fake)
     glasgow = db.scalar(select(Council).where(Council.name == "Hackney"))
     glasgow.status = CouncilStatus.broken
+    lambeth = Council(name="Lambeth", gss_code="E09000022", status=CouncilStatus.degraded)
+    db.add(lambeth)  # failing, but nobody lives there yet: not worth a line
     db.commit()
     text = R.build(db, TODAY)
     assert "Visits: *40*" in text and "visit → switched on: *5%*" in text
@@ -89,7 +91,7 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
     assert "invite link 15" in text and "WhatsApp 3" in text
     assert "Paused 2" in text and "deleted 1" in text
     assert "*Glasgow City*: 2 bin days not found on the site" in text
-    assert "Health check failing: " + glasgow.name in text
+    assert "Health check failing: " + glasgow.name in text and "Lambeth" not in text
     assert "Tapped turn on reminders → switched on: computer 0/2 (0%), phone 3/4 (75%)" in text
     assert ("By site: binjamin.uk 30 visits → 1 switched on, /d/og 10 visits → 1 switched on, "
             "WhatsApp only 1 switched on") in text

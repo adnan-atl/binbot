@@ -5,7 +5,8 @@ import json
 import logging
 from datetime import date, datetime
 
-from app.adapters.base import AdapterError, LookupInput, MissingInput, RawCollection, unreachable
+from app.adapters.base import (AdapterError, LookupInput, MissingInput, NoCollectionsForAddress,
+                               RawCollection, unreachable)
 from app.adapters.registry import AdapterSpec
 from app.core.config import get_settings
 
@@ -148,7 +149,10 @@ def parse_output(out: str | dict) -> list[RawCollection]:
             continue
         result.append(RawCollection(label=label, date=parse_uk_date(str(raw_date))))
     if not result:
-        raise AdapterError("adapter returned no collections")
+        # The council's site answered and lists nothing for this home (a flat on communal bins,
+        # a commercial unit): about the address, not the scraper, so it doesn't count against
+        # the council's health (Lambeth was marked failing over one such address).
+        raise NoCollectionsForAddress("adapter returned no collections")
     return result
 
 
