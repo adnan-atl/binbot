@@ -35,7 +35,11 @@ Every website event carries `design`: `oat` (binjamin.uk) or `og` (/d/og), so th
 can be shown together or split. When sign-up starts, the person also gets `signup_design` (set
 once), so server events (switched on, reminders, shares) can be broken down by the version they
 signed up on: in PostHog, break down by the person property `signup_design`. Empty means they
-signed up entirely in WhatsApp. Every server event carries `source: server`, `council` and
+signed up entirely in WhatsApp. A/B test (Nov 2026): oat's WhatsApp buttons are pink or the original green, picked at random
+per visit (`?cta=pink` / `?cta=green` forces one). Every oat event carries `cta_variant`, and the
+person gets `cta_variant` set once at sign-up, so switch-ons can be split by it too. The nightly
+report has a "Button test" line: visits → reached the postcode step → switched on, per colour.
+Every server event carries `source: server`, `council` and
 `referred` (joined from someone's link).
 
 ### Website: visit and sign-up funnel

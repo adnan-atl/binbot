@@ -240,6 +240,15 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
                              f"FROM events WHERE event = '$pageview' AND {span} GROUP BY 1")
         site_on = _hogql(f"SELECT toString(person.properties.signup_design), count() FROM events "
                          f"WHERE event = 'reminders_switched_on' AND {span} GROUP BY 1")
+        # A/B test: pink vs green WhatsApp buttons (oat's cta_variant): visits, how many got
+        # past the home page to the postcode step, and switch-ons by the variant they signed up with
+        ab_funnel = _hogql(
+            "SELECT toString(properties.cta_variant), "
+            "uniqIf(properties.$session_id, event = '$pageview'), "
+            "uniqIf(properties.$session_id, event = 'screen_viewed' AND toString(properties.screen) = 'postcode') "
+            f"FROM events WHERE properties.design = 'oat' AND notEmpty(toString(properties.cta_variant)) AND {span} GROUP BY 1")
+        ab_on = _hogql(f"SELECT toString(person.properties.cta_variant), count() FROM events "
+                       f"WHERE event = 'reminders_switched_on' AND {span} GROUP BY 1")
         on = {p for (p,) in _hogql(
             "SELECT DISTINCT toString(person_id) FROM events WHERE event = 'reminders_switched_on' "
             f"AND timestamp >= toDateTime('{_ts(start)}')")}
@@ -257,7 +266,19 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
             "shares": {SHARE_HOW.get(a, a or "?"): int(b) for a, b in shares},
             "calendar_failed": {a or "Unknown council": int(b) for a, b in failed},
             "via": {a or "?": int(b) for a, b in via}, "hello": by_device,
-            "sites": _sites(site_visits, site_on)}
+            "sites": _sites(site_visits, site_on), "ab": _ab(ab_funnel, ab_on)}
+
+
+def _ab(funnel: list, on: list) -> dict[str, list[int]]:
+    """{variant: [visits, reached postcode, switched on]} for the button colour test."""
+    out: dict[str, list[int]] = {}
+    for v, visits, started in funnel:
+        if v in ("pink", "green"):
+            out[v] = [int(visits), int(started), 0]
+    for v, n in on:
+        if v in out:
+            out[v][2] += int(n)
+    return out
 
 
 def _sites(visits: list, on: list) -> dict[str, list[int]]:
@@ -315,6 +336,10 @@ def build(db: Session, day: date) -> str:
         lines.append("• By site: " + ", ".join(
             f"{site} {v} visits → {n_on} switched on" if site != "WhatsApp only" else f"{site} {n_on} switched on"
             for site, (v, n_on) in sorted(ph["sites"].items(), key=lambda kv: -kv[1][0])))
+    if ph and ph.get("ab"):
+        lines.append("• Button test: " + ", ".join(
+            f"{v} {vis} visits → {st} to postcode ({_pct(st, vis)}) → {n_on} switched on ({_pct(n_on, vis)})"
+            for v, (vis, st, n_on) in sorted(ph["ab"].items())))
     lines.append(f"• Active residents now: *{active}*")
     if d.stuck_at_hello:
         lines.append(f"• Reached the last step but haven't messaged yet: {d.stuck_at_hello}")

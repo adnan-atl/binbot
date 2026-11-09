@@ -107,6 +107,7 @@ def test_website_gets_posthog_on_oat_and_og_tagged_by_design(client, monkeypatch
     assert '"ui": "https://eu.posthog.com"' in oat
     assert "persistence: 'memory'" in oat and "autocapture: false" in oat
     assert "var DESIGN = 'oat';" in oat and "signup_design: DESIGN" in oat
+    assert "cta_variant: CTA" in oat and "classList.add('cta-'" in oat  # the button colour A/B test
     og = render_index(WEB / "designs" / "og.html")  # /d/og: same events, tagged og
     assert '"key": "phc_test"' in og and "var DESIGN = 'og';" in og and "autocapture: false" in og
     assert "PostHog, in the EU" in og  # its privacy page says so

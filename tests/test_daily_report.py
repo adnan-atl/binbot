@@ -77,7 +77,8 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
             "sources": [("direct", 25), ("invite link", 15)], "shares": {"WhatsApp": 3},
             "calendar_failed": {"Glasgow City": 2}, "via": {"website": 2},
             "hello": {"phone": [4, 3], "computer": [2, 0]},
-            "sites": R._sites([("oat", 30), ("og", 10)], [("oat", 1), ("og", 1), ("", 1)])}
+            "sites": R._sites([("oat", 30), ("og", 10)], [("oat", 1), ("og", 1), ("", 1)]),
+            "ab": R._ab([("pink", 20, 10), ("green", 20, 14)], [("pink", 1), ("green", 2), ("", 1)])}
     monkeypatch.setattr(R, "posthog_day", lambda s, e: fake)
     glasgow = db.scalar(select(Council).where(Council.name == "Hackney"))
     glasgow.status = CouncilStatus.broken
@@ -92,6 +93,8 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
     assert "Paused 2" in text and "deleted 1" in text
     assert "*Glasgow City*: 2 bin days not found on the site" in text
     assert "Health check failing: " + glasgow.name in text and "Lambeth" not in text
+    assert ("Button test: green 20 visits → 14 to postcode (70%) → 2 switched on (10%), "
+            "pink 20 visits → 10 to postcode (50%) → 1 switched on (5%)") in text
     assert "Tapped turn on reminders → switched on: computer 0/2 (0%), phone 3/4 (75%)" in text
     assert ("By site: binjamin.uk 30 visits → 1 switched on, /d/og 10 visits → 1 switched on, "
             "WhatsApp only 1 switched on") in text
