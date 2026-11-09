@@ -638,12 +638,190 @@ def westminster(lookup: LookupInput, *, client: httpx.Client | None = None,
     return sorted(out, key=lambda c: (c.date, c.label))
 
 
+# ---- Castle Point -----------------------------------------------------------------------------
+# Like Westminster, Castle Point's calendar is per street: the library module's "uprn" is the
+# council's 4-digit roadID, and our home UPRN asked for a street that doesn't exist (its page
+# then has no calendar and the library fails on the heading). Find the street from the address
+# with the council's own street search, then read its calendar. The key on the page: pink days
+# are recycling (blue and pink sacks, glass), normal days are refuse (black sacks); food and
+# garden waste go out every week.
+CASTLE_POINT = "https://apps.castlepoint.gov.uk/cpapps/index.cfm"
+CASTLE_POINT_DAYS = {
+    "pink": ["Recycling (pink sacks)", "Paper and card (blue sacks)", "Glass", "Food waste",
+             "Garden waste"],
+    "normal": ["Refuse (black sacks)", "Food waste", "Garden waste"],
+}
+_POSTCODE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
+
+
+def address_lines(lookup: LookupInput) -> list[str]:
+    """The resident's own address line; failing that, this home's line(s) in the postcode's
+    address list (by UPRN or house number), else every line in the postcode."""
+    if lookup.address_line:
+        return [lookup.address_line]
+    from app.services import geo
+
+    try:
+        hits = geo.lookup_addresses(lookup.postcode)
+    except Exception:
+        hits = []
+    mine = [h.line for h in hits if (lookup.uprn and h.uprn == lookup.uprn)
+            or (lookup.house_number and h.house_number == lookup.house_number)]
+    return mine or [h.line for h in hits]
+
+
+def street_parts(line: str) -> list[str]:
+    """Comma parts of an address line that could be a street: not the number, not the postcode."""
+    parts = []
+    for part in line.split(","):
+        p = _POSTCODE.sub("", part).strip()
+        p = re.sub(r"^(flat|apartment|unit)\s+\S+\s*", "", p, flags=re.I)
+        p = re.sub(r"^\d+[a-z]?(\s*-\s*\d+[a-z]?)?\s+", "", p, flags=re.I).strip()
+        if re.search(r"[A-Za-z]{3}", p):
+            parts.append(p)
+    return parts
+
+
+def castle_point_calendar(html: str) -> list[RawCollection]:
+    soup = BeautifulSoup(html, "html.parser")
+    h1 = soup.select_one("div.contentContainer h1")
+    m = re.search(r"([A-Za-z]+)\s+(\d{4})", h1.get_text(" ", strip=True) if h1 else "")
+    if not m:
+        raise NoCollectionsForAddress("castlepoint.gov.uk: no calendar for that street")
+    year, prev = int(m.group(2)), datetime.strptime(m.group(1), "%B").month
+    out = []
+    for box in soup.select("div.calendarContainer div.calendarContainer"):
+        head = box.find("tr", class_="calendar")
+        try:
+            month = datetime.strptime(head.get_text(strip=True), "%B").month
+        except (AttributeError, ValueError):
+            continue
+        if month < prev:
+            year += 1  # December -> January
+        prev = month
+        for kind, labels in CASTLE_POINT_DAYS.items():
+            for td in box.find_all("td", class_=kind):
+                if td.get_text(strip=True).isdigit():
+                    d = date(year, month, int(td.get_text(strip=True)))
+                    out += [RawCollection(label, d) for label in labels]
+    if not out:
+        raise NoCollectionsForAddress("castlepoint.gov.uk lists no collection days for that street")
+    return sorted(out, key=lambda c: (c.date, c.label))
+
+
+def castle_point(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+    lines = address_lines(lookup)
+    if not lines:
+        raise NoCollectionsForAddress(f"castlepoint.gov.uk: no address found for {lookup.postcode}")
+    http = client or httpx.Client(headers={"User-Agent": UA}, timeout=30, follow_redirects=True)
+    try:
+        road = None
+        for part in dict.fromkeys(p for line in lines for p in street_parts(line)):
+            r = http.post(CASTLE_POINT, params={"fa": "mystreet.search"}, data={"searchterm": part})
+            r.raise_for_status()
+            found = []
+            for a in BeautifulSoup(r.text, "html.parser").find_all("a"):
+                name, _, town = a.get_text(" ", strip=True).partition(" - ")
+                rid = re.search(r"roadID=(\d+)", a.get("href") or "")
+                if rid and town and _norm_street(name) == _norm_street(part):
+                    found.append((town, rid.group(1)))
+            if found:
+                town_hit = [rid for town, rid in found
+                            if any(_norm_street(town) in _norm_street(line) for line in lines)]
+                road = (town_hit or [rid for _, rid in found])[0]
+                break
+        if road is None:
+            raise NoCollectionsForAddress(f"castlepoint.gov.uk: street not found for {lookup.postcode}")
+        r = http.post(CASTLE_POINT, params={"fa": "myStreet.displayDetails"}, data={"roadID": road})
+        r.raise_for_status()
+    except httpx.HTTPError as e:
+        raise AdapterError(f"castlepoint.gov.uk: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    return castle_point_calendar(r.text)
+
+
+# ---- East Herts ---------------------------------------------------------------------------
+# East Herts' AchieveForms form retired the lookup the library calls (683d9ff0e299d now answers
+# "User Package Not Found", so the library fails with KeyError 'integration'). The same form's
+# collection lookup is now 6accfd6441228 (read from the form's autoLookup field, Nov 2026); it
+# returns each service's name and next date ("Tuesday 17th November", no year).
+EAST_HERTS = "https://eastherts-self.achieveservice.com"
+EAST_HERTS_LOOKUP = "6accfd6441228"
+_EH_PROCESS = "AF-Process-98782935-6101-4962-9a55-5923e76057b6"
+_EH_FORM = (f"sandbox-publish://{_EH_PROCESS}/AF-Stage-dcd0ec18-dfb4-496a-a266-bd8fadaa28a7/"
+            "definition.json")
+
+
+def east_herts_rows(rows: dict, today: date) -> list[RawCollection]:
+    out = []
+    for key, value in rows.items():
+        if not key.endswith("NextDate") or not str(value or "").strip():
+            continue
+        name = re.sub(r"\s+", " ", str(rows.get(key[:-8] + "ServiceName") or key[:-8])).strip()
+        text = re.sub(r"(\d+)(st|nd|rd|th)\b", r"\1", str(value)).strip()
+        try:
+            d = datetime.strptime(f"{text} {today.year}", "%A %d %B %Y").date()
+        except ValueError:
+            try:  # weekday doesn't match this year's date: it's next year's
+                d = datetime.strptime(f"{text.split(' ', 1)[-1]} {today.year}", "%d %B %Y").date()
+            except ValueError:
+                continue
+        if d < today - timedelta(days=7):
+            d = d.replace(year=d.year + 1)
+        out.append(RawCollection(name, d))
+    return sorted(out, key=lambda c: (c.date, c.label))
+
+
+def east_herts(lookup: LookupInput, *, client: httpx.Client | None = None,
+               today: date | None = None) -> list[RawCollection]:
+    if not lookup.uprn:
+        raise MissingInput("uprn")
+    today = today or date.today()
+    from urllib.parse import quote
+
+    form = (f"{EAST_HERTS}/AchieveForms/?mode=fill&consentMessage=yes&form_uri={_EH_FORM}"
+            f"&process=1&process_uri=sandbox-processes://{_EH_PROCESS}&process_id={_EH_PROCESS}")
+    http = client or httpx.Client(headers={"User-Agent": UA}, timeout=30, follow_redirects=True)
+    try:
+        auth = http.get(f"{EAST_HERTS}/authapi/isauthenticated",
+                        params={"uri": quote(form, safe=""), "hostname": "eastherts-self.achieveservice.com",
+                                "withCredentials": "true"})
+        auth.raise_for_status()
+        sid = auth.json()["auth-session"]
+        r = http.post(f"{EAST_HERTS}/apibroker/runLookup",
+                      params={"id": EAST_HERTS_LOOKUP, "repeat_against": "", "noRetry": "true",
+                              "getOnlyTokens": "undefined", "log_id": "", "app_name": "AF-Renderer::Self",
+                              "_": str(int(datetime.now().timestamp() * 1000)), "sid": sid},
+                      json={"formValues": {"Collection Days": {"inputUPRN": {"value": str(lookup.uprn)}}}},
+                      headers={"X-Requested-With": "XMLHttpRequest",
+                               "Referer": f"{EAST_HERTS}/fillform/?iframe_id=fillform-frame-1&db_id="})
+        r.raise_for_status()
+        data = r.json()
+    except (httpx.HTTPError, ValueError, KeyError) as e:
+        raise AdapterError(f"eastherts-self.achieveservice.com: {type(e).__name__}: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    if "integration" not in data:
+        raise AdapterError(f"eastherts: lookup {EAST_HERTS_LOOKUP} refused ({data.get('error') or 'no data'})",
+                           retryable=False)
+    rows = ((data["integration"].get("transformed") or {}).get("rows_data") or {}).get("0") or {}
+    items = east_herts_rows(rows if isinstance(rows, dict) else {}, today)
+    if not items:
+        raise NoCollectionsForAddress("eastherts: no collections listed for this address")
+    return items
+
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
     "SouthHamsDistrictCouncil": south_hams,
     "WestminsterCityCouncil": westminster,
+    "CastlepointDistrictCouncil": castle_point,
+    "EastHertsCouncil": east_herts,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
     "BinBotSomersetDirect": somerset_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
