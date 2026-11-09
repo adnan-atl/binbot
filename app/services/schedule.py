@@ -34,7 +34,8 @@ from app.models import (
 )
 from app.services import checks as checker
 from app.services import geo, sides
-from app.services.normalize import PURPOSE, categorise, colour_of, council_colour, council_colour_options, describe_rule
+from app.services.normalize import (PURPOSE, categorise, colour_of, colours_text, council_colour,
+                                    council_colour_options, describe_rule)
 
 log = logging.getLogger(__name__)
 
@@ -465,6 +466,19 @@ def known_colour(db: Session, bt: BinType, round_key: str | None = None) -> str 
             or council_colour(bt.council.gss_code if bt.council else None, bt.category.value))
 
 
+def recycling_containers(db: Session, bt: BinType, round_key: str | None,
+                         categories: set[str]) -> list[tuple[str, str]]:
+    """The several colours a council's one "Recycling" collection goes out in (see
+    normalize.split_recycling), when nothing better says which: the council's label names no
+    colour, residents haven't agreed one, and glass or paper isn't listed as its own bin here."""
+    from app.services.normalize import split_recycling
+
+    if (bt.category.value != "recycling" or bt.colour or categories & {"glass", "paper"}
+            or resident_colour(db, bt, round_key)):
+        return []
+    return split_recycling(bt.council.gss_code if bt.council else None)
+
+
 def schedule_for(db: Session, prop: Property, with_checks: bool = False):
     """
     Bins for a round with a derived rule each. This is what step 3 shows. Frequencies go
@@ -483,6 +497,8 @@ def schedule_for(db: Session, prop: Property, with_checks: bool = False):
     for e in events:
         by_bin.setdefault(e.bin_type_id, []).append(e)
     out = []
+    categories = {evs[0].bin_type.category.value for evs in by_bin.values()
+                  if any(e.date >= today for e in evs)}
     for bt_id, all_evs in by_bin.items():
         evs = [e for e in all_evs if e.date >= today]
         if not evs:
@@ -491,15 +507,20 @@ def schedule_for(db: Session, prop: Property, with_checks: bool = False):
         rule = describe_rule([e.date for e in all_evs])
         rule["next"] = evs[0].date.isoformat()
         colour = known_colour(db, bt, prop.round_key)
+        parts = recycling_containers(db, bt, prop.round_key, categories)
+        if parts:
+            colour = None
         out.append({
             "bin_type_id": bt.id,
             "label": bt.council_label,
             "category": bt.category.value,
             "colour": colour,
+            "colours": [c for c, _ in parts],
             # Not known, but the council only uses these few colours for it: ask between them
-            "colour_options": [] if colour else council_colour_options(
+            "colour_options": [] if colour or parts else council_colour_options(
                 bt.council.gss_code if bt.council else None, bt.category.value),
-            "purpose": PURPOSE[bt.category],
+            "purpose": (f"Recycling: {colours_text(parts, detail=True)}" if parts
+                        else PURPOSE[bt.category]),
             "days": rule["days"],
             "frequency": rule["frequency"],
             "next": rule["next"],

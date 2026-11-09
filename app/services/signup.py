@@ -190,6 +190,7 @@ def bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.Bin
     council_bins = {b["bin_type_id"]: b for b in schedule_for(db, user.property)} if user.property else {}
     out = []
     for s in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id)):
+        colours: list[str] = []
         if s.override_rule:
             dates = expand_rule(s.override_rule, date.today(), 60)
             rule = describe_rule(dates)
@@ -204,6 +205,7 @@ def bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.Bin
             # The round's real dates (bank holiday moves included), as schedule_for has them
             upcoming = [d for d in cb["dates"] if d >= first][:4]
             colour, manual, options = cb["colour"], False, cb.get("colour_options", [])
+            colours = cb.get("colours", [])
         else:
             rule, colour, manual, options = {"days": [], "frequency": "irregular", "next": None}, None, True, []
             upcoming = []
@@ -215,5 +217,6 @@ def bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.Bin
         out.append(S.BinOut(setting_id=s.id, bin_type_id=s.bin_type_id, label=label,
                             category=s.category.value, colour=s.colour or colour, enabled=s.enabled,
                             colour_options=[] if (s.colour or colour) else options,
+                            colours=[] if s.colour else colours,
                             manual=manual, upcoming=upcoming, daily=is_daily(rule["days"]), **rule))
     return out

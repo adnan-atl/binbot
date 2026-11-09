@@ -117,6 +117,26 @@ def council_colour(gss_code: str | None, category: str | None) -> str | None:
     return c if c in COLOUR_DOTS else None
 
 
+def split_recycling(gss_code: str | None) -> list[tuple[str, str]]:
+    """Councils that collect recycling in several containers of different colours (Hounslow:
+    red box, green box for glass, blue box for paper): [(colour, what it's for)], mixed
+    recycling first. Empty when the council has one recycling colour, or none we know."""
+    entry = _council_colours().get(gss_code or "") or {}
+    if not isinstance(entry, dict):
+        return []
+    parts = [(entry.get(k), what) for k, what in
+             (("recycling", ""), ("glass", "glass"), ("paper", "paper and card"))]
+    parts = [(c, what) for c, what in parts if c in COLOUR_DOTS]
+    return parts if len({c for c, _ in parts}) > 1 else []
+
+
+def colours_text(parts: list[tuple[str, str]], detail: bool = False) -> str:
+    """'red, green and blue', or with detail 'red, green (glass) and blue (paper and card)'."""
+    words = ([f"{c} ({what})" if what else c for c, what in parts] if detail
+             else list(dict.fromkeys(c for c, _ in parts)))
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " and " + words[-1]
+
+
 def council_colour_options(gss_code: str | None, category: str | None) -> list[str]:
     """When a council uses one of a few colours for this bin depending on the street ("black or
     grey"), those colours, so we ask the resident to choose between just them. Empty when we
@@ -169,6 +189,9 @@ def display_label(label: str, category: str | None = None) -> str:
 def bin_tag(b: dict) -> str:
     """'🔵 Blue lidded bin (Mixed dry recycling)' from a bin dict (label, category, colour)."""
     label = display_label(b["label"], b.get("category"))
+    if b.get("colours") and not b.get("colour"):
+        # Several recycling containers go out together: no single colour would be right
+        return f"{KIND_EMOJI['recycling']} {bin_name(label)} ({colours_text([(c, '') for c in b['colours']])})"
     return f"{bin_emoji(label, b.get('category'), b.get('colour'))} {bin_name(label)}"
 
 

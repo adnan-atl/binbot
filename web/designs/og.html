@@ -1287,9 +1287,9 @@ Share to WhatsApp
     var m = CAT_META[b.category] || CAT_META.other;
     // No colour from the council (H&F just says "Recycling"): a neutral icon and a prompt to pick
     // one, never a guess. Bins they added themselves already have the colour they chose.
-    var ask = !b.colour && !b.manual && b.category !== 'other';
+    var multi = (b.colours || []).length > 1; var ask = !b.colour && !multi && !b.manual && b.category !== 'other';
     return { id: b.setting_id, name: b.label, kind: m.kind, days: (b.days || []).map(function (d) { return DAY_IN[d]; }),
-      freq: FREQ_IN[b.frequency] || 'unknown', next0: fmtDate(b.next), color: COLOUR_HEX[b.colour] || (ask ? NO_COLOUR : m.color), shape: m.shape, cat: b.category, on: b.enabled !== false,
+      freq: FREQ_IN[b.frequency] || 'unknown', next0: fmtDate(b.next), color: COLOUR_HEX[b.colour] || (ask || multi ? NO_COLOUR : m.color), shape: m.shape, cat: b.category, on: b.enabled !== false,
       purpose: b.purpose || '', manual: !!b.manual, upcoming: b.upcoming || [], colour: b.colour || null, askColour: ask, colourOptions: b.colour_options || [] };
   }
   function binToApi(b) {

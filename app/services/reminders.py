@@ -43,17 +43,22 @@ def effective_collections(db: Session, user: User) -> dict[date, list[dict]]:
     horizon = get_settings().horizon_days
     out: dict[date, list[dict]] = {}
     settings = db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id)).all()
+    enabled_cats = {s.category.value for s in settings if s.enabled}
     for s in settings:
         if not s.enabled:
             continue
-        colour = s.colour
+        colour, colours = s.colour, []
         if not colour and s.bin_type_id and not s.override_rule:
-            from app.services.schedule import known_colour
+            from app.services.schedule import known_colour, recycling_containers
 
             bt = db.get(BinType, s.bin_type_id)
-            colour = known_colour(db, bt, user.property.round_key if user.property else None) if bt else None
+            rk = user.property.round_key if user.property else None
+            colour = known_colour(db, bt, rk) if bt else None
+            parts = recycling_containers(db, bt, rk, enabled_cats) if bt else []
+            if parts:  # several recycling containers: name them all, not one colour
+                colour, colours = None, [c for c, _ in parts]
         bin_info = {"label": s.label, "category": s.category.value, "setting_id": s.id,
-                    "colour": colour}
+                    "colour": colour, "colours": colours}
         if s.override_rule:
             dates = expand_rule(s.override_rule, today, horizon)
         elif s.bin_type_id and user.property:
@@ -101,7 +106,8 @@ def rebuild_reminders(db: Session, user: User) -> int:
         if send_at < now_ or d in retrying:
             continue
         db.add(Reminder(user_id=user.id, collection_date=d, send_at=send_at,
-                        bins=[{"label": b["label"], "category": b["category"], "colour": b.get("colour")}
+                        bins=[{"label": b["label"], "category": b["category"], "colour": b.get("colour"),
+                               "colours": b.get("colours") or []}
                               for b in bins]))
         n += 1
     db.flush()
