@@ -814,6 +814,69 @@ def east_herts(lookup: LookupInput, *, client: httpx.Client | None = None,
     return items
 
 
+# ---- Torbay ---------------------------------------------------------------------------------
+# The library drives a browser through torbay.gov.uk by absolute XPaths (cookie banner, a link
+# that opens a new tab, then the form) and times out when any of that moves. The form itself is
+# a ServiceBuilder form that takes the address as "U<uprn>": read the form's link from the
+# council's page, open it, post it with the UPRN, read the dated list it returns.
+TORBAY_PAGE = "https://www.torbay.gov.uk/recycling/bin-collections/"
+TORBAY_FORM = "https://selfservice-torbay.servicebuilder.co.uk/renderform/Form"
+_TORBAY_ROW = re.compile(r"((?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day \d{1,2} [A-Za-z]+ \d{4})\s+"
+                         r"([A-Za-z][A-Za-z ]*?Service)\b")
+
+
+def torbay_rows(html: str) -> list[RawCollection]:
+    text = re.sub(r"\s+", " ", BeautifulSoup(html, "html.parser").get_text(" "))
+    out = []
+    for when, label in _TORBAY_ROW.findall(text):
+        try:
+            out.append(RawCollection(label.strip(), datetime.strptime(when, "%A %d %B %Y").date()))
+        except ValueError:
+            continue
+    return out
+
+
+def torbay(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+    if not lookup.uprn:
+        raise MissingInput("uprn")
+    http = client or httpx.Client(headers={"User-Agent": SOUTH_HAMS_UA}, timeout=30,
+                                  follow_redirects=True)
+    try:
+        page = http.get(TORBAY_PAGE)
+        page.raise_for_status()
+        link = next((a["href"] for a in BeautifulSoup(page.text, "html.parser").find_all("a", href=True)
+                     if "servicebuilder.co.uk/renderform" in a["href"]), None)
+        if not link:
+            raise AdapterError("torbay.gov.uk: bin collections form link not found (page changed)",
+                               retryable=False)
+        form = http.get(link)
+        form.raise_for_status()
+        soup = BeautifulSoup(form.text, "html.parser")
+
+        def field(name: str) -> str:
+            el = soup.find("input", {"name": name})
+            return (el.get("value") or "") if el else ""
+
+        if not field("__RequestVerificationToken"):
+            raise AdapterError("torbay: form has no verification token (form changed)", retryable=False)
+        r = http.post(TORBAY_FORM, data={
+            "__RequestVerificationToken": field("__RequestVerificationToken"),
+            "FormGuid": field("FormGuid"), "ObjectTemplateID": field("ObjectTemplateID"),
+            "Trigger": "submit", "CurrentSectionID": field("CurrentSectionID") or "0",
+            "TriggerCtl": "", "FF1168": f"U{lookup.uprn}",
+            "FF1168lbltxt": "Please select your address", "FF1168-text": lookup.postcode})
+        r.raise_for_status()
+    except httpx.HTTPError as e:
+        raise AdapterError(f"torbay: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    items = torbay_rows(r.text)
+    if not items:
+        raise NoCollectionsForAddress("torbay: no upcoming collections listed for this address")
+    return items
+
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
@@ -822,6 +885,7 @@ OVERRIDES = {
     "WestminsterCityCouncil": westminster,
     "CastlepointDistrictCouncil": castle_point,
     "EastHertsCouncil": east_herts,
+    "TorbayCouncil": torbay,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
     "BinBotSomersetDirect": somerset_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
