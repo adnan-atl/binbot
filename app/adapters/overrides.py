@@ -437,10 +437,69 @@ def cotswold_direct(lookup: LookupInput, *, client: httpx.Client | None = None,
         raise NoCollectionsForAddress("cotswold: no collections listed for this address")
     return items
 
+
+# ---- South Hams -------------------------------------------------------------------
+# Upstream (SouthHamsDistrictCouncil) opens the session with python-requests' own user agent,
+# then posts as Chrome, and calls .json() on whatever comes back: when the council's site
+# answers with anything else (an error page, an empty body) a resident sees "JSONDecodeError"
+# and is sent to add their bins by hand. Same two calls here, as one consistent browser, with
+# a readable error that says what the site actually sent (a 403/5xx counts as unreachable, so
+# the proxy fallback can try).
+
+SOUTH_HAMS = "https://waste.southhams.gov.uk/mycollections"
+
+
+def south_hams(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+    if not lookup.uprn:
+        raise MissingInput("uprn")
+    http = client or httpx.Client(headers={"User-Agent": UA}, timeout=30, follow_redirects=True)
+    try:
+        page = http.get(SOUTH_HAMS)
+        token = http.cookies.get("fcc_session_cookie")
+        if not token:
+            m = re.search(r'name="fcc_session_token"[^>]*value="([^"]+)"', page.text)
+            token = m.group(1) if m else None
+        if not token:
+            raise AdapterError(f"southhams.gov.uk: no session token (HTTP {page.status_code})")
+        r = http.post(SOUTH_HAMS + "/getcollectiondetails",
+                      data={"fcc_session_token": token, "uprn": lookup.uprn},
+                      headers={"X-Requested-With": "XMLHttpRequest", "Referer": SOUTH_HAMS})
+        try:
+            result = r.json()
+        except ValueError:
+            snippet = re.sub(r"\s+", " ", r.text[:120]).strip() or "an empty reply"
+            raise AdapterError(f"southhams.gov.uk: HTTP {r.status_code}, not JSON ({snippet})")
+    except httpx.HTTPError as e:
+        raise AdapterError(f"southhams.gov.uk: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    items = []
+    for tile in ((result.get("binCollections") or {}).get("tile") or []):
+        soup = BeautifulSoup(tile[0] if isinstance(tile, list) else str(tile), "html.parser")
+        for div in soup.find_all("div", class_="collectionDiv"):
+            name = div.find("h3")
+            details = div.find("div", class_="detWrap")
+            if not name or not details:
+                continue
+            m = re.search(r"next scheduled collection is (?:today, |tomorrow, )?([A-Za-z]+, \d{1,2} [A-Za-z]+ \d{4})",
+                          details.get_text(" ", strip=True))
+            if not m:
+                continue
+            try:
+                when = datetime.strptime(m.group(1), "%A, %d %B %Y").date()
+            except ValueError:
+                continue
+            items.append(RawCollection(name.get_text(strip=True), when))
+    if not items:
+        raise NoCollectionsForAddress("southhams.gov.uk: no collections listed for this address")
+    return items
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
+    "SouthHamsDistrictCouncil": south_hams,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
 
