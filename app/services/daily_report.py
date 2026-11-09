@@ -308,6 +308,24 @@ def _vs(now: int, before: int) -> str:
     return f" _({'▲' if change > 0 else '▼'} {abs(change)}%)_"
 
 
+AB_ENOUGH = 200  # visits per colour before the button test is worth calling
+
+
+def _ab_lines(ab: dict[str, list[int]]) -> list[str]:
+    icons = {"pink": "🩷 Pink", "green": "💚 Green"}
+    out = [f"{icons.get(v, v)}: {vis} visits → {st} to postcode ({_pct(st, vis)}) → "
+           f"*{n_on} switched on ({_pct(n_on, vis)})*"
+           for v, (vis, st, n_on) in sorted(ab.items(), key=lambda kv: kv[0] != "pink")]
+    if len(ab) == 2:
+        (a, (av, _, ao)), (b, (bv, _, bo)) = sorted(ab.items())
+        if min(av, bv) < AB_ENOUGH:
+            out.append(f"_Too early to call: needs about {AB_ENOUGH} visits per colour_")
+        elif av and bv and ao / av != bo / bv:
+            lead = a if ao / av > bo / bv else b
+            out.append(f"_{lead.capitalize()} is ahead on switch-ons so far_")
+    return out
+
+
 def build(db: Session, day: date) -> str:
     s = get_settings()
     start, end = window(day)
@@ -317,39 +335,45 @@ def build(db: Session, day: date) -> str:
     active = db.scalar(select(func.count()).select_from(User).where(User.status == UserStatus.active)) or 0
     k, k_base = k_factor(db, end)
     brand = s.brand_name
-    title = (f"*{brand} daily report: {day.strftime('%a %-d %b %Y')}*  "
-             f"_(compared with {(day - timedelta(days=7)).strftime('%a %-d %b')})_")
-    lines = [title, ""]
+    lines = [f"📊 *{brand} daily report · {day.strftime('%a %-d %b %Y')}*",
+             f"_Arrows compare with {(day - timedelta(days=7)).strftime('%a %-d %b')}_", ""]
 
     # Headline
     visits = ph["sessions"].get("$pageview", 0) if ph else None
     visits_w = phw["sessions"].get("$pageview", 0) if phw else 0
-    lines.append("*Headline*")
+    lines.append("*🏁 Headline*")
     if visits is not None:
-        lines.append(f"• Visits: *{visits}*{_vs(visits, visits_w)}")
-    lines.append(f"• Sign-ups started: *{d.started}*{_vs(d.started, w.started)}")
-    lines.append(f"• Switched on: *{d.switched_on}*{_vs(d.switched_on, w.switched_on)}"
-                 + (f"  ·  visit → switched on: *{_pct(d.switched_on, visits)}*" if visits else ""))
+        lines.append(f"👀 Visits: *{visits}*{_vs(visits, visits_w)}")
+    lines.append(f"✍️ Sign-ups started: *{d.started}*{_vs(d.started, w.started)}")
+    lines.append(f"✅ Switched on: *{d.switched_on}*{_vs(d.switched_on, w.switched_on)}")
+    if visits:
+        lines.append(f"      ↳ visit → switched on: *{_pct(d.switched_on, visits)}*")
     if ph and ph["via"]:
-        lines.append("   by " + ", ".join(f"{k_} {n}" for k_, n in sorted(ph["via"].items())))
-    if ph and ph.get("sites"):
-        lines.append("• By site: " + ", ".join(
-            f"{site} {v} visits → {n_on} switched on" if site != "WhatsApp only" else f"{site} {n_on} switched on"
-            for site, (v, n_on) in sorted(ph["sites"].items(), key=lambda kv: -kv[1][0])))
-    if ph and ph.get("ab"):
-        lines.append("• Button test: " + ", ".join(
-            f"{v} {vis} visits → {st} to postcode ({_pct(st, vis)}) → {n_on} switched on ({_pct(n_on, vis)})"
-            for v, (vis, st, n_on) in sorted(ph["ab"].items())))
-    lines.append(f"• Active residents now: *{active}*")
+        lines.append("      ↳ by " + ", ".join(f"{k_} {n}" for k_, n in sorted(ph["via"].items())))
+    lines.append(f"👥 Active residents now: *{active}*")
     if d.stuck_at_hello:
-        lines.append(f"• Reached the last step but haven't messaged yet: {d.stuck_at_hello}")
-    if ph and ph.get("hello"):
-        lines.append("• Tapped turn on reminders → switched on: " + ", ".join(
-            f"{dev} {n_on}/{n} ({_pct(n_on, n)})" for dev, (n, n_on) in sorted(ph["hello"].items())))
+        lines.append(f"⏳ Reached the last step but haven't messaged yet: {d.stuck_at_hello}")
     lines.append("")
 
+    # Button colour A/B test
+    if ph and ph.get("ab"):
+        lines.append("*🧪 Button test* _(binjamin.uk, pink vs green)_")
+        lines += _ab_lines(ph["ab"])
+        lines.append("")
+
+    # Sites and the last step
+    if ph and (ph.get("sites") or ph.get("hello")):
+        lines.append("*🌐 By site*")
+        for site, (v, n_on) in sorted((ph.get("sites") or {}).items(), key=lambda kv: -kv[1][0]):
+            lines.append(f"• {site}: {n_on} switched on" if site == "WhatsApp only"
+                         else f"• {site}: {v} visits → {n_on} switched on")
+        if ph.get("hello"):
+            lines.append("📱 Tapped turn on reminders → switched on: " + ", ".join(
+                f"{dev} {n_on}/{n} ({_pct(n_on, n)})" for dev, (n, n_on) in sorted(ph["hello"].items())))
+        lines.append("")
+
     # Alfred offers: the opt-out on the phone step (website) / consent step (WhatsApp)
-    lines.append(f"*{s.parent_name} offers*")
+    lines.append(f"*🎩 {s.parent_name} offers*")
     if d.consented:
         lines.append(f"• Opted out: *{d.offers_out}* of {d.consented} who gave their number "
                      f"(*{_pct(d.offers_out, d.consented)}*)"
@@ -368,7 +392,7 @@ def build(db: Session, day: date) -> str:
     lines.append("")
 
     # Funnel
-    lines.append("*Website funnel* _(unique visits)_")
+    lines.append("*🔻 Website funnel* _(unique visits, % of the step before)_")
     if ph:
         steps = [(label, ph["sessions"].get(ev, 0)) for ev, label in FUNNEL]
         prev, worst = None, None
@@ -379,20 +403,21 @@ def build(db: Session, day: date) -> str:
                 worst = ((prev - n) / prev, label)
             prev = n
         if worst and worst[0] > 0:
-            lines.append(f"Biggest drop: *{worst[1]}* (lost {round(worst[0] * 100)}% of the step before)")
+            lines.append(f"⚠️ Biggest drop: *{worst[1]}* (lost {round(worst[0] * 100)}% of the step before)")
         if ph["sources"]:
-            lines.append("*Where visits came from*: " + ", ".join(f"{a} {b}" for a, b in ph["sources"]))
+            lines.append("🧭 Where visits came from: " + ", ".join(f"{a} {b}" for a, b in ph["sources"]))
     else:
         lines.append("_Not available: set POSTHOG_PERSONAL_API_KEY and POSTHOG_PROJECT_ID on the server._")
     lines.append("")
 
     # Sharing and K-factor
-    lines.append("*Sharing and K-factor*")
-    lines.append(f"• Invite link clicks: {d.invite_clicks}{_vs(d.invite_clicks, w.invite_clicks)}  ·  "
-                 f"invited sign-ups: {d.started_invited}  ·  invited switched on: {d.switched_on_invited}")
-    taps = ("  ·  share taps on the site: "
-            + (", ".join(f"{a} {b}" for a, b in ph["shares"].items()) or "none")) if ph else ""
-    lines.append(f"• Share messages sent in WhatsApp: {d.share_messages}{taps}")
+    lines.append("*🔗 Sharing and K-factor*")
+    lines.append(f"• Invite link clicks: {d.invite_clicks}{_vs(d.invite_clicks, w.invite_clicks)}")
+    lines.append(f"• Invited sign-ups: {d.started_invited}  ·  invited switched on: {d.switched_on_invited}")
+    lines.append(f"• Share messages sent in WhatsApp: {d.share_messages}")
+    if ph:
+        lines.append("• Share taps on the site: "
+                     + (", ".join(f"{a} {b}" for a, b in ph["shares"].items()) or "none"))
     lines.append(f"• From an invite today: {_pct(d.switched_on_invited, d.switched_on)} of switch-ons"
                  f"  ·  referrals credited: {d.referrals}")
     if k is None:
@@ -403,24 +428,24 @@ def build(db: Session, day: date) -> str:
     lines.append("")
 
     # Engagement
-    lines.append("*Engagement*")
+    lines.append("*💬 Engagement*")
     lines.append(f"• Reminders sent: {d.reminders_sent}{_vs(d.reminders_sent, w.reminders_sent)}"
-                 + (f"  ·  failed: *{d.reminders_failed}*" if d.reminders_failed else ""))
+                 + (f"  ·  ❗ failed: *{d.reminders_failed}*" if d.reminders_failed else ""))
     if d.reminder_collections:
         detail = ", ".join(f"{k_.capitalize()} {n}" for k_, n in d.replies.most_common())
         lines.append(f"• Replied to: {_pct(d.reminders_replied, d.reminder_collections)}"
                      + (f" ({detail})" if detail else ""))
-    extra = [f"not understood {d.not_understood}"]
     if ph:
         ev = ph["events"]
-        extra = [f"paused {ev.get('reminders_paused', 0)}", f"deleted {ev.get('account_deleted', 0)}",
-                 f"settings changes {ev.get('reminder_time_changed', 0) + ev.get('bin_switched_on', 0) + ev.get('bin_switched_off', 0)}",
-                 *extra, f"asked for a human {ev.get('asked_for_human', 0)}"]
-    lines.append("• " + "  ·  ".join(extra)[0].upper() + "  ·  ".join(extra)[1:])
+        changes = ev.get("reminder_time_changed", 0) + ev.get("bin_switched_on", 0) + ev.get("bin_switched_off", 0)
+        lines.append(f"• Paused {ev.get('reminders_paused', 0)}  ·  deleted {ev.get('account_deleted', 0)}"
+                     f"  ·  settings changes {changes}")
+        lines.append(f"• Not understood {d.not_understood}  ·  asked for a human {ev.get('asked_for_human', 0)}")
+    else:
+        lines.append(f"• Not understood {d.not_understood}")
     lines.append("")
 
     # Problem councils
-    lines.append("*Problem councils*")
     problems = defaultdict(Counter, {k_: Counter(v) for k_, v in d.councils.items()})
     if ph:
         for name, n in ph["calendar_failed"].items():
@@ -434,8 +459,6 @@ def build(db: Session, day: date) -> str:
         what = ", ".join(f"{n} {k_}" for k_, n in sorted(bad.items(), key=lambda x: -x[1]))
         of = f" (of {c['lookups']} lookups)" if c.get("lookups") else ""
         flagged.append((score, f"• *{name}*: {what}{of}"))
-    for _, line in sorted(flagged, key=lambda x: -x[0])[:8]:
-        lines.append(line)
     # Only councils someone relies on: the nightly check only re-tests those, so a council whose
     # one failed sign-up never came back would otherwise stay "failing" here for ever.
     served = select(Property.council_id).join(User, User.property_id == Property.id).where(
@@ -443,11 +466,15 @@ def build(db: Session, day: date) -> str:
     broken = db.scalars(select(Council.name).where(
         Council.status.in_((CouncilStatus.broken, CouncilStatus.degraded)),
         Council.id.in_(served)).order_by(Council.name)).all()
+    if not flagged and not broken:
+        lines.append("*✅ Problem councils*: none today")
+        return "\n".join(lines)
+    lines.append("*🚨 Problem councils*")
+    for _, line in sorted(flagged, key=lambda x: -x[0])[:8]:
+        lines.append(line)
     if broken:
         lines.append(f"• Health check failing: {', '.join(broken[:12])}"
                      + (f" and {len(broken) - 12} more" if len(broken) > 12 else ""))
-    if not flagged and not broken:
-        lines.append("• None today")
     return "\n".join(lines)
 
 

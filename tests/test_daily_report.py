@@ -63,7 +63,7 @@ def test_report_without_posthog(day, db):
     assert "not enough data yet" in text  # K-factor needs 10 switch-ons
     assert "Not available: set POSTHOG_PERSONAL_API_KEY" in text
     assert "Replied to: 100% (Done 1)" in text
-    assert "*Alfred offers*" in text and "Opted out: *1* of 2 who gave their number (*50%*)" in text
+    assert "*🎩 Alfred offers*" in text and "Opted out: *1* of 2 who gave their number (*50%*)" in text
     assert "Of today's switch-ons: 1 can hear about Alfred, 1 opted out" in text
     assert "All active residents: *1* of 2 can hear about Alfred (*50%*)" in text
     assert "07700" not in text and "E8" not in text  # nobody's details
@@ -93,11 +93,14 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
     assert "Paused 2" in text and "deleted 1" in text
     assert "*Glasgow City*: 2 bin days not found on the site" in text
     assert "Health check failing: " + glasgow.name in text and "Lambeth" not in text
-    assert ("Button test: green 20 visits → 14 to postcode (70%) → 2 switched on (10%), "
-            "pink 20 visits → 10 to postcode (50%) → 1 switched on (5%)") in text
+    assert "*🧪 Button test*" in text
+    assert "🩷 Pink: 20 visits → 10 to postcode (50%) → *1 switched on (5%)*" in text
+    assert "💚 Green: 20 visits → 14 to postcode (70%) → *2 switched on (10%)*" in text
+    assert "Too early to call" in text
+    assert text.index("Pink:") < text.index("Green:")
     assert "Tapped turn on reminders → switched on: computer 0/2 (0%), phone 3/4 (75%)" in text
-    assert ("By site: binjamin.uk 30 visits → 1 switched on, /d/og 10 visits → 1 switched on, "
-            "WhatsApp only 1 switched on") in text
+    assert "• binjamin.uk: 30 visits → 1 switched on" in text
+    assert "• /d/og: 10 visits → 1 switched on" in text and "• WhatsApp only: 1 switched on" in text
 
 
 def test_k_factor(client, db):
