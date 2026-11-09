@@ -111,10 +111,12 @@ class UKBCDAdapter:
             return items
 
     def _fetch_direct(self, lookup: LookupInput) -> list[RawCollection]:
-        from app.adapters.overrides import OVERRIDES
+        from app.adapters.overrides import INPUT_REWRITES, OVERRIDES
 
         if self.spec.module in OVERRIDES:  # local fix for a broken upstream scraper
             return OVERRIDES[self.spec.module](lookup)
+        if self.spec.module in INPUT_REWRITES:  # right scraper, different input (street for number)
+            lookup = INPUT_REWRITES[self.spec.module](lookup)
         if self.spec.needs_browser:
             # Selenium runs a fixed number of browser sessions; queue for one instead of
             # failing with "could not start a new session" when sign-ups overlap.

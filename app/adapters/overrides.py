@@ -950,6 +950,26 @@ def ipswich(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[
     raise NoCollectionsForAddress(f"ipswich: street not found for {lookup.postcode}")
 
 
+# ---- Library modules that want the street where we pass the house number ---------------------
+# Their scraper is fine; only its input differs. Rewrite the lookup before the module runs.
+
+
+def street_in_house_number(lookup: LookupInput) -> LookupInput:
+    """Wyre Forest and similar: the street name (from the address) in the house-number field."""
+    import dataclasses
+
+    for line in address_lines(lookup):
+        parts = street_parts(line)
+        if parts:
+            return dataclasses.replace(lookup, house_number=parts[0])
+    return lookup
+
+
+INPUT_REWRITES = {
+    "WyreForestDistrictCouncil": street_in_house_number,
+}
+
+
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
     "GlasgowCityCouncil": glasgow,
