@@ -252,6 +252,70 @@
           "anchor": "2026-11-17"
         }
       ]
+    },
+    {
+      "postcode": "PO19 5DS",
+      "from": "6 Rochester Close, Chichester",
+      "bins": [
+        {
+          "label": "Food waste",
+          "category": "food",
+          "days": [
+            "FRI"
+          ],
+          "frequency": "weekly"
+        },
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "MON"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-16"
+        },
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "MON"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-23"
+        }
+      ]
+    },
+    {
+      "postcode": "PO19 6AY",
+      "from": "31 Lloyd Road, Chichester",
+      "bins": [
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "WED"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-11"
+        },
+        {
+          "label": "Food waste",
+          "category": "food",
+          "days": [
+            "FRI"
+          ],
+          "frequency": "weekly"
+        },
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "WED"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-18"
+        }
+      ]
     }
   ]
 }

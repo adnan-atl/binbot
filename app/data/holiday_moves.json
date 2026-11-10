@@ -2,7 +2,7 @@
   "_note": "Council-wide Christmas and New Year changes, applied to calendars residents enter by hand. Keyed by GSS code. 'moves' maps a usual collection date to the date it moves to; a category can replace them and list dates with no collection ('skip'). Read off the councils' own calendars; update every autumn.",
   "E07000225": {
     "council": "Chichester",
-    "checked": "2026-11-10, seven addresses (PO19 3DX, RH14 0JT, PO18 0EP, PO10 8AP, PO10 8HW, GU29 9AA, GU29 0JN)",
+    "checked": "2026-11-10, nine addresses (PO19 3DX, PO19 5DS, PO19 6AY, RH14 0JT, PO18 0EP, PO10 8AP, PO10 8HW, GU29 9AA, GU29 0JN)",
     "moves": {
       "2026-12-25": "2026-12-28",
       "2026-12-28": "2026-12-29",
