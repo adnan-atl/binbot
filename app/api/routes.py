@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.adapters.manual import clean_moves
 from app.adapters.registry import coverage, spec_for
 from app.api import schemas as S
 from app.core.config import get_settings
@@ -201,8 +202,12 @@ def put_bins(user_id: str, body: S.BinsIn, db: Session = Depends(get_db)):
                 raise HTTPException(400, "Unknown bin colour")
             s.colour = c or None
         if b.days is not None:
+            moves = clean_moves(b.moves) if b.moves is not None else \
+                (s.override_rule or {}).get("moves", {})
             s.override_rule = {"days": b.days, "frequency": b.frequency or "weekly",
-                               "anchor": b.anchor}
+                               "anchor": b.anchor, "moves": moves}
+        elif b.moves is not None and s.override_rule:
+            s.override_rule = {**s.override_rule, "moves": clean_moves(b.moves)}
         elif b.setting_id is None:
             s.override_rule = None
     db.flush()

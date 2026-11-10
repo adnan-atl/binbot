@@ -226,6 +226,8 @@ def bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.Bin
             rule["frequency"] = s.override_rule.get("frequency", rule["frequency"])
             upcoming = [d.isoformat() for d in dates if d.isoformat() >= first][:4]
             colour, manual, options = None, True, []
+            rule["anchor"] = s.override_rule.get("anchor")
+            rule["moves"] = s.override_rule.get("moves") or {}
         elif s.bin_type_id in council_bins:
             cb = council_bins[s.bin_type_id]
             rule = {"days": cb["days"], "frequency": cb["frequency"], "next": cb["next"],

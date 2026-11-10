@@ -45,6 +45,8 @@ class BinOut(BaseModel):
     upcoming: list[str] = Field(default_factory=list)
     enabled: bool = True
     manual: bool = False
+    anchor: str | None = None  # the resident's own rule: which week a rotating bin is on
+    moves: dict[str, str | None] = Field(default_factory=dict)  # their holiday changes
     # Collected (nearly) every day: shown, but never reminded about (normalize.is_daily)
     daily: bool = False
 
@@ -73,6 +75,8 @@ class BinIn(BaseModel):
     days: list[str] | None = None  # when set: manual rule
     frequency: str | None = None
     anchor: str | None = None
+    # Holiday changes to the rule: {"2026-12-25": "2026-12-28", "2027-01-01": null (none)}
+    moves: dict[str, str | None] | None = None
     colour: str | None = Field(default=None, max_length=24)  # blue, black, green, brown, grey, purple...
 
 

@@ -563,6 +563,15 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .anext-b[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#FFFFFF}
 .anext-b[aria-pressed="true"] small{color:rgba(255,255,255,.75)}
 .anext-b:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.hmoves{display:flex;flex-direction:column;gap:8px}
+.hmove{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:#FFFFFF}
+.hmove b{font-size:15px;font-weight:600}
+.hmove.moved b{text-decoration:line-through;color:var(--grey)}
+.hmove input[type=date]{font:inherit;font-size:15px;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:#FFFFFF;color:var(--ink);min-width:0}
+.hmove input[type=date]:disabled{opacity:.4}
+.hmove-x{font:inherit;font-size:13px;padding:7px 10px;border-radius:10px;border:1px solid var(--line);background:#FFFFFF;color:var(--ink);cursor:pointer;white-space:nowrap}
+.hmove-x[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#FFFFFF}
+@media (max-width:420px){.hmove{grid-template-columns:minmax(0,1fr) auto}.hmove input[type=date]{grid-column:1/-1;order:3}}
 .legal .updated{margin:-28px 0 32px;font-size:14px;color:#6E6E73;text-align:left}
 .legal p,.legal ul{margin:0 0 14px;font-size:16px;line-height:1.6;color:#4A4A4F;text-align:left}
 .legal ul{padding-left:20px}
@@ -1372,13 +1381,14 @@ Share to WhatsApp
     var multi = (b.colours || []).length > 1; var ask = !b.colour && !multi && !b.manual && b.category !== 'other';
     return { id: b.setting_id, name: b.label, kind: m.kind, days: (b.days || []).map(function (d) { return DAY_IN[d]; }),
       freq: FREQ_IN[b.frequency] || 'unknown', next0: fmtDate(b.next), color: COLOUR_HEX[b.colour] || (ask || multi ? NO_COLOUR : m.color), shape: m.shape, cat: b.category, on: b.enabled !== false,
-      purpose: b.purpose || '', manual: !!b.manual, upcoming: b.upcoming || [], colour: b.colour || null, askColour: ask, colourOptions: b.colour_options || [] };
+      purpose: b.purpose || '', manual: !!b.manual, upcoming: b.upcoming || [], colour: b.colour || null, askColour: ask, colourOptions: b.colour_options || [], anchor: b.anchor || null, moves: b.moves || {} };
   }
   function binToApi(b) {
     var o = { setting_id: b.id && b.id.indexOf('new') !== 0 ? b.id : null, label: b.name, category: b.cat || 'other', enabled: b.on !== false };
     // Only send a rule for bins the user changed or added; untouched bins keep council dates.
     if (b.dirty || !o.setting_id) { o.days = b.days.map(function (d) { return DAY_OUT[d]; }); o.frequency = FREQ_OUT[b.freq] || 'weekly'; if (CYCLE[b.freq]) o.anchor = binAnchor(b); }
     if (b.colour && (!o.setting_id || b.colourDirty)) o.colour = b.colour;  // the colour they picked
+    if (o.days || b.movesDirty) o.moves = b.moves || {};  // Christmas and New Year changes
     return o;
   }
   function saveBins() {
@@ -1738,7 +1748,7 @@ Share to WhatsApp
           '<div role="group" aria-labelledby="k-' + b.id + '">' + colourPicker(b) + '</div></div>' +
           '<div class="efield"><span class="sublabel" id="f-' + b.id + '">How often</span>' +
           '<div role="group" class="eseg" aria-labelledby="f-' + b.id + '">' + freqs + '</div></div>' +
-          (CYCLE[b.freq] && b.days.length ? cyclePicker(cycleOptions(b.days, b.freq), binAnchor(b), function (o) { return 'data-anchor="' + b.id + ':' + o.anchor + '"'; }, 'n-l-' + b.id, 'When\'s the next one?') : '')) +
+          (CYCLE[b.freq] && b.days.length ? cyclePicker(cycleOptions(b.days, b.freq), binAnchor(b), function (o) { return 'data-anchor="' + b.id + ':' + o.anchor + '"'; }, 'n-l-' + b.id, 'When\'s the next one?') : '') + holidayField(b)) +
           '<div class="eopen-f"><button type="button" class="e-remove" data-remove="' + b.id + '">Remove bin</button>' +
           '<button type="button" class="e-done" data-close="' + b.id + '">Done</button></div></div>';
       }).join('') + '</div>';
@@ -1769,6 +1779,10 @@ Share to WhatsApp
       if (i > -1) b.days.splice(i, 1); else b.days.push(p[1]);
       b.dirty = true;
       renderConfirm();
+    } else if (t.dataset.nomove) {
+      var nm = t.dataset.nomove.split('|'), nb = find(nm[0]); nb.moves = nb.moves || {};
+      if (nb.moves[nm[1]] === null) delete nb.moves[nm[1]]; else nb.moves[nm[1]] = null;
+      nb.movesDirty = true; renderConfirm();
     } else if (t.dataset.anchor) {
       var an = t.dataset.anchor.split(':'); find(an[0]).anchor = an[1]; find(an[0]).dirty = true; renderConfirm();
     } else if (t.dataset.onoff) {
@@ -1779,6 +1793,12 @@ Share to WhatsApp
       if (t.dataset.remove.indexOf('new') !== 0) removedIds.push(t.dataset.remove);
       bins = bins.filter(function (b) { return b.id !== t.dataset.remove; }); renderConfirm();
     }
+  });
+  $('#c-cards').addEventListener('change', function (e) {
+    var m = e.target.dataset.move; if (!m) return;
+    var p = m.split('|'), b = find(p[0]), v = e.target.value; b.moves = b.moves || {};
+    if (!v || v === p[1]) delete b.moves[p[1]]; else b.moves[p[1]] = v;
+    b.movesDirty = true; var row = e.target.closest('.hmove'); if (row) row.classList.toggle('moved', !!b.moves[p[1]]);
   });
   $('#c-cards').addEventListener('input', function (e) {
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
@@ -1837,6 +1857,47 @@ Share to WhatsApp
     var opts = cycleOptions(b.days, b.freq), nxt = (b.upcoming || [])[0];
     var hit = opts.filter(function (o) { return nxt && nxt >= o.anchor && nxt < isoDate(new Date(new Date(o.anchor + 'T12:00:00').getTime() + 6048e5)); })[0];
     return hit ? hit.anchor : null;
+  }
+  // Christmas and New Year: the council moves some collections by a few days. Their own
+  // rule can't know that, so list the regular dates in the holiday weeks and let them change or
+  // cancel any of them (rule "moves", adapters/manual.py). Council bins already have the real
+  // dates, so this is only for bins on the resident's own rule.
+  function holidaySeason() {
+    var t = firstShowable(), y = t.getFullYear(), m = t.getMonth();
+    if (m === 0 && t.getDate() <= 10) y -= 1; else if (m < 9) return null;
+    var from = new Date(y, 11, 20, 12), to = new Date(y + 1, 0, 10, 12);
+    return { from: isoDate(t > from ? t : from), to: isoDate(to) };
+  }
+  function ruleDates(b, fromIso, toIso) {
+    var n = CYCLE[b.freq] || 1, anchor = n > 1 ? binAnchor(b) : null;
+    if (n > 1 && !anchor) return [];
+    var idx = b.days.map(function (d) { return DAYS.indexOf(d); }).filter(function (i) { return i > -1; });
+    var out = [], d = new Date(fromIso + 'T12:00:00'), end = new Date(toIso + 'T12:00:00');
+    var a = anchor ? new Date(anchor + 'T12:00:00') : null;
+    for (; d <= end; d.setDate(d.getDate() + 1)) {
+      var wd = (d.getDay() + 6) % 7; if (idx.indexOf(wd) < 0) continue;
+      if (a) {  // same phase as the server: the first such weekday on or after the anchor
+        var first = new Date(a); first.setDate(a.getDate() + ((wd - (a.getDay() + 6) % 7) + 7) % 7);
+        var weeks = Math.round((d - first) / 6048e5);
+        if (((weeks % n) + n) % n) continue;
+      }
+      out.push(isoDate(d));
+    }
+    return out;
+  }
+  function holidayField(b) {
+    var own = b.manual || b.dirty || (b.id && b.id.indexOf('new') === 0);
+    var season = own && b.days.length ? holidaySeason() : null; if (!season) return '';
+    var dates = ruleDates(b, season.from, season.to), moves = b.moves || {}; if (!dates.length) return '';
+    var shift = function (iso, k) { var x = new Date(iso + 'T12:00:00'); x.setDate(x.getDate() + k); return isoDate(x); };
+    return '<div class="efield"><span class="sublabel" id="h-' + b.id + '">Christmas and New Year</span>' +
+      '<span class="e-hint">Councils move some collections over the holidays. Check their dates and change any that move.</span>' +
+      '<div class="hmoves" role="group" aria-labelledby="h-' + b.id + '">' + dates.map(function (iso) {
+        var mv = moves[iso], none = mv === null, key = b.id + '|' + iso;
+        return '<div class="hmove' + (mv || none ? ' moved' : '') + '"><b>' + fmtDate(iso) + '</b>' +
+          '<input type="date" aria-label="New date for ' + fmtDate(iso) + '" data-move="' + key + '" value="' + (mv || iso) + '" min="' + shift(iso, -10) + '" max="' + shift(iso, 10) + '"' + (none ? ' disabled' : '') + '>' +
+          '<button type="button" class="hmove-x" data-nomove="' + key + '" aria-pressed="' + none + '">No collection</button></div>';
+      }).join('') + '</div></div>';
   }
   function cyclePicker(opts, chosen, attr, labelId, title) {
     return '<div class="efield"><span class="sublabel" id="' + labelId + '">' + title + '</span>' +
