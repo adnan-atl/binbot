@@ -543,7 +543,7 @@ def itouch_crypt(data: bytes, encrypt: bool) -> bytes:
     return unpad.update(dec.update(data) + dec.finalize()) + unpad.finalize()
 
 
-def itouchvision(lookup: LookupInput, ids: dict, site: str, *,
+def itouchvision(lookup: LookupInput, ids: dict, site: str, *, names: dict | None = None,
                  client: httpx.Client | None = None) -> list[RawCollection]:
     """Next collection per bin from an iTouchVision council, by UPRN, without a browser."""
     if not lookup.uprn:
@@ -567,12 +567,15 @@ def itouchvision(lookup: LookupInput, ids: dict, site: str, *,
         raise AdapterError(f"{site}: HTTP {r.status_code}, unreadable reply ({snippet})")
     items = []
     for row in result.get("collectionDay") or []:
-        try:
-            when = datetime.strptime(str(row.get("collectionDay", "")), "%d-%m-%Y").date()
-        except ValueError:
-            continue
-        if (row.get("binType") or "").strip():
-            items.append(RawCollection(row["binType"].strip(), when))
+        name = (row.get("binType") or "").strip()
+        name = (names or {}).get(name.upper(), name)
+        for key in ("collectionDay", "followingDay"):  # the next date, and the one after
+            try:
+                when = datetime.strptime(str(row.get(key) or ""), "%d-%m-%Y").date()
+            except ValueError:
+                continue
+            if name:
+                items.append(RawCollection(name, when))
     if not items:
         raise NoCollectionsForAddress(f"{site}: no collections listed for this address")
     return items
@@ -580,6 +583,20 @@ def itouchvision(lookup: LookupInput, ids: dict, site: str, *,
 
 def somerset_direct(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
     return itouchvision(lookup, SOMERSET_IDS, "somerset (iTouchVision)", client=client)
+
+
+# Torfaen is on the same portal (its library scraper drives a browser there and times out).
+# The portal names its bins by colour alone; the council's own guide says the purple-lidded bin
+# is general waste and the green bin garden waste.
+TORFAEN_IDS = {"P_CLIENT_ID": 80, "P_COUNCIL_ID": 397}
+TORFAEN_NAMES = {"GREEN": "Garden waste (green bin)",
+                 "PURPLE LIDDED BIN": "General waste (purple lidded bin)",
+                 "RECYCLING & FOOD": "Recycling and food waste"}
+
+
+def torfaen(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+    return itouchvision(lookup, TORFAEN_IDS, "torfaen (iTouchVision)", names=TORFAEN_NAMES,
+                        client=client)
 
 
 # ---- Westminster ----------------------------------------------------------------------------
@@ -1081,6 +1098,7 @@ OVERRIDES = {
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
     "SouthHamsDistrictCouncil": south_hams,
     "WestDevonBoroughCouncil": west_devon,
+    "TorfaenCouncil": torfaen,
     "WestminsterCityCouncil": westminster,
     "CastlepointDistrictCouncil": castle_point,
     "EastHertsCouncil": east_herts,
