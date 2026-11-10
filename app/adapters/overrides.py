@@ -76,6 +76,65 @@ def hammersmith_and_fulham(lookup: LookupInput, *, html: str | None = None,
     return out
 
 
+# ---- Newham ---------------------------------------------------------------------------
+# Upstream (NewhamCouncil) reads "Tuesday 10/11/2026" month-first, so 10 Nov becomes 11 Oct
+# (any day up to the 12th comes out wrong). The page shows each bin's next and previous
+# dates, UK order, with the weekday: read them day-first, check the weekday, and use the gap
+# between previous and next for the frequency.
+
+NEWHAM_BINS = {"domestic": "Domestic waste", "recycling": "Recycling", "food waste": "Food waste"}
+NEWHAM_UA = "Binjamin/1.0 (+https://binjamin.uk)"
+_NEWHAM_DATE = re.compile(r"(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\W+(\d{1,2})/(\d{1,2})/(\d{4})", re.I)
+
+
+def _newham_date(m: re.Match) -> date | None:
+    wd, a, b, y = WEEKDAYS[m.group(1).lower()], int(m.group(2)), int(m.group(3)), int(m.group(4))
+    for d, mo in ((a, b), (b, a)):  # day-first, as printed; month-first only if that's the one that fits
+        try:
+            dt = date(y, mo, d)
+        except ValueError:
+            continue
+        if dt.weekday() == wd:
+            return dt
+    return None
+
+
+def newham(lookup: LookupInput, *, html: str | None = None,
+           today: date | None = None) -> list[RawCollection]:
+    today = today or date.today()
+    if html is None:
+        if not lookup.uprn:
+            raise MissingInput("uprn")
+        url = f"https://bincollection.newham.gov.uk/Details/Index/{lookup.uprn}"
+        try:
+            # The council's certificate chain is incomplete; the library skips verification too
+            r = httpx.get(url, headers={"User-Agent": NEWHAM_UA}, timeout=30, verify=False)
+            r.raise_for_status()
+        except httpx.HTTPError as e:
+            raise AdapterError(f"newham.gov.uk: {e}") from e
+        html = r.text
+    soup = BeautifulSoup(html, "html.parser")
+    out: list[RawCollection] = []
+    for card in soup.find_all("div", class_="card"):
+        head = card.find("div", class_="card-header")
+        text = card.get_text(" ", strip=True).replace("\xa0", " ")
+        label = next((v for k, v in NEWHAM_BINS.items()
+                      if head and re.search(rf"\b{k}\b", head.get_text(" ", strip=True), re.I)), None)
+        if not label:
+            continue
+        dates = [d for d in (_newham_date(m) for m in _NEWHAM_DATE.finditer(text)) if d]
+        if not dates:
+            continue
+        nxt = dates[0]
+        gap = (nxt - dates[1]).days if len(dates) > 1 else 0
+        step = gap if gap in (7, 14, 21, 28) else 0
+        series = [nxt + timedelta(days=step * i) for i in range(WEEKS_AHEAD)] if step else [nxt]
+        out += [RawCollection(label=label, date=d) for d in series if d >= today]
+    if not out:
+        raise NoCollectionsForAddress("newham.gov.uk: no collection dates for this address")
+    return out
+
+
 # ---- Glasgow City ---------------------------------------------------------------------
 # Upstream (GlasgowCityCouncil) keeps only "Your next Blue Bin day is Today" and throws
 # away the rest of the page, which also says "Blue Bins are emptied every 14 days" and
@@ -1094,6 +1153,7 @@ INPUT_REWRITES = {
 
 OVERRIDES = {
     "LondonBoroughHammersmithandFulham": hammersmith_and_fulham,
+    "NewhamCouncil": newham,
     "GlasgowCityCouncil": glasgow,
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
     "SouthHamsDistrictCouncil": south_hams,
