@@ -41,7 +41,8 @@ def clean_moves(raw: dict | None) -> dict:
             new = date.fromisoformat(v) if v else None
         except (TypeError, ValueError):
             continue
-        if new is None or (new != usual and abs((new - usual).days) <= MAX_MOVE_DAYS):
+        # new == usual is kept: "no change", it undoes the council's move for that date
+        if new is None or abs((new - usual).days) <= MAX_MOVE_DAYS:
             out[usual.isoformat()] = new.isoformat() if new else None
     return out
 

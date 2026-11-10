@@ -27,7 +27,7 @@ def test_no_moves_keeps_the_old_phase():
 def test_clean_moves_drops_nonsense():
     assert clean_moves({"2026-12-25": "2026-12-28", "2027-01-01": None, "bad": "2027-01-02",
                         "2026-12-01": "2027-03-01", "2026-12-10": "2026-12-10"}) == \
-        {"2026-12-25": "2026-12-28", "2027-01-01": None}
+        {"2026-12-25": "2026-12-28", "2027-01-01": None, "2026-12-10": "2026-12-10"}
 
 
 def test_saved_through_the_site_and_shown_back(client):

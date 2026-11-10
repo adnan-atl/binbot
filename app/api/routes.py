@@ -24,7 +24,7 @@ from app.models import (
     level_for,
     now,
 )
-from app.services import analytics, geo, signup, split
+from app.services import analytics, geo, holidays, signup, split
 from app.services.reminders import handle_inbound, rebuild_reminders, send_welcome, start_link
 from app.services.schedule import (
     get_or_create_council,
@@ -202,8 +202,11 @@ def put_bins(user_id: str, body: S.BinsIn, db: Session = Depends(get_db)):
                 raise HTTPException(400, "Unknown bin colour")
             s.colour = c or None
         if b.days is not None:
-            moves = clean_moves(b.moves) if b.moves is not None else \
+            # The council's own holiday changes first; anything the resident set wins.
+            gss = user.property.council.gss_code if user.property else None
+            mine = clean_moves(b.moves) if b.moves is not None else \
                 (s.override_rule or {}).get("moves", {})
+            moves = {**holidays.council_moves(gss, s.category.value), **mine}
             s.override_rule = {"days": b.days, "frequency": b.frequency or "weekly",
                                "anchor": b.anchor, "moves": moves}
         elif b.moves is not None and s.override_rule:

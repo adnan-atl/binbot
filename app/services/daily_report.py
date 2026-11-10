@@ -114,7 +114,8 @@ def switched_on(db: Session, start: datetime, end: datetime) -> tuple[int, int]:
 
 def db_day(db: Session, start: datetime, end: datetime) -> DbDay:
     d = DbDay()
-    new = db.scalars(select(User).where(User.created_at >= start, User.created_at < end)).all()
+    new = db.scalars(select(User).where(User.created_at >= start, User.created_at < end,
+                                        User.lookup_source.is_distinct_from("seed"))).all()
     d.started = len(new)
     d.started_invited = sum(1 for u in new if u.referred_by_id)
     d.switched_on, d.switched_on_invited = switched_on(db, start, end)
