@@ -921,6 +921,87 @@ def east_herts(lookup: LookupInput, *, client: httpx.Client | None = None,
     return items
 
 
+# ---- Gloucester -----------------------------------------------------------------------------
+# The library drives a browser through the council's AchieveForms page (~23s). The form itself
+# asks a chain of public lookups: the property's bins by UPRN, each bin's round ("Monday Week
+# 1"), and that round's next date. Same lookups here, the three rounds in parallel (~5s).
+GLOUCESTER = "https://gloucester-self.achieveservice.com"
+GLOUCESTER_PAGE = GLOUCESTER + "/service/Bins___Check_your_bin_day"
+GLOUCESTER_UA = "Binjamin/1.0 (+https://binjamin.uk)"
+_GL_SECTION = "Your waste collections"
+_GL_BINS = "63f72ddc8ca25"
+# kind -> (round lookup, next-date lookup, our label)
+_GL_KINDS = {"Refuse": ("63f731d2b50d7", "63ca72c70c3b1", "General waste"),
+             "Recycling": ("63f89f73018c0", "63cfcf4756b5d", "Recycling"),
+             "Food": ("63f8a11714712", "63cfcf8ac7877", "Food waste"),
+             "Garden": ("63f8a15776b5d", "63cfcfc1c486c", "Garden waste")}
+
+
+def gloucester_rows(kind: str, schedule: str, next_iso: str, today: date) -> list[RawCollection]:
+    """One bin's next date, projected along its round: "Weekly" every 7 days, "Week 1/2" every 14."""
+    try:
+        nxt = date.fromisoformat(next_iso)
+    except (TypeError, ValueError):
+        return []
+    s = (schedule or "").lower()
+    step = 7 if "weekly" in s else 14 if "week" in s else 0
+    dates = [nxt + timedelta(days=step * i) for i in range(WEEKS_AHEAD if step == 7 else 4)] if step else [nxt]
+    return [RawCollection(_GL_KINDS[kind][2], d) for d in dates if d >= today]
+
+
+def gloucester(lookup: LookupInput, *, client: httpx.Client | None = None,
+               today: date | None = None) -> list[RawCollection]:
+    if not lookup.uprn:
+        raise MissingInput("uprn")
+    import concurrent.futures
+
+    today = today or date.today()
+    http = client or httpx.Client(headers={"User-Agent": GLOUCESTER_UA}, timeout=30, follow_redirects=True)
+    try:
+        auth = http.get(f"{GLOUCESTER}/authapi/isauthenticated",
+                        params={"uri": GLOUCESTER_PAGE, "hostname": "gloucester-self.achieveservice.com",
+                                "withCredentials": "true"})
+        auth.raise_for_status()
+        sid = auth.json()["auth-session"]
+
+        def run(lookup_id: str, values: dict) -> dict:
+            r = http.post(f"{GLOUCESTER}/apibroker/runLookup",
+                          params={"id": lookup_id, "repeat_against": "", "noRetry": "true",
+                                  "getOnlyTokens": "undefined", "log_id": "", "app_name": "AF-Renderer::Self",
+                                  "_": str(int(datetime.now().timestamp() * 1000)), "sid": sid},
+                          json={"formValues": {_GL_SECTION: {k: {"value": v} for k, v in values.items()}}},
+                          headers={"X-Requested-With": "XMLHttpRequest"})
+            r.raise_for_status()
+            rows = ((r.json().get("integration") or {}).get("transformed") or {}).get("rows_data") or {}
+            return (rows.get("0") if isinstance(rows, dict) else None) or {}
+
+        uprn = str(lookup.uprn)
+        bins = run(_GL_BINS, {"binUprn": uprn})
+
+        def one(kind: str) -> list[RawCollection]:
+            bin_id = bins.get(f"{kind}Id")
+            if not bin_id:
+                return []
+            round_lookup, next_lookup, _ = _GL_KINDS[kind]
+            sched = run(round_lookup, {"binUprn": uprn, f"{kind}Id": bin_id})
+            workflow = sched.get(f"{kind}1")
+            if not workflow:
+                return []
+            nxt = run(next_lookup, {"binUprn": uprn, f"{kind}1": workflow})
+            return gloucester_rows(kind, sched.get(f"{kind}_Schedule1", ""), nxt.get(f"Next{kind}1DateISO"), today)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+            items = [c for part in ex.map(one, _GL_KINDS) for c in part]
+    except (httpx.HTTPError, ValueError, KeyError) as e:
+        raise AdapterError(f"gloucester-self.achieveservice.com: {type(e).__name__}: {e}") from e
+    finally:
+        if client is None:
+            http.close()
+    if not items:
+        raise NoCollectionsForAddress("gloucester: no collections listed for this address")
+    return sorted(items, key=lambda c: (c.date, c.label))
+
+
 # ---- Torbay ---------------------------------------------------------------------------------
 # The library drives a browser through torbay.gov.uk by absolute XPaths (cookie banner, a link
 # that opens a new tab, then the form) and times out when any of that moves. The form itself is
@@ -1179,6 +1260,7 @@ OVERRIDES = {
     "ChelmsfordCityCouncil": chelmsford,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
     "BinBotForestOfDeanDirect": forest_of_dean_direct,  # registry.CUSTOM_FIRST, same form
+    "BinBotGloucesterDirect": gloucester,  # registry.CUSTOM_FIRST: before the browser one
     "BinBotSomersetDirect": somerset_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
 

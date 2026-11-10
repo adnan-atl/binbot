@@ -248,6 +248,13 @@ CUSTOM: dict[str, AdapterSpec] = {
         url="https://community.fdean.gov.uk/s/waste-collection-enquiry",
         needs_postcode=True, needs_house_number=True,
         note="Salesforce flow, no browser: address lookup, then the flow's collection table."),
+    # Gloucester: the council's AchieveForms lookups asked directly by UPRN (~5s) instead of
+    # the library's browser run (~23s); the browser one stays as the fallback.
+    "E07000081": AdapterSpec(
+        module="BinBotGloucesterDirect", gss_code="E07000081", name="Gloucester",
+        url="https://gloucester-self.achieveservice.com/service/Bins___Check_your_bin_day",
+        needs_uprn=True, needs_postcode=True, requires=frozenset({"uprn"}),
+        note="AchieveForms lookups, no browser: bins by UPRN, then each bin's round and next date."),
     # Somerset: moved to iTouchVision's portal (Nov 2026); the library module still drives
     # the old somerset.gov.uk form in a browser and times out. This asks the portal directly
     # by UPRN (~1s) and goes first (CUSTOM_FIRST); the browser one stays as the fallback.
@@ -315,7 +322,7 @@ def _alternates() -> dict[str, list[AdapterSpec]]:
 
 
 # Councils where our own scraper beats the library's, so it's tried first.
-CUSTOM_FIRST = {"E07000079", "E07000080", "E06000066"}  # Cotswold, Forest of Dean, Somerset: no browser
+CUSTOM_FIRST = {"E07000079", "E07000080", "E07000081", "E06000066"}  # Cotswold, Forest of Dean, Gloucester, Somerset: no browser
 
 # Library entries tagged with another council's code: never a second chance for that council.
 # GosportBoroughCouncil's input.json entry carries Stroud's code (E07000082); it asks Gosport's
