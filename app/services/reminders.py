@@ -1129,6 +1129,8 @@ def send_fallbacks(db: Session, now_utc: datetime | None = None) -> int:
     Returns how many fallbacks went out."""
     from app.services import inbox
 
+    if not get_settings().auto_fallback_reply:  # the team answers these from Slack
+        return 0
     now = now_utc or datetime.now(ZoneInfo("UTC"))
     rows = db.scalars(select(ChangeLog).where(
         ChangeLog.scope == "user", ChangeLog.kind == "unrecognised",

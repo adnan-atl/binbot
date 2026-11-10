@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     # Ask people to share in the WhatsApp welcome? Off: people share once Binjamin has done
     # something for them (after their first Done, or the Sunday-evening nudge).
     share_in_welcome: bool = False
+    # Answer messages Binjamin doesn't understand with a stock line ("beyond my bin grade")?
+    # Off: they go to the team's Slack inbox only, and a person replies. Turn on
+    # (AUTO_FALLBACK_REPLY=true) to have Binjamin answer them itself after a minute.
+    auto_fallback_reply: bool = False
     # Splitting a postcode round moves residents and messages them. Until it's been watched
     # on real councils, only log what it would do ("would_split" in change_log).
     split_dry_run: bool = True

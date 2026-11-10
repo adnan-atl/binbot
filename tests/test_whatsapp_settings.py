@@ -13,6 +13,13 @@ from app.providers import messaging
 from app.services.reminders import parse_time, send_fallbacks
 from tests.test_flow import signup
 
+
+@pytest.fixture
+def fallback_on():
+    """The stock reply to messages Binjamin doesn't understand is off by default (the team
+    answers from Slack); these tests are about how it behaves when it's switched on."""
+    get_settings().auto_fallback_reply = True
+
 PHONE = "+447700900123"
 LONDON = ZoneInfo("Europe/London")
 BINS = ["Blue recycling bin", "Black general waste bin", "Food waste caddy", "Green garden waste bin"]
@@ -226,7 +233,7 @@ def _replies(db):
                                        .order_by(Outbox.created_at, Outbox.id))]
 
 
-def test_fallback_waits_until_they_stop_typing_then_answers_once(client, db, uid):
+def test_fallback_waits_until_they_stop_typing_then_answers_once(client, db, uid, fallback_on):
     before = len(_replies(db))
     assert say(client, "blah blah") == ""  # no instant reply
     assert say(client, "and another thing") == ""
@@ -238,7 +245,7 @@ def test_fallback_waits_until_they_stop_typing_then_answers_once(client, db, uid
     assert send_fallbacks(db, now_utc=_later(120)) == 0  # never twice for the same burst
 
 
-def test_fallback_at_most_once_a_day(client, db, uid):
+def test_fallback_at_most_once_a_day(client, db, uid, fallback_on):
     say(client, "blah blah")
     assert send_fallbacks(db, now_utc=_later(61)) == 1
     say(client, "asdfgh")
@@ -376,6 +383,15 @@ def test_acknowledgements_get_no_reply_and_dont_bother_the_team(client, db, uid,
     assert not db.scalars(select(ChangeLog).where(ChangeLog.kind == "unrecognised")).all()
 
 
-def test_a_real_question_still_counts(client, db, uid):
+def test_a_real_question_still_counts(client, db, uid, fallback_on):
     assert say(client, "ok but can you do glass?") == ""  # waits, then the one fallback
     assert send_fallbacks(db, now_utc=_later(61)) == 1
+
+
+def test_no_stock_reply_by_default(client, db, uid):
+    """Off by default: a message Binjamin doesn't understand goes to the team, unanswered."""
+    before = len(_replies(db))
+    assert say(client, "blah blah") == ""
+    assert send_fallbacks(db, now_utc=_later(61)) == 0
+    assert send_fallbacks(db, now_utc=_later(600)) == 0
+    assert _replies(db)[before:] == []
