@@ -78,7 +78,7 @@ def test_not_questions_still_go_where_they_did(client, db, uid):
     ("where's the nearest tip", "Tips and recycling centres are run by Hackney", True),
     ("what's the forecast for tomorrow?", "I'm a bin butler, not a weatherman!", False),
     ("can you help with my energy bills", "That's beyond my bin grade, sorry.", True),
-    ("thanks!", "You're welcome!", False),
+    ("thanks for the reminder!", "You're welcome!", False),
     ("hello", "Hi! I'll message you the evening before", False),
     ("who are you?", "I'm Binny, by Alfred.", False),
 ])
@@ -117,9 +117,14 @@ def test_a_sentence_with_tomorrow_in_it_is_not_a_question(client, db, uid, midda
         assert not reply.startswith(("Tomorrow (", "Nothing tomorrow.")), q
 
 
-def test_all_good_is_an_acknowledgement():
-    """"All good" (Kensington and Chelsea, 10 Nov 2026): nothing to answer, nothing for the team."""
-    for t in ("All good", "all good!", "Perfect", "Great 👍", "That's great", "sorted", "Nice one"):
-        assert reminders.is_ack(t), t
-    for t in ("All good but what about glass?", "great, when is my next collection?"):
-        assert not reminders.is_ack(t), t
+def test_happy_sign_offs_get_youre_welcome(client, db, uid, midday):
+    """"All good" (Kensington and Chelsea, 10 Nov 2026), "Great", "Perfect, thanks!": a happy
+    sign-off gets a "You're welcome"; a plain "ok" gets nothing; sarcasm gets neither."""
+    for t in ("All good", "all good!", "Perfect", "Great \U0001F44D", "That's great", "Lovely thanks",
+              "Perfect, thanks so much!", "thanks"):
+        assert say(client, t).startswith("You're welcome"), t
+    for t in ("ok", "got it", "\U0001F44D"):
+        assert say(client, t) == "", t
+    for t in ("great, now I have to wait a week", "thanks but it's still wrong",
+              "great, when is my next collection?"):
+        assert not say(client, t).startswith("You're welcome"), t

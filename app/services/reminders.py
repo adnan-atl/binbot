@@ -1059,9 +1059,22 @@ OPT_OUT_RE = re.compile(r"(please\s+)?(stop|unsubscribe|opt[ -]?out|cancel|end|q
 FALLBACK_TAIL = "Tap Settings to change your bins or reminder time."
 # Acknowledgements that need no reply at all (and aren't worth the team's attention).
 ACK_RE = re.compile(r"(ok(ay|ey|ie|i)?|o\.k\.?|k+|alright|all right|cool|got it|noted|sure|fine|"
-                    r"will do|roger|sounds good|no worries|np|yep|yup|kk|all good|all sorted|all set|"
-                    r"sorted|good|great|perfect|lovely|brilliant|nice|nice one|amazing|awesome|"
-                    r"(that'?s|thats) (great|perfect|fine|good|brilliant|lovely))", re.IGNORECASE)
+                    r"will do|roger|sounds good|no worries|np|yep|yup|kk)", re.IGNORECASE)
+# A positive sign-off and nothing else: "Great", "All good", "Perfect, thanks!", "Lovely 👍".
+# Gets a "You're welcome". Anything longer ("great, now I have to wait a week") isn't one.
+_POSITIVE_WORD = (r"(thanks|thank you|thank u|thx|ty|cheers|ta|great|perfect|brilliant|lovely|amazing|"
+                  r"awesome|fab|fantastic|superb|excellent|nice|nice one|good|all good|all sorted|all set|"
+                  r"sorted|(that'?s|thats) (great|perfect|brilliant|lovely|amazing|good|fab))")
+POSITIVE_RE = re.compile(rf"{_POSITIVE_WORD}( (so much|very much|a lot|loads|mate|binjamin|binji|"
+                         rf"{_POSITIVE_WORD}))*", re.IGNORECASE)
+YOURE_WELCOME = "You're welcome! \U0001F44B"
+
+
+def is_positive(text: str) -> bool:
+    """'Great', 'All good!', 'Perfect, thanks 👍': a happy sign-off, worth a 'You're welcome'."""
+    words = re.sub(r"[^\w\s']", " ", (text or "").strip())
+    words = re.sub(r"\s+", " ", words).strip()
+    return bool(words) and bool(POSITIVE_RE.fullmatch(words))
 
 
 def is_ack(text: str) -> bool:
@@ -1110,7 +1123,9 @@ _TOPICS = [
     (r"\b(council tax|energy|electricity|gas bill|broadband|insurance|mortgage|water bill|bills?)\b",
      "That's beyond my bin grade, sorry. I can only help with your bin collections.", True),
     (r"^(no thanks|no thank you|no ta)\b", "No problem!", False),
-    (r"^(?!no\b).*\b(thanks|thank you|thank u|cheers|ta|nice one|great|perfect|brilliant|lovely)\b",
+    # Thanks inside a longer message, but not a sarcastic one ("thanks, now I have to wait a week")
+    (r"^(?!no\b)(?!.*\b(but|now|wait|still|again|not|never|wrong|late|useless|annoying|ugh)\b)"
+     r".*\b(thanks|thank you|thank u|cheers)\b",
      "You're welcome! \U0001F44B", False),
     (r"^(hi|hello|hey|hiya|morning|evening|afternoon|yo)\b[\s!.]*$",
      "Hi! I'll message you the evening before your next collection. Ask me \"when's my next "
@@ -1344,6 +1359,8 @@ def handle_inbound(db: Session, phone: str, text: str) -> str:
         reply = Reply("Thanks, noted. If your home's days are different, tap \"These aren't my "
                       f"days\" in {get_settings().brand_name} to set your own.")
         to_inbox = "wrong_day"
+    elif is_positive(text):  # "Great", "All good", "Perfect, thanks": nothing for the team
+        reply = Reply(YOURE_WELCOME)
     elif is_ack(text):
         # "Ok", "👍", "got it": nothing to answer, nothing for the team. A reply would only annoy.
         db.commit()
