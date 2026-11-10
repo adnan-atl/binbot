@@ -82,6 +82,10 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
     if round_has_calendar(db, prop.round_key):
         # A neighbour already fetched this postcode's round: reuse it, no lookup at all.
         source, shared = "neighbours", True
+    elif copy_neighbour_manual(db, user, prop):
+        # The council can't be asked (or wasn't answering) and a neighbour typed their days in
+        # by hand: same postcode, same lorry, so they're this home's days too.
+        source, shared = "neighbours", True
     elif council.status != CouncilStatus.unsupported:
         res = refresh_round(db, prop, source="demo" if source == "demo" else "council")
         # A site that isn't answering won't answer for the neighbours either: don't make the
@@ -113,6 +117,30 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
         inbox.alert_slow_lookup(prop, secs, source, error)
     return StartResult(user=user, prop=prop, source=source if not error else "manual",
                        error=error, shared=shared)
+
+
+def copy_neighbour_manual(db: Session, user: User, prop) -> bool:
+    """Give `user` the bins a neighbour on the same round entered by hand. The most recent
+    neighbour wins (their days are the freshest). False when nobody has typed any in."""
+    rows = db.execute(
+        select(UserBinSetting, User.id)
+        .join(User, User.id == UserBinSetting.user_id)
+        .join(Property, Property.id == User.property_id)
+        .where(Property.round_key == prop.round_key, User.id != user.id,
+               User.status != UserStatus.stopped,
+               UserBinSetting.bin_type_id.is_(None), UserBinSetting.override_rule.is_not(None))
+        .order_by(User.created_at.desc())
+    ).all()
+    if not rows:
+        return False
+    donor = rows[0][1]
+    for s, uid in rows:
+        if uid != donor or not s.enabled:
+            continue
+        db.add(UserBinSetting(user_id=user.id, label=s.label, category=s.category,
+                              override_rule=dict(s.override_rule), colour=s.colour))
+    db.flush()
+    return True
 
 
 def log_checks(db: Session, prop) -> None:
