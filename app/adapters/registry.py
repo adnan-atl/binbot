@@ -241,6 +241,13 @@ CUSTOM: dict[str, AdapterSpec] = {
         url="https://community.cotswold.gov.uk/s/waste-collection-enquiry",
         needs_postcode=True, needs_house_number=True,
         note="Salesforce flow, no browser: address lookup, then the flow's collection table."),
+    # Forest of Dean: the same Salesforce form as Cotswold on the council's own site (Ubico runs
+    # both), client code "FOD". ~3s instead of the library's ~24s browser run.
+    "E07000080": AdapterSpec(
+        module="BinBotForestOfDeanDirect", gss_code="E07000080", name="Forest of Dean",
+        url="https://community.fdean.gov.uk/s/waste-collection-enquiry",
+        needs_postcode=True, needs_house_number=True,
+        note="Salesforce flow, no browser: address lookup, then the flow's collection table."),
     # Somerset: moved to iTouchVision's portal (Nov 2026); the library module still drives
     # the old somerset.gov.uk form in a browser and times out. This asks the portal directly
     # by UPRN (~1s) and goes first (CUSTOM_FIRST); the browser one stays as the fallback.
@@ -308,7 +315,12 @@ def _alternates() -> dict[str, list[AdapterSpec]]:
 
 
 # Councils where our own scraper beats the library's, so it's tried first.
-CUSTOM_FIRST = {"E07000079", "E06000066"}  # Cotswold, Somerset: no browser, seconds not ~30s
+CUSTOM_FIRST = {"E07000079", "E07000080", "E06000066"}  # Cotswold, Forest of Dean, Somerset: no browser
+
+# Library entries tagged with another council's code: never a second chance for that council.
+# GosportBoroughCouncil's input.json entry carries Stroud's code (E07000082); it asks Gosport's
+# contractor's API and can't know Stroud's rounds.
+NOT_ALTERNATES = {"E07000082": {"GosportBoroughCouncil"}}
 
 
 def candidates(gss_code: str, name: str | None = None) -> list[AdapterSpec]:
@@ -320,6 +332,8 @@ def candidates(gss_code: str, name: str | None = None) -> list[AdapterSpec]:
     if gss_code in CUSTOM_FIRST and gss_code in CUSTOM:
         out.insert(0, CUSTOM[gss_code])
     for spec in [CUSTOM.get(gss_code), *_alternates().get(gss_code, [])]:
+        if spec and spec.module in NOT_ALTERNATES.get(gss_code, set()):
+            continue
         if spec and spec.module not in {s.module for s in out}:
             out.append(spec)
     return out

@@ -152,3 +152,36 @@ def test_address_the_council_doesnt_list_doesnt_start_the_browser(hedge):
     with pytest.raises(NoCollectionsForAddress):
         schedule._hedged(fast, slow, LookupInput(postcode="GL8 8AQ"))
     assert state["calls"] == ["direct"]
+
+
+def test_forest_of_dean_uses_its_own_site_and_client_code():
+    from app.adapters.overrides import forest_of_dean_direct
+    seen = []
+
+    def handler(req: httpx.Request):
+        seen.append(req.url.host)
+        if req.method == "GET":
+            return httpx.Response(200, text=PAGE)
+        action = json.loads(parse_qs(req.content.decode())["message"][0])["actions"][0]
+        name = action["descriptor"].rsplit("$", 1)[-1]
+        if name == "startFlow":
+            assert json.loads(action["params"]["arguments"])[0]["value"] == "FOD"
+            rv = {"response": {"interviewStatus": "STARTED", "serializedEncodedState": "S0"}}
+        elif name == "lookup":
+            rv = {"lookupResults": {"Property__c": {"records": [
+                {"id": "a1", "fields": {"Name": {"value": "1 HIGH STREET, LYDNEY, GL15 6JT"}}}]}}}
+        else:
+            rv = {"response": {"interviewStatus": "STARTED", "fields": [
+                {"name": "dataJson", "value": json.dumps([{"col1": "Green Recycling Box", "col2": "Thu, 12 November"}])}]}}
+        return httpx.Response(200, text="while(1);" + json.dumps({"actions": [{"state": "SUCCESS", "returnValue": rv}]}))
+
+    items = forest_of_dean_direct(LookupInput(postcode="GL15 6JT", house_number="1"),
+                                  client=httpx.Client(transport=httpx.MockTransport(handler)),
+                                  today=date(2026, 11, 10))
+    assert [(i.label, i.date) for i in items] == [("Green Recycling Box", date(2026, 11, 12))]
+    assert set(seen) == {"community.fdean.gov.uk"}
+    assert candidates("E07000080", "Forest of Dean")[0].module == "BinBotForestOfDeanDirect"
+
+
+def test_gosport_is_not_a_backup_for_stroud():
+    assert "GosportBoroughCouncil" not in [s.module for s in candidates("E07000082", "Stroud")]

@@ -356,9 +356,9 @@ COTSWOLD_FLOW = "WebFormAlloyWasteCollectionEnquiry"
 _APP = "siteforce:communityApp"
 
 
-def _cotswold_context(http: httpx.Client) -> dict:
+def _cotswold_context(http: httpx.Client, base: str = COTSWOLD) -> dict:
     """The page's Aura context (framework id + app version), read from its HTML."""
-    html = http.get(COTSWOLD + COTSWOLD_PAGE).text
+    html = http.get(base + COTSWOLD_PAGE).text
     fw = re.search(r'fwuid%22%3A%22([^%]+)%22|"fwuid":"([^"]+)"', html)
     app = re.search(r'APPLICATION@markup://siteforce:communityApp(?:%22%3A%22|":")([^%"]+)', html)
     if not fw or not app:
@@ -368,13 +368,14 @@ def _cotswold_context(http: httpx.Client) -> dict:
             "dn": [], "globals": {}, "uad": False}
 
 
-def _aura(http: httpx.Client, ctx: dict, descriptor: str, params: dict) -> dict:
+def _aura(http: httpx.Client, ctx: dict, descriptor: str, params: dict,
+          base: str = COTSWOLD) -> dict:
     import json
 
     body = {"message": json.dumps({"actions": [{"id": "1;a", "descriptor": descriptor,
                                                 "callingDescriptor": "UNKNOWN", "params": params}]}),
             "aura.context": json.dumps(ctx), "aura.pageURI": COTSWOLD_PAGE, "aura.token": "null"}
-    r = http.post(COTSWOLD + "/s/sfsites/aura?r=1", data=body)
+    r = http.post(base + "/s/sfsites/aura?r=1", data=body)
     r.raise_for_status()
     action = json.loads(r.text.removeprefix("while(1);"))["actions"][0]
     if action.get("state") != "SUCCESS":
@@ -433,7 +434,9 @@ def _cotswold_date(text: str, today: date) -> date | None:
 
 
 def cotswold_direct(lookup: LookupInput, *, client: httpx.Client | None = None,
-                    today: date | None = None) -> list[RawCollection]:
+                    today: date | None = None, base: str = COTSWOLD,
+                    client_code: str = "CDC") -> list[RawCollection]:
+    """Also Forest of Dean: same Salesforce form (Ubico runs both), its own site and client code."""
     import json
 
     today = today or date.today()
@@ -442,19 +445,20 @@ def cotswold_direct(lookup: LookupInput, *, client: httpx.Client | None = None,
         raise MissingInput("house_number")
     http = client or httpx.Client(headers={"User-Agent": UA}, timeout=30, follow_redirects=True)
     try:
-        ctx = _cotswold_context(http)
+        ctx = _cotswold_context(http, base)
         started = _aura(http, ctx, "aura://FlowRuntimeConnectController/ACTION$startFlow", {
             "flowDevName": COTSWOLD_FLOW, "enableTrace": False, "enableRollbackMode": False,
             "debugAsUserId": "", "useLatestSubflow": False, "isBuilderDebug": False,
             "arguments": json.dumps([{"name": "vClientCode", "type": "String",
-                                      "supportsRecordId": False, "value": "CDC"}])})
+                                      "supportsRecordId": False, "value": client_code}])},
+                        base)
         state = (started.get("response") or {}).get("serializedEncodedState")
         record = None
         for q in (f"{house} {lookup.postcode}", lookup.postcode):
             found = _aura(http, ctx, "aura://LookupController/ACTION$lookup", {
                 "objectApiName": "Case", "fieldApiName": "Property__c", "pageParam": 1,
                 "pageSize": 50, "q": q, "searchType": "TypeAhead", "targetApiName": "Property__c",
-                "body": {"sourceRecord": {"apiName": "Case", "fields": {"Id": None}}}})
+                "body": {"sourceRecord": {"apiName": "Case", "fields": {"Id": None}}}}, base)
             records = [r for res in (found.get("lookupResults") or {}).values()
                        for r in (res.get("records") or [])]
             record = _cotswold_pick(records, lookup.house_number, lookup.address_line)
@@ -474,7 +478,7 @@ def cotswold_direct(lookup: LookupInput, *, client: httpx.Client | None = None,
             out = _aura(http, ctx, "aura://FlowRuntimeConnectController/ACTION$navigateFlow", {
                 "request": {"action": action, "serializedState": state, "fields": fields,
                             "uiElementVisited": True, "enableTrace": False, "lcErrors": {},
-                            "isBuilderDebug": False}})
+                            "isBuilderDebug": False}}, base)
             resp = out.get("response") or {}
             status = resp.get("interviewStatus")
             if status == "Error":
@@ -484,7 +488,7 @@ def cotswold_direct(lookup: LookupInput, *, client: httpx.Client | None = None,
             state, action, fields = resp.get("serializedEncodedState"), "CONTINUE_AFTER_COMMIT", []
         rows = json.loads(_find_value(resp, "dataJson") or "[]")
     except httpx.HTTPError as e:
-        raise AdapterError(f"community.cotswold.gov.uk: {e}") from e
+        raise AdapterError(f"{base.removeprefix('https://')}: {e}") from e
     finally:
         if client is None:
             http.close()
@@ -496,6 +500,14 @@ def cotswold_direct(lookup: LookupInput, *, client: httpx.Client | None = None,
     if not items:
         raise NoCollectionsForAddress("cotswold: no collections listed for this address")
     return items
+
+
+FOREST_OF_DEAN = "https://community.fdean.gov.uk"
+
+
+def forest_of_dean_direct(lookup: LookupInput, **kw) -> list[RawCollection]:
+    """Forest of Dean: Cotswold's form on the council's own Salesforce site (~3s, not ~24s)."""
+    return cotswold_direct(lookup, base=FOREST_OF_DEAN, client_code="FOD", **kw)
 
 
 # ---- South Hams -------------------------------------------------------------------
@@ -1166,6 +1178,7 @@ OVERRIDES = {
     "IpswichBoroughCouncil": ipswich,
     "ChelmsfordCityCouncil": chelmsford,
     "BinBotCotswoldDirect": cotswold_direct,  # registry.CUSTOM_FIRST: before the browser one
+    "BinBotForestOfDeanDirect": forest_of_dean_direct,  # registry.CUSTOM_FIRST, same form
     "BinBotSomersetDirect": somerset_direct,  # registry.CUSTOM_FIRST: before the browser one
 }
 
