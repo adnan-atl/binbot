@@ -96,3 +96,22 @@ def test_asking_for_the_dates_lists_the_next_few(client, db, uid, q):
     reply = say(client, q)
     assert reply.startswith("Your next collections:\n"), q
     assert reply.count("\n") >= 3 and reply.endswith("I'll remind you at 7pm the evening before."), q
+
+
+def test_bare_time_questions(client, db, uid, midday):
+    """"What is tomorrow?" (Hounslow, 10 Nov 2026) has no bin word in it, but sent to a bin bot
+    it's a question about bins: answer it from their calendar, don't hand it to the team."""
+    for q in ("What is tomorrow?", "whats tomorrow", "tomorrow?", "What’s out tonight?",
+              "what's on tomorrow"):
+        reply = say(client, q)
+        assert reply.startswith(("Tomorrow (", "Nothing tomorrow.")), q
+    for q in ("anything this week?", "what about this week"):
+        assert say(client, q).startswith(("This week:", "Nothing more this week.")), q
+    assert say(client, "what about next week?").startswith(("Next week:", "Nothing next week."))
+    assert say(client, "what's today?").startswith(("Today (", "Nothing today."))
+
+
+def test_a_sentence_with_tomorrow_in_it_is_not_a_question(client, db, uid, midday):
+    for q in ("I am away tomorrow", "tomorrow I will be late"):
+        reply = say(client, q)
+        assert not reply.startswith(("Tomorrow (", "Nothing tomorrow.")), q

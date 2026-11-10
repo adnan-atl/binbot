@@ -891,6 +891,13 @@ _NOT_A_QUESTION_RE = re.compile(r"\b(turn|switch|stop|pause|delete|change|remind
                                 r"didn'?t|wasn'?t|weren'?t|not been|never|forgot|complain\w*|"
                                 r"christmas|xmas|easter|bank holidays?|new year|boxing day)\b",
                                 re.IGNORECASE)
+# The whole message is just a time: "What is tomorrow?", "whats on tonight", "tomorrow?",
+# "anything this week?". Sent to a bin bot, that's a question about their bins.
+_BARE_TIME_RE = re.compile(
+    r"(?:(?:so |and |ok |hi |hey )?(?:what(?:'?s| is| are| about)?|whats|is (?:there|it) anything|anything|"
+    r"which ones?|which)\s+)?(?:(?:on|out|going out|due|happening|for|bins?)\s+)?"
+    r"(?:for\s+)?(tomorrow|tonight|today|this week|next week)(?:\s+then)?\s*[?!.]*",
+    re.IGNORECASE)
 # Words people use for each kind of bin (the category, or words in the bin's own label)
 _BIN_WORDS = {
     "recycling": r"recycl\w*|blue",
@@ -914,8 +921,9 @@ def collection_answer(db: Session, user: User, text: str) -> Reply | None:
     """A genuine question about their collections, answered from their own calendar: the next
     collection, what goes out tomorrow or this week, or when a particular bin is next.
     Returns None for anything else."""
-    t = text.strip()
-    if not (_ASK_RE.search(t) and _TOPIC_RE.search(t)) or _NOT_A_QUESTION_RE.search(t):
+    t = text.strip().replace("\u2019", "'")  # WhatsApp's curly apostrophe: "What’s on tomorrow?"
+    bare = _BARE_TIME_RE.fullmatch(t)
+    if not (bare or (_ASK_RE.search(t) and _TOPIC_RE.search(t))) or _NOT_A_QUESTION_RE.search(t):
         return None
     days = _upcoming(db, user)
     tail = (f" I'll remind you at {_clock(user.reminder_time)} {_when(user)}."
@@ -948,7 +956,7 @@ def collection_answer(db: Session, user: User, text: str) -> Reply | None:
         return Reply("I don't have that bin on your calendar. Tap Settings, then My bins, to see "
                      "the ones I remind you about.", buttons=[SETTINGS_BUTTON])
     today = datetime.now(ZoneInfo(get_settings().timezone)).date()
-    if re.search(r"\btomorrow\b", low):
+    if re.search(r"\b(tomorrow|tonight)\b", low):  # tonight: what goes out tonight, for tomorrow
         on = dict(days).get(today + timedelta(days=1))
         if on:
             return Reply(f"Tomorrow ({fmt(today + timedelta(days=1))}): "
@@ -963,6 +971,20 @@ def collection_answer(db: Session, user: User, text: str) -> Reply | None:
         d, bins = days[0]
         return Reply(f"Nothing more this week. Next up: {_join([bin_tag(b) for b in bins])} on "
                      f"{fmt(d)}.")
+    if re.search(r"\bnext week\b", low):
+        start = today + timedelta(days=7 - today.weekday())
+        week = [(d, b) for d, b in days if start <= d < start + timedelta(days=7)]
+        if week:
+            return Reply("Next week: " + "; ".join(
+                f"{_join([bin_tag(b) for b in bins])} on {fmt(d)}" for d, bins in week) + "." + tail)
+        d, bins = days[0]
+        return Reply(f"Nothing next week. Next up: {_join([bin_tag(b) for b in bins])} on {fmt(d)}.")
+    if re.search(r"\btoday\b", low):
+        on = dict(days).get(today)
+        if on:
+            return Reply(f"Today ({fmt(today)}): {_join([bin_tag(b) for b in on])}.")
+        d, bins = days[0]
+        return Reply(f"Nothing today. Next up: {_join([bin_tag(b) for b in bins])} on {fmt(d)}.{tail}")
     if _LIST_RE.search(low):  # "remind me of my dates", "what's my schedule?"
         lines = [f"{fmt(d)}: {_join([bin_tag(b) for b in bins])}" for d, bins in days[:4]]
         return Reply("Your next collections:\n" + "\n".join(lines) + ("\n" + tail.strip() if tail else ""))
