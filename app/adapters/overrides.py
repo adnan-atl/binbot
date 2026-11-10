@@ -453,29 +453,31 @@ SOUTH_HAMS_UA = "Binjamin/1.0 (+https://binjamin.uk)"
 SOUTH_HAMS = "https://waste.southhams.gov.uk/mycollections"
 
 
-def south_hams(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+def fcc_collections(lookup: LookupInput, page_url: str, post_url: str, site: str, *,
+                    client: httpx.Client | None = None) -> list[RawCollection]:
+    """FCC Environment's council sites (South Hams, West Devon): open the page for a session
+    token, post it with the UPRN, read each service's next collection from the tiles."""
     if not lookup.uprn:
         raise MissingInput("uprn")
     http = client or httpx.Client(headers={"User-Agent": SOUTH_HAMS_UA}, timeout=30,
                                   follow_redirects=True)
     try:
-        page = http.get(SOUTH_HAMS)
+        page = http.get(page_url)
         token = http.cookies.get("fcc_session_cookie")
         if not token:
             m = re.search(r'name="fcc_session_token"[^>]*value="([^"]+)"', page.text)
             token = m.group(1) if m else None
         if not token:
-            raise AdapterError(f"southhams.gov.uk: no session token (HTTP {page.status_code})")
-        r = http.post(SOUTH_HAMS + "/getcollectiondetails",
-                      data={"fcc_session_token": token, "uprn": lookup.uprn},
-                      headers={"X-Requested-With": "XMLHttpRequest", "Referer": SOUTH_HAMS})
+            raise AdapterError(f"{site}: no session token (HTTP {page.status_code})")
+        r = http.post(post_url, data={"fcc_session_token": token, "uprn": lookup.uprn},
+                      headers={"X-Requested-With": "XMLHttpRequest", "Referer": page_url})
         try:
             result = r.json()
         except ValueError:
             snippet = re.sub(r"\s+", " ", r.text[:120]).strip() or "an empty reply"
-            raise AdapterError(f"southhams.gov.uk: HTTP {r.status_code}, not JSON ({snippet})")
+            raise AdapterError(f"{site}: HTTP {r.status_code}, not JSON ({snippet})")
     except httpx.HTTPError as e:
-        raise AdapterError(f"southhams.gov.uk: {e}") from e
+        raise AdapterError(f"{site}: {e}") from e
     finally:
         if client is None:
             http.close()
@@ -487,18 +489,35 @@ def south_hams(lookup: LookupInput, *, client: httpx.Client | None = None) -> li
             details = div.find("div", class_="detWrap")
             if not name or not details:
                 continue
-            m = re.search(r"next scheduled collection is (?:today, |tomorrow, )?([A-Za-z]+, \d{1,2} [A-Za-z]+ \d{4})",
+            m = re.search(r"next scheduled collection is\s+(?:today,\s*|tomorrow,\s*)?"
+                          r"([A-Za-z]+,\s*\d{1,2}\s+[A-Za-z]+\s+\d{4})",
                           details.get_text(" ", strip=True))
             if not m:
                 continue
             try:
-                when = datetime.strptime(m.group(1), "%A, %d %B %Y").date()
+                when = datetime.strptime(re.sub(r"\s+", " ", m.group(1)).replace(" ,", ","),
+                                         "%A, %d %B %Y").date()
             except ValueError:
                 continue
             items.append(RawCollection(name.get_text(strip=True), when))
     if not items:
-        raise NoCollectionsForAddress("southhams.gov.uk: no collections listed for this address")
+        raise NoCollectionsForAddress(f"{site}: no collections listed for this address")
     return items
+
+
+def south_hams(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+    return fcc_collections(lookup, SOUTH_HAMS, SOUTH_HAMS + "/getcollectiondetails",
+                           "southhams.gov.uk", client=client)
+
+
+# West Devon shares South Hams' waste contractor and its site, at a different address. The
+# library drives a browser just to get the session cookie, and times out; no browser is needed.
+WEST_DEVON = "https://westdevon.fccenvironment.co.uk"
+
+
+def west_devon(lookup: LookupInput, *, client: httpx.Client | None = None) -> list[RawCollection]:
+    return fcc_collections(lookup, WEST_DEVON, WEST_DEVON + "/ajaxprocessor/getcollectiondetails",
+                           "westdevon.fccenvironment.co.uk", client=client)
 
 # ---- iTouchVision portal (Somerset) ---------------------------------------------------------
 # Somerset moved its bin-day lookup to iTouchVision's portal in November 2026, so the library's
@@ -1061,6 +1080,7 @@ OVERRIDES = {
     "GlasgowCityCouncil": glasgow,
     "BinBotKensingtonAndChelsea": kensington_and_chelsea,  # registry.CUSTOM
     "SouthHamsDistrictCouncil": south_hams,
+    "WestDevonBoroughCouncil": west_devon,
     "WestminsterCityCouncil": westminster,
     "CastlepointDistrictCouncil": castle_point,
     "EastHertsCouncil": east_herts,
