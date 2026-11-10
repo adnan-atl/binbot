@@ -1,28 +1,257 @@
 {
   "_note": "Calendars for councils we can't ask (they block automated lookups), copied by hand from the council's own calendar for one address on each postcode. Loaded with: docker exec binny-api-1 python -m app.tools.seed_rounds. The council's holiday changes (holiday_moves.json) are added on load. anchor = one real collection date.",
   "rounds": [
-    {"postcode": "PO19 3DX", "from": "25 Parklands Road, Chichester", "bins": [
-      {"label": "General waste", "category": "general", "days": ["TUE"], "frequency": "fortnightly", "anchor": "2026-11-10"},
-      {"label": "Recycling", "category": "recycling", "days": ["TUE"], "frequency": "fortnightly", "anchor": "2026-11-17"},
-      {"label": "Food waste", "category": "food", "days": ["FRI"], "frequency": "weekly"},
-      {"label": "Garden waste", "category": "garden", "days": ["FRI"], "frequency": "fortnightly", "anchor": "2026-11-20"}]},
-    {"postcode": "RH14 0JT", "from": "10 Plaistow Road, Kirdford", "bins": [
-      {"label": "Recycling", "category": "recycling", "days": ["THU"], "frequency": "fortnightly", "anchor": "2026-11-12"},
-      {"label": "General waste", "category": "general", "days": ["THU"], "frequency": "fortnightly", "anchor": "2026-11-19"},
-      {"label": "Food waste", "category": "food", "days": ["MON"], "frequency": "weekly"}]},
-    {"postcode": "PO18 0EP", "from": "3 and 4 Potnore, Lavant", "bins": [
-      {"label": "General waste", "category": "general", "days": ["WED"], "frequency": "fortnightly", "anchor": "2026-11-11"},
-      {"label": "Recycling", "category": "recycling", "days": ["WED"], "frequency": "fortnightly", "anchor": "2026-11-18"},
-      {"label": "Food waste", "category": "food", "days": ["WED"], "frequency": "weekly"},
-      {"label": "Garden waste", "category": "garden", "days": ["TUE"], "frequency": "fortnightly", "anchor": "2026-11-17"}]},
-    {"postcode": "PO10 8AP", "from": "35 Main Road, Southbourne", "bins": [
-      {"label": "Recycling", "category": "recycling", "days": ["TUE"], "frequency": "fortnightly", "anchor": "2026-11-10"},
-      {"label": "General waste", "category": "general", "days": ["TUE"], "frequency": "fortnightly", "anchor": "2026-11-17"},
-      {"label": "Food waste", "category": "food", "days": ["WED"], "frequency": "weekly"}]},
-    {"postcode": "PO10 8HW", "from": "5 Lazy Acre, Southbourne", "bins": [
-      {"label": "Food waste", "category": "food", "days": ["WED"], "frequency": "weekly"},
-      {"label": "Garden waste", "category": "garden", "days": ["THU"], "frequency": "fortnightly", "anchor": "2026-11-12"},
-      {"label": "General waste", "category": "general", "days": ["MON"], "frequency": "fortnightly", "anchor": "2026-11-16"},
-      {"label": "Recycling", "category": "recycling", "days": ["MON"], "frequency": "fortnightly", "anchor": "2026-11-23"}]}
+    {
+      "postcode": "PO19 3DX",
+      "from": "25 Parklands Road, Chichester",
+      "bins": [
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-10"
+        },
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-17"
+        },
+        {
+          "label": "Food waste",
+          "category": "food",
+          "days": [
+            "FRI"
+          ],
+          "frequency": "weekly"
+        },
+        {
+          "label": "Garden waste",
+          "category": "garden",
+          "days": [
+            "FRI"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-20"
+        }
+      ]
+    },
+    {
+      "postcode": "RH14 0JT",
+      "from": "10 Plaistow Road, Kirdford",
+      "bins": [
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "THU"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-12"
+        },
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "THU"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-19"
+        },
+        {
+          "label": "Food waste",
+          "category": "food",
+          "days": [
+            "MON"
+          ],
+          "frequency": "weekly"
+        }
+      ]
+    },
+    {
+      "postcode": "PO18 0EP",
+      "from": "3 and 4 Potnore, Lavant",
+      "bins": [
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "WED"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-11"
+        },
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "WED"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-18"
+        },
+        {
+          "label": "Food waste",
+          "category": "food",
+          "days": [
+            "WED"
+          ],
+          "frequency": "weekly"
+        },
+        {
+          "label": "Garden waste",
+          "category": "garden",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-17"
+        }
+      ]
+    },
+    {
+      "postcode": "PO10 8AP",
+      "from": "35 Main Road, Southbourne",
+      "bins": [
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-10"
+        },
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-17"
+        },
+        {
+          "label": "Food waste",
+          "category": "food",
+          "days": [
+            "WED"
+          ],
+          "frequency": "weekly"
+        }
+      ]
+    },
+    {
+      "postcode": "PO10 8HW",
+      "from": "5 Lazy Acre, Southbourne",
+      "bins": [
+        {
+          "label": "Food waste",
+          "category": "food",
+          "days": [
+            "WED"
+          ],
+          "frequency": "weekly"
+        },
+        {
+          "label": "Garden waste",
+          "category": "garden",
+          "days": [
+            "THU"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-12"
+        },
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "MON"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-16"
+        },
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "MON"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-23"
+        }
+      ]
+    },
+    {
+      "postcode": "GU29 9AA",
+      "from": "5 Crossways, Easebourne",
+      "bins": [
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-10"
+        },
+        {
+          "label": "Garden waste",
+          "category": "garden",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-10"
+        },
+        {
+          "label": "Food waste",
+          "category": "food",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "weekly"
+        },
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-17"
+        }
+      ]
+    },
+    {
+      "postcode": "GU29 0JN",
+      "from": "Minsted Farm, Stedham",
+      "bins": [
+        {
+          "label": "General waste",
+          "category": "general",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-10"
+        },
+        {
+          "label": "Recycling",
+          "category": "recycling",
+          "days": [
+            "TUE"
+          ],
+          "frequency": "fortnightly",
+          "anchor": "2026-11-17"
+        }
+      ]
+    }
   ]
 }
