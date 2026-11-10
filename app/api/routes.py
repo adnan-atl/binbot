@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.adapters.base import unreachable
 from app.adapters.manual import clean_moves
 from app.adapters.registry import coverage, spec_for
 from app.api import schemas as S
@@ -108,7 +109,8 @@ def signup_start(body: S.StartIn, request: Request, db: Session = Depends(get_db
     analytics.track(user, "signup_started", via="website", calendar=res.source,
                     shared=bool(res.shared), calendar_error=bool(res.error), bins=len(bins))
     return S.StartOut(user_id=user.id, property_id=res.prop.id, council=res.prop.council.name,
-                      source=res.source, error=res.error, shared=res.shared, bins=bins)
+                      source=res.source, error=res.error, shared=res.shared, bins=bins,
+                      council_down=bool(res.error and unreachable(res.error) and not bins))
 
 
 # Shared with the WhatsApp sign-up: see services/signup.py

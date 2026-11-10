@@ -85,6 +85,30 @@ def paon_alternatives(house_number: str | None) -> list[str]:
     return [a for i, a in enumerate(out) if a and a != hn and a not in out[:i]]
 
 
+_DOWN_WORDS = ("planned maintenance", "maintenance in progress", "under maintenance",
+               "down for maintenance", "scheduled maintenance", "temporarily unavailable",
+               "service unavailable", "site is currently offline", "currently unavailable")
+
+
+def site_down(url: str | None) -> str | None:
+    """'maintenance' or 'HTTP 503' when the council's page is plainly down, else None. Only a
+    server error or a maintenance notice counts: a page that refuses us (403) or doesn't answer
+    proves nothing here, because the scraper did get an answer a moment ago."""
+    if not url or not url.startswith("http"):
+        return None
+    import httpx
+
+    try:
+        r = httpx.get(url, timeout=10, follow_redirects=True,
+                      headers={"User-Agent": "Binjamin/1.0 (+https://binjamin.uk)"})
+    except Exception:  # noqa: BLE001
+        return None
+    if r.status_code >= 500:
+        return f"HTTP {r.status_code}"
+    text = r.text[:20000].lower()
+    return "maintenance" if any(w in text for w in _DOWN_WORDS) else None
+
+
 def _browser_slots() -> threading.BoundedSemaphore:
     global _SLOTS
     if _SLOTS is None:
@@ -130,6 +154,18 @@ class UKBCDAdapter:
             return items
 
     def _fetch_direct(self, lookup: LookupInput) -> list[RawCollection]:
+        try:
+            return self._fetch_with_retry(lookup)
+        except NoCollectionsForAddress as e:
+            # A council's maintenance page has no dates on it either, and the scraper reads that
+            # as "nothing for this address" (Stroud, 10 Nov 2026). Look at the page before
+            # sending the resident to add their bins by hand.
+            why = site_down(self.spec.url)
+            if why:
+                raise AdapterError(f"{self.name}: council website is down ({why})") from e
+            raise
+
+    def _fetch_with_retry(self, lookup: LookupInput) -> list[RawCollection]:
         from app.adapters.overrides import INPUT_REWRITES
 
         if self.spec.module in INPUT_REWRITES:  # right scraper, different input (street for number)

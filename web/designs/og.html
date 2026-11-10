@@ -1413,6 +1413,7 @@ Share to WhatsApp
       trackUser(j.user_id);
       API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
       note = j.shared && j.error ? j.error : '';
+      councilDown = !!j.council_down;
       PSTEPS[0].subDone = j.council || PSTEPS[0].subDone;
       // Live API: show exactly what the council gave us, never the demo bins.
       bins = (j.bins || []).map(binFromApi);
@@ -1599,12 +1600,14 @@ Share to WhatsApp
   if (narrowMq) { var onMq = function () { if (current === 'confirm' && !editing) renderConfirm(); };
     if (narrowMq.addEventListener) narrowMq.addEventListener('change', onMq); else if (narrowMq.addListener) narrowMq.addListener(onMq); }
   var calendarFailed = false;
+  var councilDown = false;  // the council's website was down when we asked
   function renderConfirm() {
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
     var empty = !bins.length;
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
       : editing ? 'Edit your bins' : 'Check these are right';
-    $('#c-lede').textContent = empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
+    $('#c-lede').textContent = empty && councilDown ? (API.council || 'Your council') + "'s website is down right now, so we couldn't fetch your days. Try again in a little while, or add your bins below. Takes about 30 seconds."
+      : empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
       : editing ? 'Tap a bin to change its day or how often.'
       : note ? note : "We'll remind you the night before.";  // a council problem shows here instead
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';

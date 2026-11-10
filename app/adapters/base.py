@@ -48,7 +48,8 @@ class CalendarAdapter(Protocol):
 
 _UNREACHABLE = ("timed out", "timeout", "read operation", "connecterror", "connection refused",
                 "connection reset", "remote end closed", "name or service not known",
-                "temporary failure in name resolution", "403", "forbidden", "502", "503", "504")
+                "temporary failure in name resolution", "403", "forbidden", "502", "503", "504",
+                "website is down")
 
 
 def unreachable(error: str | None) -> bool:

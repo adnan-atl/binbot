@@ -59,6 +59,7 @@ class StartOut(BaseModel):
     bins: list[BinOut]
     shared: bool = False  # calendar reused from the postcode round, not fetched for this home
     error: str | None = None
+    council_down: bool = False  # the council's website is down: try again later, or add by hand
 
 
 class OwnCalendarIn(BaseModel):
