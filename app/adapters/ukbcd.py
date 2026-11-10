@@ -1,5 +1,7 @@
 """Wraps a UKBinCollectionData council module as a CalendarAdapter."""
 import concurrent.futures
+import dataclasses
+import re
 import threading
 import json
 import logging
@@ -66,6 +68,23 @@ def _run_module(spec: AdapterSpec, lookup: LookupInput) -> str:
 _SLOTS: threading.BoundedSemaphore | None = None
 
 
+def paon_alternatives(house_number: str | None) -> list[str]:
+    """Plainer ways to say a house "number" that's really number + building name:
+    '26 OLD MUSTARD MILL' -> ['26', 'OLD MUSTARD MILL']; 'Flat 3, 18' -> ['3', '18'].
+    Empty for a plain number, or a name with no number in it."""
+    hn = (house_number or "").strip()
+    nums = re.findall(r"\d+[A-Za-z]?\b", hn)
+    if not nums or hn == nums[0]:
+        return []
+    out = [nums[0]]
+    if len(nums) > 1:
+        out.append(nums[-1])
+    name = re.sub(r"^\s*(flat|apartment|unit)?\s*\d+[A-Za-z]?\s*,?\s*", "", hn, flags=re.I).strip(" ,")
+    if name and not name.isdigit():
+        out.append(name)
+    return [a for i, a in enumerate(out) if a and a != hn and a not in out[:i]]
+
+
 def _browser_slots() -> threading.BoundedSemaphore:
     global _SLOTS
     if _SLOTS is None:
@@ -117,6 +136,24 @@ class UKBCDAdapter:
             return OVERRIDES[self.spec.module](lookup)
         if self.spec.module in INPUT_REWRITES:  # right scraper, different input (street for number)
             lookup = INPUT_REWRITES[self.spec.module](lookup)
+        try:
+            return self._fetch_once(lookup)
+        except AdapterError as e:
+            # "26 OLD MUSTARD MILL" as the house number: many councils' address searches only
+            # match the number and find nothing. Try the plainer forms before giving up.
+            alts = paon_alternatives(lookup.house_number) if self.spec.needs_house_number else []
+            if not alts or unreachable(str(e)) or isinstance(e, MissingInput):
+                raise
+            for alt in alts[: 1 if self.spec.needs_browser else 2]:
+                log.info("%s: no luck with %r, trying %r", self.name, lookup.house_number, alt)
+                try:
+                    return self._fetch_once(dataclasses.replace(lookup, house_number=alt))
+                except AdapterError as e2:
+                    if unreachable(str(e2)):
+                        raise
+            raise
+
+    def _fetch_once(self, lookup: LookupInput) -> list[RawCollection]:
         if self.spec.needs_browser:
             # Selenium runs a fixed number of browser sessions; queue for one instead of
             # failing with "could not start a new session" when sign-ups overlap.
