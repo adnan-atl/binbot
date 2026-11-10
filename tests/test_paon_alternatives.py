@@ -65,3 +65,20 @@ def test_no_retry_when_the_site_is_down(monkeypatch):
     with pytest.raises(AdapterError):
         UKBCDAdapter(spec)._fetch_direct(LookupInput(postcode="NR1 2GE", house_number="26 OLD MUSTARD MILL"))
     assert tried == ["26 OLD MUSTARD MILL"]
+
+
+def test_our_own_scrapers_get_the_retry_too(monkeypatch):
+    from app.adapters import overrides
+    tried = []
+
+    def fake(lookup):
+        tried.append(lookup.house_number)
+        if lookup.house_number != "26":
+            raise AdapterError("castlepoint: no such address")
+        return [RawCollection("Refuse", date(2026, 11, 17))]
+
+    monkeypatch.setitem(overrides.OVERRIDES, "CastlepointDistrictCouncil", fake)
+    spec = AdapterSpec(module="CastlepointDistrictCouncil", gss_code="E07000069", name="Castle Point",
+                       url="", needs_house_number=True)
+    got = UKBCDAdapter(spec)._fetch_direct(LookupInput(postcode="SS8 0AA", house_number="26 OLD MUSTARD MILL"))
+    assert got and tried == ["26 OLD MUSTARD MILL", "26"]
