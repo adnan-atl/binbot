@@ -1059,7 +1059,9 @@ OPT_OUT_RE = re.compile(r"(please\s+)?(stop|unsubscribe|opt[ -]?out|cancel|end|q
 FALLBACK_TAIL = "Tap Settings to change your bins or reminder time."
 # Acknowledgements that need no reply at all (and aren't worth the team's attention).
 ACK_RE = re.compile(r"(ok(ay|ey|ie|i)?|o\.k\.?|k+|alright|all right|cool|got it|noted|sure|fine|"
-                    r"will do|roger|sounds good|no worries|np|yep|yup|kk)", re.IGNORECASE)
+                    r"will do|roger|sounds good|no worries|np|yep|yup|kk|all good|all sorted|all set|"
+                    r"sorted|good|great|perfect|lovely|brilliant|nice|nice one|amazing|awesome|"
+                    r"(that'?s|thats) (great|perfect|fine|good|brilliant|lovely))", re.IGNORECASE)
 
 
 def is_ack(text: str) -> bool:

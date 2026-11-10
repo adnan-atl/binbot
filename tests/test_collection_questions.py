@@ -115,3 +115,11 @@ def test_a_sentence_with_tomorrow_in_it_is_not_a_question(client, db, uid, midda
     for q in ("I am away tomorrow", "tomorrow I will be late"):
         reply = say(client, q)
         assert not reply.startswith(("Tomorrow (", "Nothing tomorrow.")), q
+
+
+def test_all_good_is_an_acknowledgement():
+    """"All good" (Kensington and Chelsea, 10 Nov 2026): nothing to answer, nothing for the team."""
+    for t in ("All good", "all good!", "Perfect", "Great 👍", "That's great", "sorted", "Nice one"):
+        assert reminders.is_ack(t), t
+    for t in ("All good but what about glass?", "great, when is my next collection?"):
+        assert not reminders.is_ack(t), t
