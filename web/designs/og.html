@@ -1190,7 +1190,7 @@ Share to WhatsApp
     var s = st ? st.s : screenFromUrl();
     if (s === 'parsing' && !fetching) s = 'postcode';
     current = document.querySelector('[data-screen="' + s + '"]') ? s : 'home';
-    if (current === 'confirm' && stepped && bins.length > 1) { cstep = st && st.c ? st.c : 'pick'; editing = false; renderConfirm(); }
+    if (current === 'confirm' && stepped && bins.length > 1) { cstep = st && st.c ? st.c : firstStep; editing = false; renderConfirm(); }
     swap(from);
   });
   // Between home, About and FAQs: the old content fades out (View Transitions where the browser
@@ -1246,9 +1246,9 @@ Share to WhatsApp
   document.addEventListener('click', function (e) {
     if (!e.target.closest('[data-back]')) return;
     if (current === 'confirm' && editing && bins.length) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
-    if (current === 'confirm' && stepped && cstep !== 'pick' && bins.length > 1) {
+    if (current === 'confirm' && stepped && cstep !== firstStep && bins.length > 1) {
       if (entry() && entry().c) { history.back(); return; }
-      cstep = cstep === 'check' && needsColour() ? 'colour' : 'pick'; renderConfirm(); window.scrollTo(0, 0); return;
+      cstep = cstep === 'check' && needsColour() && firstStep !== 'check' ? 'colour' : firstStep; renderConfirm(); window.scrollTo(0, 0); return;
     }
     var i = ORDER_SCREENS.indexOf(current);
     var prev = ORDER_SCREENS[Math.max(0, i - 1)];
@@ -1439,7 +1439,7 @@ Share to WhatsApp
     go('parsing');
     req.then(function (j) {
       trackUser(j.user_id);
-      API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null; cstep = (j.bins || []).length > 1 ? 'pick' : 'check'; stepped = cstep === 'pick';
+      API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null; cstep = 'check'; stepped = false;
       note = j.shared && j.error ? j.error : '';
       councilDown = !!j.council_down;
       PSTEPS[0].subDone = j.council || PSTEPS[0].subDone;
@@ -1456,6 +1456,7 @@ Share to WhatsApp
       if (!j) return;
       fetching = false;
       calendarFailed = !bins.length;
+      track('bin_check_started', { first: startSteps(), bins: bins.length });
       track(calendarFailed ? 'calendar_failed' : 'calendar_loaded', { council: API.council || null, bins: bins.length, shared: shared });
       var dayNames = []; bins.forEach(function (b) { b.days.forEach(function (d) { if (dayNames.indexOf(d) < 0) dayNames.push(d); }); });
       // Nothing from the council or the street: no fake checklist of ticks, straight to
@@ -1630,7 +1631,18 @@ Share to WhatsApp
   var calendarFailed = false;
   // The bin check is three short questions, one per screen: which bins (pick), their colours
   // (colour, only when we don't know them) and the week they make (check).
-  var cstep = 'check', stepped = false;  // stepped: this sign-up started at question 1
+  var cstep = 'check', stepped = false, firstStep = 'check';  // stepped: started before the week screen
+  // Only ask a question when the answer is likely to change something:
+  // - "Which bins do you put out?" when the council lists 4 or more bins, or one people
+  //   usually opt into (garden waste), or one most of that council's residents untick
+  //   (the server sends those already unticked). Never for a calendar a neighbour typed in.
+  // - "What colour are they?" only when a kept bin has no known colour.
+  // - "Your bin week" always. A short, complete list goes straight there: one tap.
+  function needsPick() {
+    if (bins.length < 2 || bins.every(function (b) { return b.manual; })) return false;
+    return bins.length >= 4 || bins.some(function (b) { return b.cat === 'garden' || b.on === false; });
+  }
+  function startSteps() { firstStep = cstep = needsPick() ? 'pick' : needsColour() ? 'colour' : 'check'; stepped = cstep !== 'check'; return cstep; }
   function colourBins() { return bins.filter(function (b) { return b.on !== false && (b.askColour || b.asked); }); }
   function needsColour() { return colourBins().length > 0; }
   // Each question is its own history entry, so the phone's back button steps back through them.
@@ -1705,7 +1717,7 @@ Share to WhatsApp
           '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : daily ? 'Daily, so no reminders' : esc(subline(b))) + '</span></span></span>' +
           '<span class="c-days">' + chips + '</span>' +
           '<span class="c-freq">' + (daily ? 'No reminders' : freqText(b)) + '</span>' +
-          (b.on !== false ? '<button type="button" class="wrongday" data-wrong="' + b.id + '">Wrong day?</button>' : '') +
+          (b.on !== false ? '<button type="button" class="wrongday" data-wrong="' + b.id + '">Change</button>' : '') +
           '</div>';
       }).join('');
     } else {
@@ -1744,7 +1756,7 @@ Share to WhatsApp
           '<div class="efield"><span class="sublabel" id="f-' + b.id + '">How often</span>' +
           '<div role="group" class="eseg" aria-labelledby="f-' + b.id + '">' + freqs + '</div></div>' +
           (CYCLE[b.freq] && b.days.length ? cyclePicker(cycleOptions(b.days, b.freq), binAnchor(b), function (o) { return 'data-anchor="' + b.id + ':' + o.anchor + '"'; }, 'n-l-' + b.id, 'When\'s the next one?') : '') + holidayField(b)) +
-          '<div class="eopen-f"><button type="button" class="e-remove" data-remove="' + b.id + '">Remove bin</button>' +
+          '<div class="eopen-f"><button type="button" class="e-remove" data-remove="' + b.id + '">' + (b.manual || String(b.id).indexOf('new') === 0 ? 'Remove bin' : 'I don\'t have this bin') + '</button>' +
           '<button type="button" class="e-done" data-close="' + b.id + '">Done</button></div></div>';
       }).join('') + '</div>';
     }
@@ -1818,6 +1830,10 @@ Share to WhatsApp
       var ob = find(t.dataset.onoff); ob.on = ob.on === false; renderConfirm();
     } else if (t.dataset.freq) {
       var q = t.dataset.freq.split(':'); find(q[0]).freq = q[1]; find(q[0]).dirty = true; renderConfirm();
+    } else if (t.dataset.remove && find(t.dataset.remove) && !find(t.dataset.remove).manual && t.dataset.remove.indexOf('new') !== 0) {
+      // A council bin they don't have: switched off, not deleted, so we learn which bins a
+      // council's residents don't use and they can tick it back later.
+      find(t.dataset.remove).on = false; openBin = null; editing = false; track('bin_ticked', { on: false, via: 'change' }); renderConfirm(); window.scrollTo(0, 0);
     } else if (t.dataset.remove) {
       if (t.dataset.remove.indexOf('new') !== 0) removedIds.push(t.dataset.remove);
       bins = bins.filter(function (b) { return b.id !== t.dataset.remove; }); renderConfirm();

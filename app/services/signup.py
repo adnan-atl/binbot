@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.adapters.base import unreachable
@@ -152,6 +152,31 @@ def log_checks(db: Session, prop) -> None:
                          diff=c))
 
 
+# A council bin starts unticked for new sign-ups once most of that council's residents have
+# unticked it (garden waste is a paid extra in most places; some councils list every service
+# for every address). The site shows "Which bins do you put out?" so they can tick it back.
+UNUSED_MIN_RESIDENTS = 10
+UNUSED_SHARE = 0.5
+
+
+def mostly_unused(db: Session, bin_type_ids: list[str]) -> set[str]:
+    """Bin types that more than UNUSED_SHARE of at least UNUSED_MIN_RESIDENTS active residents
+    have switched off."""
+    if not bin_type_ids:
+        return set()
+    rows = db.execute(
+        select(UserBinSetting.bin_type_id, UserBinSetting.enabled, func.count())
+        .join(User, User.id == UserBinSetting.user_id)
+        .where(UserBinSetting.bin_type_id.in_(bin_type_ids), User.status == UserStatus.active)
+        .group_by(UserBinSetting.bin_type_id, UserBinSetting.enabled)).all()
+    on: dict[str, int] = {}
+    off: dict[str, int] = {}
+    for bt, enabled, n in rows:
+        (on if enabled else off)[bt] = n
+    return {bt for bt, n in off.items()
+            if n + on.get(bt, 0) >= UNUSED_MIN_RESIDENTS and n > UNUSED_SHARE * (n + on.get(bt, 0))}
+
+
 def seed_settings(db: Session, user: User, prop) -> None:
     """One UserBinSetting per council bin on the property's round."""
     for s in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id,
@@ -159,9 +184,12 @@ def seed_settings(db: Session, user: User, prop) -> None:
                                                       UserBinSetting.override_rule.is_(None))):
         db.delete(s)
     db.flush()
-    for b in schedule_for(db, prop):
+    found = schedule_for(db, prop)
+    unused = mostly_unused(db, [b["bin_type_id"] for b in found])
+    for b in found:
         db.add(UserBinSetting(user_id=user.id, bin_type_id=b["bin_type_id"],
-                              label=b["label"], category=BinCategory(b["category"])))
+                              label=b["label"], category=BinCategory(b["category"]),
+                              enabled=b["bin_type_id"] not in unused))
     db.flush()
 
 
