@@ -1398,7 +1398,7 @@ Share to WhatsApp
   }
   function pickColour(id, c) {
     var b = find(id); if (!b) return;
-    b.colour = c; b.color = COLOUR_HEX[c]; b.askColour = false; b.asked = true; b.colourDirty = true;
+    b.colour = c; b.color = COLOUR_HEX[c]; b.askColour = false; b.asked = true; b.editColour = false; b.colourDirty = true;
     renderConfirm();
   }
   function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso + 'T12:00:00'); return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', ''); }
@@ -1768,6 +1768,11 @@ Share to WhatsApp
       }).join('');
     } else if (!editing && cstep === 'colour') {
       $('#c-rows').innerHTML = colourBins().map(function (b) {
+        // Colour chosen: one quiet line with Edit. The swatches only show while it's unanswered.
+        if (b.colour && !b.editColour) return '<div class="cols binrow">' +
+          '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span>' +
+          '<span style="font-size:14px;color:var(--grey)">' + esc(COLOUR_NAME[b.colour] || b.colour) + '</span></span></span>' +
+          '<span class="c-days"><button type="button" class="wrongday" style="margin:0" data-editcolour="' + b.id + '" aria-label="Change the colour of ' + esc(b.name) + '">Edit</button></span></div>';
         return '<div class="cols binrow">' +
           '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span></span>' +
           '<div class="cpick cbig" role="group" aria-label="What colour is your ' + esc(b.name) + ' bin?">' + colourPicker(b) + '</div></div>';
@@ -1830,6 +1835,8 @@ Share to WhatsApp
   $('#c-rows').addEventListener('click', function (e) {
     var pk = e.target.closest('[data-pick]');
     if (pk) { if (pickSwiped) { pickSwiped = false; return; } var pb = find(pk.dataset.pick); pb.on = pb.on === false; track('bin_ticked', { on: pb.on }); renderConfirm(); return; }
+    var ec = e.target.closest('[data-editcolour]');
+    if (ec) { find(ec.dataset.editcolour).editColour = true; renderConfirm(); return; }
     var wr = e.target.closest('[data-wrong]');
     if (wr) { track('bin_wrong_day'); editing = true; openBin = wr.dataset.wrong; renderConfirm(); window.scrollTo(0, 0); return; }
     var t = e.target.closest('[data-pickcolour]'); if (!t) return;
