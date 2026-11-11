@@ -1681,7 +1681,7 @@ Share to WhatsApp
         var on = b.on !== false;
         return '<button type="button" class="pickrow" data-pick="' + b.id + '" aria-pressed="' + on + '">' +
           '<span class="binic">' + binSvg(b, 40) + '</span>' +
-          '<span style="min-width:0"><b>' + esc(b.name) + '</b><small>' + (on ? esc(subline(b)) : 'I don\'t have this') + '</small></span>' +
+          '<span style="min-width:0"><b>' + esc(b.name) + '</b>' + (on ? '' : '<small>I don\'t have this</small>') + '</span>' +
           '<span class="tick">' + tick + '</span></button>';
       }).join('');
     } else if (!editing && cstep === 'colour') {
