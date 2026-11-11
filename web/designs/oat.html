@@ -552,6 +552,16 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .pickrow[aria-pressed="false"] .tick{background:transparent;color:transparent;border-color:var(--grey)}
 .pickrow:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
 .pill.is-off{opacity:.45}
+#c-rows{overflow:hidden;border-radius:inherit}
+.pickrow{position:relative}
+.pickrow[aria-pressed="true"]::after{content:"I don't have this";position:absolute;left:100%;top:0;bottom:0;width:150px;display:flex;align-items:center;padding-left:16px;background:var(--ink);color:#fff;font-size:14px;font-weight:600}
+.cbig{display:block;margin-top:12px}
+.cbig .cpick-sw,.cbig .cpick-sw.cpick-few{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 4px;max-width:none}
+.cbig .cswatch{width:auto;height:auto;min-height:60px;flex-direction:column;gap:5px;padding:8px 0;border-radius:12px}
+.cbig .cswatch i{width:28px;height:28px}
+.cbig .cswatch::after{content:attr(title);font-size:12px;line-height:1;color:var(--grey)}
+.cbig .cswatch[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--ink);background:#FFFFFF}
+.cbig .cswatch[aria-pressed="true"]::after{color:var(--ink);font-weight:700}
 .wrongday{grid-column:1/-1;justify-self:start;margin-top:6px;padding:0;border:0;background:none;color:var(--grey);font:inherit;font-size:14px;text-decoration:underline;cursor:pointer}
 
 .cpick-q{flex:none;font-size:14px;font-weight:500;color:#6E6E73}
@@ -1262,6 +1272,7 @@ Share to WhatsApp
     var s = st ? st.s : screenFromUrl();
     if (s === 'parsing' && !fetching) s = 'postcode';
     current = document.querySelector('[data-screen="' + s + '"]') ? s : 'home';
+    if (current === 'confirm' && stepped && bins.length > 1) { cstep = st && st.c ? st.c : 'pick'; editing = false; renderConfirm(); }
     swap(from);
   });
   // Between home, About and FAQs: the old content fades out (View Transitions where the browser
@@ -1317,7 +1328,10 @@ Share to WhatsApp
   document.addEventListener('click', function (e) {
     if (!e.target.closest('[data-back]')) return;
     if (current === 'confirm' && editing && bins.length) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
-    if (current === 'confirm' && stepped && cstep !== 'pick' && bins.length > 1) { cstep = cstep === 'check' && needsColour() ? 'colour' : 'pick'; renderConfirm(); window.scrollTo(0, 0); return; }
+    if (current === 'confirm' && stepped && cstep !== 'pick' && bins.length > 1) {
+      if (entry() && entry().c) { history.back(); return; }
+      cstep = cstep === 'check' && needsColour() ? 'colour' : 'pick'; renderConfirm(); window.scrollTo(0, 0); return;
+    }
     var i = ORDER_SCREENS.indexOf(current);
     var prev = ORDER_SCREENS[Math.max(0, i - 1)];
     if (prev === 'parsing') prev = 'postcode';  // the loading screen isn't a step to go back to
@@ -1384,7 +1398,7 @@ Share to WhatsApp
   }
   function pickColour(id, c) {
     var b = find(id); if (!b) return;
-    b.colour = c; b.color = COLOUR_HEX[c]; b.askColour = false; b.colourDirty = true;
+    b.colour = c; b.color = COLOUR_HEX[c]; b.askColour = false; b.asked = true; b.colourDirty = true;
     renderConfirm();
   }
   function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso + 'T12:00:00'); return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', ''); }
@@ -1699,7 +1713,21 @@ Share to WhatsApp
   // The bin check is three short questions, one per screen: which bins (pick), their colours
   // (colour, only when we don't know them) and the week they make (check).
   var cstep = 'check', stepped = false;  // stepped: this sign-up started at question 1
-  function needsColour() { return bins.some(function (b) { return b.on !== false && b.askColour; }); }
+  function colourBins() { return bins.filter(function (b) { return b.on !== false && (b.askColour || b.asked); }); }
+  function needsColour() { return colourBins().length > 0; }
+  // Each question is its own history entry, so the phone's back button steps back through them.
+  function setStep(step) {
+    cstep = step;
+    try { history.pushState({ s: 'confirm', sid: SID, n: (entry() ? entry().n : 0) + 1, c: step }, '', location.href); } catch (e) {}
+    renderConfirm(); window.scrollTo(0, 0);
+  }
+  function councilName() { var c = API.council || ''; return !c ? '' : /council/i.test(c) ? c : c + ' Council'; }
+  function pickLede() {  // where this list came from, then what to do with it
+    var all = bins.length && bins.every(function (b) { return b.manual; }), c = councilName();
+    return (all ? 'Your neighbours on ' + postcode.toUpperCase() + ' put these out. '
+      : shared && c ? c + ' collects these on ' + postcode.toUpperCase() + '. '
+      : c ? c + ' collects these from your address. ' : '') + 'Untick any you don\'t have.';
+  }
   function nextStep() { return cstep === 'pick' && needsColour() ? 'colour' : 'check'; }
   var councilDown = false;  // the council's website was down when we asked
   function renderConfirm() {
@@ -1710,7 +1738,7 @@ Share to WhatsApp
     $('#c-lede').textContent = empty && councilDown ? (API.council || 'Your council') + "'s website is down right now, so we couldn't fetch your days. Try again in a little while, or add your bins below. Takes about 30 seconds."
       : empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
       : editing ? 'Tap a bin to change its day or how often.'
-      : cstep === 'pick' ? 'Untick any you don\'t have.'
+      : cstep === 'pick' ? pickLede()
       : cstep === 'colour' ? 'So your reminder shows the right bin.'
       : note ? note : "We'll remind you the night before.";  // a council problem shows here instead
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
@@ -1722,10 +1750,11 @@ Share to WhatsApp
     // Don't let people confirm a schedule we can't remind them about yet.
     var missing = bins.filter(function (b) { return b.on !== false && !b.days.length; }).length;
     var kept = bins.filter(function (b) { return b.on !== false; }).length;
-    $('#c-yes').textContent = cstep === 'pick' ? (kept ? 'Next' : 'Tick at least one bin') : cstep === 'colour' ? 'Next'
+    $('#c-yes').textContent = cstep === 'pick' ? (kept ? 'Next' : 'Tick at least one bin') : cstep === 'colour' ? (bins.some(function (b) { return b.asked; }) ? 'Next' : 'Skip for now')
       : missing ? 'Set the missing days' : 'Yes, that\'s right';
     $('#c-yes').classList.toggle('is-off', cstep === 'pick' && !kept);
-    $('#c-edit').textContent = cstep === 'pick' ? '+ Add a bin that\'s missing' : cstep === 'colour' ? 'Skip' : 'Something else is wrong';
+    $('#c-edit').textContent = cstep === 'pick' ? '+ Add a bin that\'s missing' : 'Something else is wrong';
+    $('#c-edit').hidden = cstep === 'colour';
     $('#c-yes').setAttribute('href', missing ? '#confirm' : '#phone');
     $('#c-yes').dataset.missing = missing ? '1' : '';
     if (!editing && cstep === 'pick') {
@@ -1738,10 +1767,10 @@ Share to WhatsApp
           '<span class="tick">' + tick + '</span></button>';
       }).join('');
     } else if (!editing && cstep === 'colour') {
-      $('#c-rows').innerHTML = bins.filter(function (b) { return b.on !== false && b.askColour; }).map(function (b) {
+      $('#c-rows').innerHTML = colourBins().map(function (b) {
         return '<div class="cols binrow">' +
           '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span></span>' +
-          '<div class="cpick" role="group" aria-label="What colour is your ' + esc(b.name) + ' bin?">' + colourPicker(b) + '</div></div>';
+          '<div class="cpick cbig" role="group" aria-label="What colour is your ' + esc(b.name) + ' bin?">' + colourPicker(b) + '</div></div>';
       }).join('');
     } else if (!editing) {
       $('#c-rows').innerHTML = bins.filter(function (b) { return b.on !== false || cstep !== 'check'; }).map(function (b) {
@@ -1800,7 +1829,7 @@ Share to WhatsApp
   }
   $('#c-rows').addEventListener('click', function (e) {
     var pk = e.target.closest('[data-pick]');
-    if (pk) { if (swiped) { swiped = false; return; } var pb = find(pk.dataset.pick); pb.on = pb.on === false; track('bin_ticked', { on: pb.on }); renderConfirm(); return; }
+    if (pk) { if (pickSwiped) { pickSwiped = false; return; } var pb = find(pk.dataset.pick); pb.on = pb.on === false; track('bin_ticked', { on: pb.on }); renderConfirm(); return; }
     var wr = e.target.closest('[data-wrong]');
     if (wr) { track('bin_wrong_day'); editing = true; openBin = wr.dataset.wrong; renderConfirm(); window.scrollTo(0, 0); return; }
     var t = e.target.closest('[data-pickcolour]'); if (!t) return;
@@ -1812,21 +1841,34 @@ Share to WhatsApp
     find(id).on = e.target.checked; renderConfirm();
   });
   var openBin = null;  // the bin open in the editor; the rest are one-line rows
-  var swipeX = null, swipeRow = null, swiped = false;
+  // Swipe a ticked bin left to say "I don't have this". It only starts once the finger has
+  // clearly moved sideways (so scrolling the list never wobbles the rows), and the label that
+  // slides in behind the row says what letting go will do. Tapping does the same and undoes it.
+  var sw = null, pickSwiped = false;
   $('#c-rows').addEventListener('touchstart', function (e) {
-    swipeRow = e.target.closest('[data-pick]'); swipeX = swipeRow ? e.touches[0].clientX : null;
+    var row = e.target.closest('[data-pick][aria-pressed="true"]');
+    sw = row ? { row: row, x: e.touches[0].clientX, y: e.touches[0].clientY, on: false } : null;
   }, { passive: true });
   $('#c-rows').addEventListener('touchmove', function (e) {
-    if (swipeX === null || !swipeRow) return;
-    var dx = e.touches[0].clientX - swipeX; swipeRow.style.transform = 'translateX(' + Math.max(-90, Math.min(90, dx)) + 'px)';
+    if (!sw) return;
+    var dx = e.touches[0].clientX - sw.x, dy = e.touches[0].clientY - sw.y;
+    if (!sw.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }  // scrolling
+      if (dx < -12 && Math.abs(dx) > Math.abs(dy) * 1.5) sw.on = true; else return;
+    }
+    sw.row.style.transition = 'none'; sw.row.style.transform = 'translateX(' + Math.max(-150, Math.min(0, dx)) + 'px)';
   }, { passive: true });
-  $('#c-rows').addEventListener('touchend', function (e) {
-    if (swipeX === null || !swipeRow) return;
-    var dx = e.changedTouches[0].clientX - swipeX, row = swipeRow; swipeX = null; swipeRow = null; row.style.transform = '';
-    if (Math.abs(dx) < 60) return;
-    swiped = true; setTimeout(function () { swiped = false; }, 400);  // the tap that ends a swipe isn't a tick
-    var sb = find(row.dataset.pick); sb.on = dx > 0; track('bin_swiped', { on: sb.on }); renderConfirm();
-  });
+  function swipeEnd(e) {
+    if (!sw) return;
+    var dx = e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX - sw.x : 0, row = sw.row, was = sw.on; sw = null;
+    row.style.transition = ''; row.style.transform = '';
+    if (!was) return;
+    pickSwiped = true; setTimeout(function () { pickSwiped = false; }, 400);  // the tap that ends a swipe isn't a tick
+    if (dx > -70) return;
+    find(row.dataset.pick).on = false; track('bin_swiped', { on: false }); renderConfirm();
+  }
+  $('#c-rows').addEventListener('touchend', swipeEnd);
+  $('#c-rows').addEventListener('touchcancel', swipeEnd);
   $('#c-cards').addEventListener('click', function (e) {
     var t = e.target.closest('button'); if (!t) return;
     if (t.dataset.pickcolour) {
@@ -1866,15 +1908,15 @@ Share to WhatsApp
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
   });
   $('#c-edit').addEventListener('click', function (e) {
-    if (cstep === 'colour') { e.stopImmediatePropagation(); track('bin_colours_skipped'); cstep = 'check'; renderConfirm(); window.scrollTo(0, 0); }
-    else if (cstep === 'pick') { e.stopImmediatePropagation(); track('bin_add_missing'); editing = true; openBin = null; adding = { type: null, days: [], freq: null }; renderConfirm(); }
+    if (cstep === 'pick') { e.stopImmediatePropagation(); track('bin_add_missing'); editing = true; openBin = null; adding = { type: null, days: [], freq: null }; renderConfirm(); }
   });
   $('#c-edit').addEventListener('click', function () { track('bins_edit_opened'); editing = true; openBin = null; renderConfirm(); });
   document.addEventListener('click', function (e) {
     var y = e.target.closest('#c-yes'); if (!y || editing || cstep === 'check') return;
     e.preventDefault(); e.stopImmediatePropagation();
     if (cstep === 'pick' && !bins.some(function (b) { return b.on !== false; })) return;
-    track('bin_check_step', { from: cstep }); cstep = nextStep(); renderConfirm(); window.scrollTo(0, 0);
+    if (cstep === 'colour' && !bins.some(function (b) { return b.asked; })) track('bin_colours_skipped');
+    track('bin_check_step', { from: cstep }); setStep(nextStep());
   }, true);
   document.addEventListener('click', function (e) {
     var y = e.target.closest('#c-yes'); if (!y || !y.dataset.missing) return;
