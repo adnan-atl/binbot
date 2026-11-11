@@ -541,6 +541,19 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 /* Add a bin: colour swatches */
 /* "What colour is it?" under a bin whose colour the council didn't give (we never guess it) */
 .cpick{grid-column:1/-1;display:flex;align-items:center;gap:10px;margin-top:10px}
+/* Step 1 of the bin check: which bins do you put out? One tap per bin, or swipe it away. */
+.pickrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;padding:14px 16px;min-height:72px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;transition:opacity .15s,transform .15s;touch-action:pan-y}
+.pickrow:last-child{border-bottom:0}
+.pickrow b{display:block;font-size:17px;font-weight:700}
+.pickrow small{display:block;font-size:14px;color:var(--grey);margin-top:2px}
+.pickrow .tick{width:30px;height:30px;border-radius:50%;border:2px solid var(--ink);display:grid;place-items:center;background:var(--ink);color:#fff}
+.pickrow[aria-pressed="false"]{opacity:.5}
+.pickrow[aria-pressed="false"] b{text-decoration:line-through}
+.pickrow[aria-pressed="false"] .tick{background:transparent;color:transparent;border-color:var(--grey)}
+.pickrow:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.pill.is-off{opacity:.45}
+.wrongday{grid-column:1/-1;justify-self:start;margin-top:6px;padding:0;border:0;background:none;color:var(--grey);font:inherit;font-size:14px;text-decoration:underline;cursor:pointer}
+
 .cpick-q{flex:none;font-size:14px;font-weight:500;color:#6E6E73}
 .cpick-sw{flex:1;min-width:0;max-width:320px;display:flex;justify-content:space-between;gap:2px}
 .cswatch{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:999px;background:none;cursor:pointer}
@@ -1304,6 +1317,7 @@ Share to WhatsApp
   document.addEventListener('click', function (e) {
     if (!e.target.closest('[data-back]')) return;
     if (current === 'confirm' && editing && bins.length) { editing = false; adding = null; renderConfirm(); window.scrollTo(0, 0); return; }
+    if (current === 'confirm' && stepped && cstep !== 'pick' && bins.length > 1) { cstep = cstep === 'check' && needsColour() ? 'colour' : 'pick'; renderConfirm(); window.scrollTo(0, 0); return; }
     var i = ORDER_SCREENS.indexOf(current);
     var prev = ORDER_SCREENS[Math.max(0, i - 1)];
     if (prev === 'parsing') prev = 'postcode';  // the loading screen isn't a step to go back to
@@ -1493,7 +1507,7 @@ Share to WhatsApp
     go('parsing');
     req.then(function (j) {
       trackUser(j.user_id);
-      API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null;
+      API.userId = j.user_id; API.council = j.council; shared = !!j.shared; editing = false; adding = null; cstep = (j.bins || []).length > 1 ? 'pick' : 'check'; stepped = cstep === 'pick';
       note = j.shared && j.error ? j.error : '';
       councilDown = !!j.council_down;
       PSTEPS[0].subDone = j.council || PSTEPS[0].subDone;
@@ -1682,15 +1696,22 @@ Share to WhatsApp
   if (narrowMq) { var onMq = function () { if (current === 'confirm' && !editing) renderConfirm(); };
     if (narrowMq.addEventListener) narrowMq.addEventListener('change', onMq); else if (narrowMq.addListener) narrowMq.addListener(onMq); }
   var calendarFailed = false;
+  // The bin check is three short questions, one per screen: which bins (pick), their colours
+  // (colour, only when we don't know them) and the week they make (check).
+  var cstep = 'check', stepped = false;  // stepped: this sign-up started at question 1
+  function needsColour() { return bins.some(function (b) { return b.on !== false && b.askColour; }); }
+  function nextStep() { return cstep === 'pick' && needsColour() ? 'colour' : 'check'; }
   var councilDown = false;  // the council's website was down when we asked
   function renderConfirm() {
     if (!bins.length && !editing) { editing = true; if (!adding) adding = { type: null, days: [], freq: null }; }
     var empty = !bins.length;
     $('#c-title').innerHTML = empty ? 'Add your bins<br><span>Which bins do you put out?</span>'
-      : editing ? 'Edit your bins' : 'Check these are right';
+      : editing ? 'Edit your bins' : cstep === 'pick' ? 'Which bins do you put out?' : cstep === 'colour' ? 'What colour are they?' : 'Your bin week';
     $('#c-lede').textContent = empty && councilDown ? (API.council || 'Your council') + "'s website is down right now, so we couldn't fetch your days. Try again in a little while, or add your bins below. Takes about 30 seconds."
       : empty ? 'Pick each bin, the day it goes out and how often. Takes about 30 seconds.'
       : editing ? 'Tap a bin to change its day or how often.'
+      : cstep === 'pick' ? 'Untick any you don\'t have.'
+      : cstep === 'colour' ? 'So your reminder shows the right bin.'
       : note ? note : "We'll remind you the night before.";  // a council problem shows here instead
     $('#c-save').textContent = empty ? 'Add a bin first' : 'Save changes';
     $('#c-save').disabled = empty;
@@ -1700,11 +1721,30 @@ Share to WhatsApp
     $('#c-editor').hidden = !editing;
     // Don't let people confirm a schedule we can't remind them about yet.
     var missing = bins.filter(function (b) { return b.on !== false && !b.days.length; }).length;
-    $('#c-yes').textContent = missing ? 'Set the missing days' : 'Yes, these are right';
+    var kept = bins.filter(function (b) { return b.on !== false; }).length;
+    $('#c-yes').textContent = cstep === 'pick' ? (kept ? 'Next' : 'Tick at least one bin') : cstep === 'colour' ? 'Next'
+      : missing ? 'Set the missing days' : 'Yes, that\'s right';
+    $('#c-yes').classList.toggle('is-off', cstep === 'pick' && !kept);
+    $('#c-edit').textContent = cstep === 'pick' ? '+ Add a bin that\'s missing' : cstep === 'colour' ? 'Skip' : 'Something else is wrong';
     $('#c-yes').setAttribute('href', missing ? '#confirm' : '#phone');
     $('#c-yes').dataset.missing = missing ? '1' : '';
-    if (!editing) {
+    if (!editing && cstep === 'pick') {
+      var tick = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>';
       $('#c-rows').innerHTML = bins.map(function (b) {
+        var on = b.on !== false;
+        return '<button type="button" class="pickrow" data-pick="' + b.id + '" aria-pressed="' + on + '">' +
+          '<span class="binic">' + binSvg(b, 40) + '</span>' +
+          '<span style="min-width:0"><b>' + esc(b.name) + '</b><small>' + (on ? esc(subline(b)) : 'I don\'t have this') + '</small></span>' +
+          '<span class="tick">' + tick + '</span></button>';
+      }).join('');
+    } else if (!editing && cstep === 'colour') {
+      $('#c-rows').innerHTML = bins.filter(function (b) { return b.on !== false && b.askColour; }).map(function (b) {
+        return '<div class="cols binrow">' +
+          '<span class="c-name"><span class="binic">' + binSvg(b, 40) + '</span><span style="font-size:17px;font-weight:700">' + esc(b.name) + '</span></span>' +
+          '<div class="cpick" role="group" aria-label="What colour is your ' + esc(b.name) + ' bin?">' + colourPicker(b) + '</div></div>';
+      }).join('');
+    } else if (!editing) {
+      $('#c-rows').innerHTML = bins.filter(function (b) { return b.on !== false || cstep !== 'check'; }).map(function (b) {
         var chosen = DAYS.filter(function (d) { return b.days.indexOf(d) > -1; });
         var daily = b.on !== false && isDaily(b);
         var chips = b.on === false ? '<span class="daychip" style="background:var(--line);color:var(--grey)">Off</span>' : !chosen.length ? '<span class="hint">Not set</span>' : daily ? '<span class="daychip">' + dailyChip(chosen) + '</span>' : chosen.length > 1 ? '<span class="daychip">' + chosen.join(' · ') + '</span>' : chosen.map(function (d) { return '<span class="daychip">' + d + '</span>'; }).join('');
@@ -1713,7 +1753,7 @@ Share to WhatsApp
           '<span class="m-only m-freq">' + (b.on === false ? "You don't put this one out" : daily ? 'Daily, so no reminders' : esc(subline(b))) + '</span></span></span>' +
           '<span class="c-days">' + chips + '</span>' +
           '<span class="c-freq">' + (daily ? 'No reminders' : freqText(b)) + '</span>' +
-          (b.askColour && b.on !== false ? '<div class="cpick" role="group" aria-label="What colour is your ' + esc(b.name) + ' bin?"><span class="cpick-q">Colour?</span>' + colourPicker(b) + '</div>' : '') +
+          (b.on !== false ? '<button type="button" class="wrongday" data-wrong="' + b.id + '">Wrong day?</button>' : '') +
           '</div>';
       }).join('');
     } else {
@@ -1759,6 +1799,10 @@ Share to WhatsApp
     renderAdder();
   }
   $('#c-rows').addEventListener('click', function (e) {
+    var pk = e.target.closest('[data-pick]');
+    if (pk) { if (swiped) { swiped = false; return; } var pb = find(pk.dataset.pick); pb.on = pb.on === false; track('bin_ticked', { on: pb.on }); renderConfirm(); return; }
+    var wr = e.target.closest('[data-wrong]');
+    if (wr) { track('bin_wrong_day'); editing = true; openBin = wr.dataset.wrong; renderConfirm(); window.scrollTo(0, 0); return; }
     var t = e.target.closest('[data-pickcolour]'); if (!t) return;
     e.preventDefault();
     var p = t.dataset.pickcolour.split(':'); pickColour(p[0], p[1]);
@@ -1768,6 +1812,21 @@ Share to WhatsApp
     find(id).on = e.target.checked; renderConfirm();
   });
   var openBin = null;  // the bin open in the editor; the rest are one-line rows
+  var swipeX = null, swipeRow = null, swiped = false;
+  $('#c-rows').addEventListener('touchstart', function (e) {
+    swipeRow = e.target.closest('[data-pick]'); swipeX = swipeRow ? e.touches[0].clientX : null;
+  }, { passive: true });
+  $('#c-rows').addEventListener('touchmove', function (e) {
+    if (swipeX === null || !swipeRow) return;
+    var dx = e.touches[0].clientX - swipeX; swipeRow.style.transform = 'translateX(' + Math.max(-90, Math.min(90, dx)) + 'px)';
+  }, { passive: true });
+  $('#c-rows').addEventListener('touchend', function (e) {
+    if (swipeX === null || !swipeRow) return;
+    var dx = e.changedTouches[0].clientX - swipeX, row = swipeRow; swipeX = null; swipeRow = null; row.style.transform = '';
+    if (Math.abs(dx) < 60) return;
+    swiped = true; setTimeout(function () { swiped = false; }, 400);  // the tap that ends a swipe isn't a tick
+    var sb = find(row.dataset.pick); sb.on = dx > 0; track('bin_swiped', { on: sb.on }); renderConfirm();
+  });
   $('#c-cards').addEventListener('click', function (e) {
     var t = e.target.closest('button'); if (!t) return;
     if (t.dataset.pickcolour) {
@@ -1806,7 +1865,17 @@ Share to WhatsApp
   $('#c-cards').addEventListener('input', function (e) {
     var id = e.target.dataset.name; if (id) { find(id).name = e.target.value; }
   });
+  $('#c-edit').addEventListener('click', function (e) {
+    if (cstep === 'colour') { e.stopImmediatePropagation(); track('bin_colours_skipped'); cstep = 'check'; renderConfirm(); window.scrollTo(0, 0); }
+    else if (cstep === 'pick') { e.stopImmediatePropagation(); track('bin_add_missing'); editing = true; openBin = null; adding = { type: null, days: [], freq: null }; renderConfirm(); }
+  });
   $('#c-edit').addEventListener('click', function () { track('bins_edit_opened'); editing = true; openBin = null; renderConfirm(); });
+  document.addEventListener('click', function (e) {
+    var y = e.target.closest('#c-yes'); if (!y || editing || cstep === 'check') return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (cstep === 'pick' && !bins.some(function (b) { return b.on !== false; })) return;
+    track('bin_check_step', { from: cstep }); cstep = nextStep(); renderConfirm(); window.scrollTo(0, 0);
+  }, true);
   document.addEventListener('click', function (e) {
     var y = e.target.closest('#c-yes'); if (!y || !y.dataset.missing) return;
     e.preventDefault(); e.stopImmediatePropagation(); editing = true;
