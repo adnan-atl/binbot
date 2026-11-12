@@ -38,15 +38,27 @@ COUNCIL_COLOURS: dict[str, dict[str, BinCategory]] = {
     "E09000013": {  # Hammersmith & Fulham (sacks/bins by colour)
         "blue": BinCategory.recycling, "black": BinCategory.general,
     },
+    # Lambeth's service names each container by colour only. Its own records say which is
+    # which: "Domestic Recycling 240L wheelie bin" is the green bin, "Domestic Food Waste 23L
+    # kerbside" the brown bin (not garden waste, which goes out in sacks).
+    "E09000022": {
+        "green": BinCategory.recycling, "brown": BinCategory.food, "black": BinCategory.general,
+    },
 }
+
+
+def council_category(label: str, gss_code: str | None) -> BinCategory | None:
+    """What this council means by a colour-only label, when we've been told (COUNCIL_COLOURS)."""
+    if gss_code and gss_code in COUNCIL_COLOURS:
+        return COUNCIL_COLOURS[gss_code].get(colour_of(label.lower()))
+    return None
 
 
 def categorise(label: str, gss_code: str | None = None) -> BinCategory:
     l = label.lower()
-    if gss_code and gss_code in COUNCIL_COLOURS:
-        c = colour_of(l)
-        if c and c in COUNCIL_COLOURS[gss_code]:
-            return COUNCIL_COLOURS[gss_code][c]
+    told = council_category(label, gss_code)
+    if told:
+        return told
     # "Non-Recyclable Refuse" (Bromley) contains "recycl": it's general waste, not recycling.
     if _NOT_RECYCLING.search(l):
         return BinCategory.general

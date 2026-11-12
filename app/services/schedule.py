@@ -34,7 +34,7 @@ from app.models import (
 )
 from app.services import checks as checker
 from app.services import geo, sides
-from app.services.normalize import (PURPOSE, categorise, colour_of, colours_text, council_colour,
+from app.services.normalize import (PURPOSE, categorise, colour_of, colours_text, council_category, council_colour,
                                     council_colour_options, describe_rule)
 
 log = logging.getLogger(__name__)
@@ -74,8 +74,14 @@ def get_or_create_bin_type(db: Session, council: Council, label: str) -> BinType
     )
     cat = categorise(label, council.gss_code)
     if bt:
-        if bt.category == BinCategory.other and cat != BinCategory.other:
-            bt.category = cat  # we learned what this colour means for this council
+        learned = bt.category == BinCategory.other and cat != BinCategory.other
+        # The council's own meaning for a colour beats our earlier guess from the label
+        # (Lambeth's "brown bin" is food waste; the general rules read it as garden).
+        if bt.category != cat and (learned or council_category(label, council.gss_code)):
+            for st in db.scalars(select(UserBinSetting).where(
+                    UserBinSetting.bin_type_id == bt.id, UserBinSetting.category == bt.category)):
+                st.category = cat
+            bt.category = cat
         return bt
     bt = BinType(council_id=council.id, council_label=label,
                  category=cat, colour=colour_of(label))
