@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.base import unreachable
 from app.adapters.manual import clean_moves
-from app.adapters.registry import coverage, spec_for
+from app.adapters.registry import BLOCKED, coverage, spec_for
 from app.api import schemas as S
 from app.core.config import get_settings
 from app.core.db import get_db
@@ -111,7 +111,8 @@ def signup_start(body: S.StartIn, request: Request, db: Session = Depends(get_db
                     shared=bool(res.shared), calendar_error=bool(res.error), bins=len(bins))
     return S.StartOut(user_id=user.id, property_id=res.prop.id, council=res.prop.council.name,
                       source=res.source, error=res.error, shared=res.shared, bins=bins,
-                      council_down=bool(res.error and unreachable(res.error) and not bins))
+                      council_down=bool(res.error and unreachable(res.error) and not bins),
+                      checker_url=None if bins else BLOCKED.get(res.prop.council.gss_code))
 
 
 # Shared with the WhatsApp sign-up: see services/signup.py

@@ -10,6 +10,8 @@ import sys
 
 from sqlalchemy import select
 
+from app.adapters.registry import BLOCKED
+
 from app.core.db import session_factory
 from app.models import CouncilStatus, Property, User
 from app.services import signup
@@ -25,7 +27,8 @@ def run(db, apply: bool) -> list[str]:
         if not lapsed:
             continue
         prop = representative_for(db, key)
-        if not prop or not prop.council or prop.council.status == CouncilStatus.unsupported:
+        if (not prop or not prop.council or prop.council.status == CouncilStatus.unsupported
+                or prop.council.gss_code in BLOCKED):
             continue
         line = f"{key}: {len(lapsed)} bin(s) out of dates"
         if apply:

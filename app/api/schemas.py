@@ -60,6 +60,9 @@ class StartOut(BaseModel):
     shared: bool = False  # calendar reused from the postcode round, not fetched for this home
     error: str | None = None
     council_down: bool = False  # the council's website is down: try again later, or add by hand
+    # The council blocks automated lookups: its own bin-day page, for the resident to check
+    # their days on before typing them in.
+    checker_url: str | None = None
 
 
 class OwnCalendarIn(BaseModel):

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters.base import (AdapterError, LookupInput, NoCollectionsForAddress, RawCollection,
                                unreachable)
-from app.adapters.registry import CUSTOM_FIRST, candidates, library_version, spec_for
+from app.adapters.registry import BLOCKED, CUSTOM_FIRST, candidates, library_version, spec_for
 from app.adapters.ukbcd import UKBCDAdapter
 from app.core.config import get_settings
 from app.models import (
@@ -208,6 +208,8 @@ def fetch_collections(council: Council, prop: Property) -> list[RawCollection]:
         from app.services.demo import demo_collections
 
         return demo_collections()
+    if getattr(council, "gss_code", None) in BLOCKED:
+        raise AdapterError("council blocks automated lookups", retryable=False)
     adapters = _adapters_for(council)
     if not adapters:
         raise AdapterError("no adapter for council", retryable=False)

@@ -330,6 +330,23 @@ CUSTOM_FIRST = {"E07000079", "E07000080", "E07000081", "E06000066"}  # Cotswold,
 NOT_ALTERNATES = {"E07000082": {"GosportBoroughCouncil"}}
 
 
+# Councils whose bin-day page sits behind a bot check (Cloudflare's "security verification",
+# reCAPTCHA) or otherwise refuses automated visits. We don't try to get past those. Residents
+# there look their days up on the council's own page (the link below) and type them in once;
+# the rest of their postcode then gets them (signup.copy_neighbour_manual). Checked from our
+# server on the date shown; take a council out when it lets us in (or gives us a feed).
+BLOCKED: dict[str, str] = {
+    "E07000225": "https://www.chichester.gov.uk/checkyourbinday",  # Chichester, 2026-11
+    "E07000106": "https://www.canterbury.gov.uk",  # Canterbury, 2026-11
+    "E07000136": "https://www.boston.gov.uk/findwastecollections",  # Boston, 2026-11-12
+    "E07000137": "https://www.e-lindsey.gov.uk/mywastecollections",  # East Lindsey, 2026-11-12
+    "S12000011": "https://eastrenfrewshire.gov.uk/bin-days",  # East Renfrewshire, 2026-11-12
+    "E07000145": "https://myaccount.great-yarmouth.gov.uk/article/6456/Find-my-waste-collection-days",  # Great Yarmouth, 2026-11-12
+    "E06000004": "https://www.stockton.gov.uk/bin-collection-days",  # Stockton-on-Tees, 2026-11-12
+    "E06000006": "https://webapp.halton.gov.uk/PublicWebForms/WasteServiceSearchv1.aspx#collections",  # Halton (reCAPTCHA), 2026-11
+}
+
+
 def candidates(gss_code: str, name: str | None = None) -> list[AdapterSpec]:
     """Scrapers to try for a council, best first: the primary library module (or ours, for
     CUSTOM_FIRST councils), then the other, then any other module that serves it. Fetching

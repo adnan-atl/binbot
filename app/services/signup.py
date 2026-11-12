@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.adapters.base import unreachable
+from app.adapters.registry import BLOCKED
 from app.adapters.manual import expand_rule
 from app.api import schemas as S
 from app.core.config import get_settings
@@ -82,7 +83,8 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
         source = "demo"
     stored = round_has_calendar(db, prop.round_key)
     lapsed = lapsed_bins(db, prop.round_key) if stored else {}
-    can_ask = council.status != CouncilStatus.unsupported
+    # A council that blocks automated lookups isn't asked at all: no wait, straight to hand entry.
+    can_ask = council.status != CouncilStatus.unsupported and council.gss_code not in BLOCKED
     mine = None
     if stored and not (lapsed and can_ask):
         # A neighbour already fetched this postcode's round: reuse its days. Which bins this
