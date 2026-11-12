@@ -401,7 +401,7 @@ def _cover_other_homes(db: Session, prop: Property, items: list[RawCollection], 
 # subscription, a 120 litre bin where next door has 180). When the council answers quickly,
 # ask it about this home too; give up after the deadline and use the street's bins.
 QUICK_LOOKUP_SECONDS = 5.0
-OWN_BINS_DEADLINE = 8.0
+OWN_BINS_DEADLINE = 13.0
 
 
 def council_is_quick(db: Session, council: Council) -> bool:
