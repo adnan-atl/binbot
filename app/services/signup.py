@@ -91,7 +91,8 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
         # by hand: same postcode, same lorry, so they're this home's days too.
         source, shared = "neighbours", True
     elif can_ask:
-        res = refresh_round(db, prop, source="demo" if source == "demo" else "council")
+        res = refresh_round(db, prop, source="demo" if source == "demo" else "council",
+                            waiting=True)
         if res.error and stored:
             # The stored calendar has a bin with no dates left (the council only publishes the
             # next one) and asking again failed: what we hold still beats nothing.

@@ -10,6 +10,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
+from time import monotonic
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -343,11 +344,67 @@ class RefreshResult:
     error: str | None = None
 
 
-def refresh_round(db: Session, prop: Property, source: str = "council") -> RefreshResult:
-    """Fetch the calendar for a property's round, store it, and diff against what we had."""
+# Bins only some homes on a postcode have (a garden subscription, a different size of refuse
+# bin) aren't in the answer for a home without them. Ask up to this many of the round's other
+# homes for those bins; a resident waiting at sign-up gets fewer, and none after a slow lookup.
+COVER_HOMES, COVER_HOMES_WAITING, COVER_AFTER_SECONDS = 4, 2, 5.0
+# A bin with dates this recent still counts as one the round has.
+RECENT_BIN = timedelta(days=35)
+
+
+def _in_window(items: list[RawCollection], today: date) -> list[RawCollection]:
+    """Keep a bounded horizon; drop past dates."""
+    horizon = today + timedelta(days=get_settings().horizon_days)
+    return [i for i in items if today <= i.date <= horizon]
+
+
+def _cover_other_homes(db: Session, prop: Property, items: list[RawCollection], today: date,
+                       homes: int) -> tuple[list[RawCollection], set[str]]:
+    """
+    The round has bins this address's answer doesn't mention: ask the round's other homes
+    for them. Returns (their dates for those bins, bins still unaccounted for). A bin stays
+    unaccounted for when we couldn't ask every other home, so its absence proves nothing and
+    its dates are left alone; when every other home answered without it, it has really gone.
+    """
+    council = prop.council
+    listed = {get_or_create_bin_type(db, council, i.label).id for i in items}
+    known = set(db.scalars(select(CollectionEvent.bin_type_id).where(
+        CollectionEvent.round_key == prop.round_key, CollectionEvent.date >= today - RECENT_BIN)).all())
+    missing = known - listed
+    if not missing:
+        return [], set()
+    others = db.scalars(
+        select(Property).where(Property.round_key == prop.round_key, Property.id != prop.id,
+                               Property.id.in_(select(User.property_id)))
+        .order_by(Property.created_at).limit(homes + 1)).all()
+    asked_all = len(others) <= homes
+    extra: dict[tuple[str, date], RawCollection] = {}
+    found: set[str] = set()
+    for other in others[:homes]:
+        if found >= missing:
+            break
+        try:
+            got = _in_window(fetch_collections(council, other), today)
+        except AdapterError as e:
+            log.info("refresh: other home on %s failed: %s", prop.round_key, e)
+            asked_all = False
+            continue
+        for i in got:
+            bt_id = get_or_create_bin_type(db, council, i.label).id
+            if bt_id in missing:
+                extra[(i.label, i.date)] = i
+                found.add(bt_id)
+    return list(extra.values()), (missing - found if not asked_all else set())
+
+
+def refresh_round(db: Session, prop: Property, source: str = "council",
+                  waiting: bool = False) -> RefreshResult:
+    """Fetch the calendar for a property's round, store it, and diff against what we had.
+    `waiting`: a resident is watching the loader, so keep the extra lookups short."""
     council = prop.council
     s = get_settings()
     today = date.today()
+    started = monotonic()
     try:
         items = fetch_collections(council, prop)
     except AdapterError as e:
@@ -361,8 +418,12 @@ def refresh_round(db: Session, prop: Property, source: str = "council") -> Refre
         db.commit()
         return RefreshResult(snapshot=snap, changed=False, diff={}, error=str(e))
 
-    # Keep a bounded horizon; drop past dates.
-    items = [i for i in items if today <= i.date <= today + timedelta(days=s.horizon_days)]
+    items = _in_window(items, today)
+    homes = COVER_HOMES
+    if waiting:
+        homes = COVER_HOMES_WAITING if monotonic() - started < COVER_AFTER_SECONDS else 0
+    extra, keep = _cover_other_homes(db, prop, items, today, homes)
+    items = items + extra
     content_hash = _hash(items)
     last = db.scalar(
         select(Snapshot).where(Snapshot.round_key == prop.round_key, Snapshot.ok.is_(True))
@@ -380,7 +441,7 @@ def refresh_round(db: Session, prop: Property, source: str = "council") -> Refre
         db.commit()
         return RefreshResult(snapshot=snap, changed=False, diff={})
 
-    diff = _apply_events(db, prop.round_key, council, items, snap)
+    diff = _apply_events(db, prop.round_key, council, items, snap, keep)
     if last is not None and any(diff.values()):
         db.add(ChangeLog(scope="round", scope_id=prop.round_key, kind="dates_changed", diff=diff))
     db.commit()
@@ -397,8 +458,10 @@ def _keep_going(db: Session, prop: Property) -> None:
 
 
 def _apply_events(db: Session, round_key: str, council: Council, items: list[RawCollection],
-                  snap: Snapshot) -> dict:
-    """Upsert future events for the round; return {added, removed, moved}."""
+                  snap: Snapshot, keep: set[str] | frozenset = frozenset()) -> dict:
+    """Upsert future events for the round; return {added, removed, moved}. `keep`: bins that
+    only other homes on the round have and that we couldn't ask about (_cover_other_homes):
+    not being in this fetch isn't a removal."""
     today = date.today()
     existing = db.scalars(
         select(CollectionEvent).where(CollectionEvent.round_key == round_key,
@@ -409,7 +472,8 @@ def _apply_events(db: Session, round_key: str, council: Council, items: list[Raw
     filled = set(db.scalars(select(Snapshot.id).where(Snapshot.round_key == round_key,
                                                       Snapshot.source.in_(BORROWED_SOURCES))).all())
     borrowed = {(e.bin_type_id, e.date): e for e in existing if e.snapshot_id in filled}
-    have = {(e.bin_type_id, e.date): e for e in existing if e.snapshot_id not in filled}
+    have = {(e.bin_type_id, e.date): e for e in existing
+            if e.snapshot_id not in filled and e.bin_type_id not in keep}
     want: dict[tuple[str, date], RawCollection] = {}
     for i in items:
         bt = get_or_create_bin_type(db, council, i.label)
