@@ -397,6 +397,73 @@ def _cover_other_homes(db: Session, prop: Property, items: list[RawCollection], 
     return list(extra.values()), (missing - found if not asked_all else set())
 
 
+# A neighbour's calendar has the street's days, but which bins a home has is its own (a garden
+# subscription, a 120 litre bin where next door has 180). When the council answers quickly,
+# ask it about this home too; give up after the deadline and use the street's bins.
+QUICK_LOOKUP_SECONDS = 5.0
+OWN_BINS_DEADLINE = 8.0
+
+
+def council_is_quick(db: Session, council: Council) -> bool:
+    """Has this council answered a sign-up's lookup within QUICK_LOOKUP_SECONDS before?"""
+    best = db.scalar(select(func.min(User.lookup_seconds))
+                     .join(Property, Property.id == User.property_id)
+                     .where(Property.council_id == council.id,
+                            User.lookup_source.in_(("council", "demo"))))
+    return best is not None and best <= QUICK_LOOKUP_SECONDS
+
+
+def own_bins(db: Session, prop: Property, today: date | None = None) -> set[str] | None:
+    """
+    The bins the council lists for this home, as bin type ids, for a home joining a round
+    that already has a calendar. A bin the round didn't have yet is added with its dates;
+    nothing else on the round changes (one home's answer says nothing about the neighbours').
+    None when the council didn't answer in time, had nothing, or disagrees with the round's
+    days, so the caller falls back to every bin on the round.
+    """
+    import concurrent.futures as cf
+    from types import SimpleNamespace
+
+    today = today or date.today()
+    council = prop.council
+    # Plain copies: the lookup runs on another thread, which mustn't touch the session.
+    c = SimpleNamespace(adapter=council.adapter, gss_code=council.gss_code, name=council.name,
+                        adapter_params=council.adapter_params)
+    home = SimpleNamespace(postcode=prop.postcode, uprn=prop.uprn, house_number=prop.house_number,
+                           address_line=prop.address_line, round_key=prop.round_key)
+    ex = cf.ThreadPoolExecutor(max_workers=1)
+    try:
+        items = ex.submit(fetch_collections, c, home).result(timeout=OWN_BINS_DEADLINE)
+    except cf.TimeoutError:
+        log.info("own bins: %s took over %ss for %s", council.name, OWN_BINS_DEADLINE, prop.postcode)
+        return None
+    except Exception as e:  # the street's calendar still stands
+        log.info("own bins: %s failed for %s: %s", council.name, prop.postcode, e)
+        return None
+    finally:
+        ex.shutdown(wait=False)
+    items = _in_window(items, today)
+    if not items:
+        return None
+    round_days: dict[str, set[int]] = {}
+    for e in db.scalars(select(CollectionEvent).where(
+            CollectionEvent.round_key == prop.round_key, CollectionEvent.date >= today)):
+        round_days.setdefault(e.bin_type_id, set()).add(e.date.weekday())
+    theirs = [(get_or_create_bin_type(db, council, i.label).id, i.date) for i in items]
+    # A bin the street has, on a day the street doesn't put it out: this home may be on
+    # another round (a split postcode). That's for verify.py and split.py to settle with
+    # more than one answer; change nothing here.
+    if any(bt in round_days and d.weekday() not in round_days[bt] for bt, d in theirs):
+        log.info("own bins: %s differs from its round's days, left to verify", prop.postcode)
+        return None
+    mine = {bt for bt, _ in theirs}
+    for bt, d in theirs:
+        if bt not in round_days:  # a bin nobody on the round had yet: its dates come with it
+            db.add(CollectionEvent(round_key=prop.round_key, bin_type_id=bt, date=d))
+    db.flush()
+    return mine
+
+
 def refresh_round(db: Session, prop: Property, source: str = "council",
                   waiting: bool = False) -> RefreshResult:
     """Fetch the calendar for a property's round, store it, and diff against what we had.

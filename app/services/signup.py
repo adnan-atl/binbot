@@ -29,8 +29,8 @@ from app.models import (
 )
 from app.services.normalize import describe_rule, display_label, is_daily
 from app.services.reminders import credit_referral, rebuild_reminders
-from app.services.schedule import (lapsed_bins, refresh_round, resolve_property, round_has_calendar,
-                                   schedule_for)
+from app.services.schedule import (council_is_quick, lapsed_bins, own_bins, refresh_round,
+                                   resolve_property, round_has_calendar, schedule_for)
 from app.services.verify import rescue_round, verify_round
 
 log = logging.getLogger(__name__)
@@ -83,9 +83,13 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
     stored = round_has_calendar(db, prop.round_key)
     lapsed = lapsed_bins(db, prop.round_key) if stored else {}
     can_ask = council.status != CouncilStatus.unsupported
+    mine = None
     if stored and not (lapsed and can_ask):
-        # A neighbour already fetched this postcode's round: reuse it, no lookup at all.
+        # A neighbour already fetched this postcode's round: reuse its days. Which bins this
+        # home has is its own, so a council that answers quickly is asked about that.
         source, shared = "neighbours", True
+        if can_ask and council_is_quick(db, council):
+            mine = own_bins(db, prop)
     elif not stored and copy_neighbour_manual(db, user, prop):
         # The council can't be asked (or wasn't answering) and a neighbour typed their days in
         # by hand: same postcode, same lorry, so they're this home's days too.
@@ -108,7 +112,7 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
             if lapsed:
                 restore_lapsed_bins(db, prop.round_key, lapsed, skip=user.id)
     if not error:
-        seed_settings(db, user, prop)
+        seed_settings(db, user, prop, only=mine)
     db.commit()
     if not error and not shared:  # neighbours reuse a round that was already checked
         log_checks(db, prop)
@@ -188,14 +192,17 @@ def mostly_unused(db: Session, bin_type_ids: list[str]) -> set[str]:
             if n + on.get(bt, 0) >= UNUSED_MIN_RESIDENTS and n > UNUSED_SHARE * (n + on.get(bt, 0))}
 
 
-def seed_settings(db: Session, user: User, prop) -> None:
-    """One UserBinSetting per council bin on the property's round."""
+def seed_settings(db: Session, user: User, prop, only: set | None = None) -> None:
+    """One UserBinSetting per council bin on the property's round; with `only`, just the bins
+    the council lists for this home (schedule.own_bins)."""
     for s in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id,
                                                       UserBinSetting.bin_type_id.is_not(None),
                                                       UserBinSetting.override_rule.is_(None))):
         db.delete(s)
     db.flush()
     found = schedule_for(db, prop)
+    if only:
+        found = [b for b in found if b["bin_type_id"] in only] or found
     unused = mostly_unused(db, [b["bin_type_id"] for b in found])
     for b in found:
         db.add(UserBinSetting(user_id=user.id, bin_type_id=b["bin_type_id"],

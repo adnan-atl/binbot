@@ -75,3 +75,35 @@ def test_a_resident_waiting_after_a_slow_lookup_is_not_kept_longer(client, db, m
     answers[A] = [RawCollection("Refuse", WK1), RawCollection("Refuse", WK2)]
     schedule.refresh_round(db, props[A], waiting=True)
     assert calls == [A] and _dates(db, props[A], "Garden Bin") == [WK1]
+
+
+def test_a_neighbour_joining_gets_their_own_bins_not_the_whole_street(client, db, monkeypatch):
+    """Council answers quickly: the second home on a postcode is asked about, so the home
+    with the garden bin gets it and the home without doesn't."""
+    answers = {A: [RawCollection("Refuse", WK1)],
+               B: [RawCollection("Refuse", WK1), RawCollection("Garden Bin", WK1)],
+               "10000004": [RawCollection("Refuse", WK1)]}
+    monkeypatch.setattr(schedule, "fetch_collections", lambda council, prop: answers[prop.uprn])
+    labels = {}
+    for uprn in (A, B, "10000004"):
+        r = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": uprn}).json()
+        labels[uprn] = sorted(b["label"] for b in r["bins"])
+        assert not r["error"]
+    assert len(labels[A]) == 1 and len(labels[B]) == 2 and len(labels["10000004"]) == 1
+    assert labels[B] != labels[A]
+
+
+def test_a_council_that_fails_for_the_second_home_still_gives_the_street_calendar(client, db, monkeypatch):
+    answers = {A: [RawCollection("Refuse", WK1), RawCollection("Garden Bin", WK1)],
+               B: AdapterError("site down", retryable=True)}
+
+    def fetch(council, prop):
+        if isinstance(answers[prop.uprn], Exception):
+            raise answers[prop.uprn]
+        return answers[prop.uprn]
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    first = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": A}).json()
+    second = client.post("/api/signup/start", json={"postcode": "E8 3PB", "uprn": B}).json()
+    assert second["shared"] is True and not second["error"]
+    assert len(second["bins"]) == len(first["bins"]) == 2
