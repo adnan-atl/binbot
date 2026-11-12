@@ -33,6 +33,7 @@ from app.services.schedule import (
     postcode_round_key,
     refresh_round,
     round_has_calendar,
+    round_is_current,
 )
 
 log = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ def postcode_lookup(postcode: str, request: Request, addresses: bool = False,
         raise HTTPException(400, "That doesn't look like a UK postcode")
     spec = spec_for(info.gss_code, info.district)
     council = get_or_create_council(db, info.gss_code, info.district)
-    known = round_has_calendar(db, postcode_round_key(council, info.postcode))
+    known = round_is_current(db, postcode_round_key(council, info.postcode))
     db.commit()
     return S.PostcodeOut(
         postcode=info.postcode, council=info.district, gss_code=info.gss_code,

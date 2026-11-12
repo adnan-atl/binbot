@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.adapters.base import (AdapterError, LookupInput, NoCollectionsForAddress, RawCollection,
@@ -141,6 +141,27 @@ def round_has_calendar(db: Session, round_key: str) -> bool:
         select(CollectionEvent.id).where(CollectionEvent.round_key == round_key,
                                          CollectionEvent.date >= date.today()).limit(1)
     ) is not None
+
+
+def lapsed_bins(db: Session, round_key: str, today: date | None = None) -> dict[str, date]:
+    """Bins whose dates ran out since we last asked the council: {bin_type_id: last date}.
+    Councils that publish only "your next collection" leave a stored calendar with nothing
+    upcoming for a bin once that day passes, so reusing it as it is would lose the bin. A bin
+    that already had no dates left when we last asked (garden waste in winter) doesn't count:
+    asking again wouldn't bring it back."""
+    today = today or date.today()
+    asked = db.scalar(select(func.max(Snapshot.fetched_at))
+                      .where(Snapshot.round_key == round_key, Snapshot.ok.is_(True)))
+    asked_on = asked.date() if asked else None
+    last = db.execute(select(CollectionEvent.bin_type_id, func.max(CollectionEvent.date))
+                      .where(CollectionEvent.round_key == round_key)
+                      .group_by(CollectionEvent.bin_type_id)).all()
+    return {bt: d for bt, d in last if d < today and (asked_on is None or d >= asked_on)}
+
+
+def round_is_current(db: Session, round_key: str) -> bool:
+    """A stored calendar a new neighbour can be given without asking the council again."""
+    return round_has_calendar(db, round_key) and not lapsed_bins(db, round_key)
 
 
 def representative_for(db: Session, round_key: str) -> Property | None:

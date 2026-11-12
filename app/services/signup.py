@@ -29,7 +29,8 @@ from app.models import (
 )
 from app.services.normalize import describe_rule, display_label, is_daily
 from app.services.reminders import credit_referral, rebuild_reminders
-from app.services.schedule import refresh_round, resolve_property, round_has_calendar, schedule_for
+from app.services.schedule import (lapsed_bins, refresh_round, resolve_property, round_has_calendar,
+                                   schedule_for)
 from app.services.verify import rescue_round, verify_round
 
 log = logging.getLogger(__name__)
@@ -79,23 +80,32 @@ def start_signup(db: Session, postcode: str, uprn: str | None = None,
     source, error, shared = "manual", None, False
     if get_settings().demo_mode:
         source = "demo"
-    if round_has_calendar(db, prop.round_key):
+    stored = round_has_calendar(db, prop.round_key)
+    lapsed = lapsed_bins(db, prop.round_key) if stored else {}
+    can_ask = council.status != CouncilStatus.unsupported
+    if stored and not (lapsed and can_ask):
         # A neighbour already fetched this postcode's round: reuse it, no lookup at all.
         source, shared = "neighbours", True
-    elif copy_neighbour_manual(db, user, prop):
+    elif not stored and copy_neighbour_manual(db, user, prop):
         # The council can't be asked (or wasn't answering) and a neighbour typed their days in
         # by hand: same postcode, same lorry, so they're this home's days too.
         source, shared = "neighbours", True
-    elif council.status != CouncilStatus.unsupported:
+    elif can_ask:
         res = refresh_round(db, prop, source="demo" if source == "demo" else "council")
+        if res.error and stored:
+            # The stored calendar has a bin with no dates left (the council only publishes the
+            # next one) and asking again failed: what we hold still beats nothing.
+            source, shared = "neighbours", True
         # A site that isn't answering won't answer for the neighbours either: don't make the
         # resident wait through two more timeouts.
-        if res.error and not unreachable(res.error) and rescue_round(db, prop):
+        elif res.error and not unreachable(res.error) and rescue_round(db, prop):
             source = "neighbours"  # this address failed; a neighbour's calendar worked
         elif res.error:
             error = res.error
         else:
             source = source if source == "demo" else "council"
+            if lapsed:
+                restore_lapsed_bins(db, prop.round_key, lapsed, skip=user.id)
     if not error:
         seed_settings(db, user, prop)
     db.commit()
@@ -191,6 +201,34 @@ def seed_settings(db: Session, user: User, prop) -> None:
                               label=b["label"], category=BinCategory(b["category"]),
                               enabled=b["bin_type_id"] not in unused))
     db.flush()
+
+
+def restore_lapsed_bins(db: Session, round_key: str, lapsed: dict, skip: str | None = None) -> int:
+    """Residents who joined a round while one of its bins had no dates left (schedule.lapsed_bins)
+    were never offered that bin. Now the council has been asked again, give it to them. Someone
+    who joined while it was still showing and removed it is left alone. Returns bins added."""
+    added = 0
+    users = db.scalars(select(User).join(Property, Property.id == User.property_id)
+                       .where(Property.round_key == round_key)).all()
+    for u in users:
+        if u.id == skip or u.property is None or u.created_at is None:
+            continue
+        have = set(db.scalars(select(UserBinSetting.bin_type_id)
+                              .where(UserBinSetting.user_id == u.id)).all())
+        found = [b for b in schedule_for(db, u.property)
+                 if b["bin_type_id"] in lapsed and b["bin_type_id"] not in have
+                 and u.created_at.date() > lapsed[b["bin_type_id"]]]
+        if not found:
+            continue
+        unused = mostly_unused(db, [b["bin_type_id"] for b in found])
+        for b in found:
+            db.add(UserBinSetting(user_id=u.id, bin_type_id=b["bin_type_id"], label=b["label"],
+                                  category=BinCategory(b["category"]),
+                                  enabled=b["bin_type_id"] not in unused))
+            added += 1
+        db.flush()
+        rebuild_reminders(db, u)
+    return added
 
 
 def fill_gaps(db: Session, user: User) -> None:

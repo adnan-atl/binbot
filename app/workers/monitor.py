@@ -28,10 +28,10 @@ from app.models import (
     UserStatus,
 )
 from app.providers.messaging import send_message, send_template_message, uses_template
-from app.services import split
+from app.services import signup, split
 from app.services.reminders import dispatch_due, rebuild_reminders
 from app.services.verify import verify_round
-from app.services.schedule import refresh_round, representative_for
+from app.services.schedule import lapsed_bins, refresh_round, representative_for
 
 log = logging.getLogger(__name__)
 
@@ -76,11 +76,14 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
         prop = representative_for(db, key)
         if not prop or not prop.council or prop.council.status == CouncilStatus.unsupported:
             continue
+        lapsed = lapsed_bins(db, key, today)
         res = refresh_round(db, prop)
         stats["checked"] += 1
         if res.error:
             stats["failed"] += 1
             continue
+        if lapsed:
+            signup.restore_lapsed_bins(db, key, lapsed)
         verify_round(db, prop)  # fill gaps from neighbours again (at most weekly)
         db.commit()
         if res.changed:
