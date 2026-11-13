@@ -31,7 +31,8 @@ from app.models import (
 from app.services.normalize import describe_rule, display_label, is_daily
 from app.services.reminders import credit_referral, rebuild_reminders
 from app.services.schedule import (council_is_quick, lapsed_bins, own_bins, refresh_round,
-                                   resolve_property, round_has_calendar, schedule_for)
+                                   resolve_property, round_has_calendar, schedule_for,
+                                   with_council_dates)
 from app.services.verify import rescue_round, verify_round
 
 log = logging.getLogger(__name__)
@@ -297,6 +298,9 @@ def bins_out(db: Session, user: User, now: datetime | None = None) -> list[S.Bin
         colours: list[str] = []
         if s.override_rule:
             dates = expand_rule(s.override_rule, date.today(), 60)
+            if s.bin_type_id and user.property:
+                dates = with_council_dates(db, user.property.round_key, s.bin_type_id,
+                                           s.override_rule, dates)
             rule = describe_rule(dates)
             rule["days"] = s.override_rule.get("days", rule["days"])
             rule["frequency"] = s.override_rule.get("frequency", rule["frequency"])

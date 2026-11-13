@@ -61,6 +61,11 @@ def effective_collections(db: Session, user: User) -> dict[date, list[dict]]:
                     "colour": colour, "colours": colours}
         if s.override_rule:
             dates = expand_rule(s.override_rule, today, horizon)
+            if s.bin_type_id and user.property:
+                from app.services.schedule import with_council_dates
+
+                dates = with_council_dates(db, user.property.round_key, s.bin_type_id,
+                                           s.override_rule, dates, today)
         elif s.bin_type_id and user.property:
             dates = db.scalars(
                 select(CollectionEvent.date).where(

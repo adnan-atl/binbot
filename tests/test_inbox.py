@@ -263,11 +263,25 @@ def test_sign_up_card_says_how_the_checker_went():
 
 
 def test_sign_up_card_flags_bins_changed_by_hand(client, db, slack, monkeypatch):
-    from app.models import UserBinSetting, User
+    from app.models import CollectionEvent, UserBinSetting, User
     from app.services.inbox import signup_card
     uid = client.post("/api/signup/start", json={"postcode": "e83pb", "uprn": "10000002",
                                                   "house_number": "12"}).json()["user_id"]
     db.add(UserBinSetting(user_id=uid, label="Garden", category="garden",
                           override_rule={"days": ["TUE"], "frequency": "weekly"}))
     db.commit()
-    assert "1 bin added or changed by hand" in signup_card(db, db.get(User, uid), "website")
+    assert "1 bin added by hand" in signup_card(db, db.get(User, uid), "website")
+    # Only "how often" on a council bin (same day as the council's) is routine, and says so;
+    # a different day is a disagreement.
+    theirs = db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == uid,
+                                                     UserBinSetting.bin_type_id.is_not(None))).all()
+    ev = db.scalar(select(CollectionEvent).where(CollectionEvent.bin_type_id == theirs[0].bin_type_id))
+    day = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][ev.date.weekday()]
+    other = "MON" if day != "MON" else "TUE"
+    theirs[0].override_rule = {"days": [day], "frequency": "fortnightly"}
+    db.commit()
+    assert "how often set on 1 bin" in signup_card(db, db.get(User, uid), "website")
+    theirs[0].override_rule = {"days": [other], "frequency": "weekly"}
+    db.commit()
+    card = signup_card(db, db.get(User, uid), "website")
+    assert "day changed on 1 bin" in card and "how often" not in card

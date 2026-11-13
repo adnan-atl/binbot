@@ -180,6 +180,53 @@ def representative_for(db: Session, round_key: str) -> Property | None:
     )
 
 
+# ------------------------------------------------------------------ a resident's pattern on a council bin
+
+_DAY_NUM = {"MON": 0, "TUE": 1, "WED": 2, "THU": 3, "FRI": 4, "SAT": 5, "SUN": 6}
+
+
+def follows_council_days(db: Session, round_key: str, bin_type_id: str, rule: dict,
+                         today: date | None = None) -> bool:
+    """Did the resident keep the council's day for this bin and only say how often it goes out?
+    (Councils that publish just the next date leave the frequency to them.) A resident who
+    picked a different day has told us the council is wrong for their home: their day stands."""
+    today = today or date.today()
+    mine = {_DAY_NUM[d] for d in rule.get("days", []) if d in _DAY_NUM}
+    council = {d.weekday() for d in db.scalars(select(CollectionEvent.date).where(
+        CollectionEvent.round_key == round_key, CollectionEvent.bin_type_id == bin_type_id,
+        CollectionEvent.date >= today - timedelta(days=70)))}
+    return bool(mine) and bool(council) and mine <= council
+
+
+def with_council_dates(db: Session, round_key: str, bin_type_id: str, rule: dict,
+                       dates: list[date], today: date | None = None) -> list[date]:
+    """
+    A resident's pattern on a council bin, corrected by the dates the council actually
+    publishes. Their pattern fills in what the council doesn't say (how often); where the
+    council gives a date that isn't on the pattern, the council's date replaces the nearest
+    pattern date within a week (a bank holiday move), so Christmas changes still reach them.
+    Left alone: a bin whose day the resident changed, and any date they moved themselves.
+    """
+    today = today or date.today()
+    if not follows_council_days(db, round_key, bin_type_id, rule, today):
+        return dates
+    council = sorted(set(db.scalars(select(CollectionEvent.date).where(
+        CollectionEvent.round_key == round_key, CollectionEvent.bin_type_id == bin_type_id,
+        CollectionEvent.date >= today)).all()))
+    moves = rule.get("moves") or {}
+    theirs = {date.fromisoformat(v) for v in moves.values() if v}
+    out = set(dates)
+    for d in council:
+        if d in out or d.isoformat() in moves:
+            continue
+        near = sorted((abs((r - d).days), r) for r in out
+                      if abs((r - d).days) <= 6 and r not in council and r not in theirs)
+        if near:
+            out.discard(near[0][1])
+        out.add(d)
+    return sorted(out)
+
+
 # ------------------------------------------------------------------ fetching
 
 

@@ -213,12 +213,27 @@ def signup_card(db: Session, user: User, via: str) -> str:
             f"checker failed after {secs:.0f}s, bins added by hand" if source == "manual" else
             f"instant (a neighbour's calendar)" if source == "neighbours" and secs < 2 else
             f"checker took {secs:.0f}s")
-    # Bins they added or changed themselves (a different day, a bin the council didn't list)
+    # What they did by hand, most worth a look first: a bin the council didn't list, a day
+    # they changed (they disagree with the council), or only how often (the council publishes
+    # just the next date, so every resident there is asked: routine).
     from app.models import UserBinSetting
-    hand = [b for b in db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id))
-            if b.override_rule or b.bin_type_id is None] if getattr(user, "id", None) else []
-    edited = (f"{len(hand)} bin{'s' if len(hand) != 1 else ''} added or changed by hand"
-              if hand and source != "manual" else "")
+    from app.services.schedule import follows_council_days
+
+    added = changed = often = 0
+    rk = getattr(user.property, "round_key", None)
+    for b in (db.scalars(select(UserBinSetting).where(UserBinSetting.user_id == user.id))
+              if getattr(user, "id", None) else []):
+        if b.bin_type_id is None:
+            added += 1
+        elif b.override_rule and rk and follows_council_days(db, rk, b.bin_type_id, b.override_rule):
+            often += 1
+        elif b.override_rule:
+            changed += 1
+    s_ = lambda n: "" if n == 1 else "s"
+    edited = "" if source == "manual" else ", ".join(x for x in (
+        f"{added} bin{s_(added)} added by hand" if added else "",
+        f"day changed on {changed} bin{s_(changed)}" if changed else "",
+        f"how often set on {often} bin{s_(often)}" if often else "") if x)
     detail = " · ".join(x for x in (council, wait, edited) if x)
     if detail:
         lines.append(detail)
