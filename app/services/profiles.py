@@ -49,6 +49,50 @@ PROFILES: dict[str, list[CouncilProfile]] = {
             note="Three-weekly rotation: one of grey / plastics-glass-cans / paper-card each week.",
         ),
     ],
+    # West Oxfordshire, Cotswold and Lambeth publish only each bin's next date, so the calendar
+    # can't show how often a bin goes out until we've watched it for a few weeks. Their own
+    # documents say. Flats with communal bins, and homes on sacks, can be on a different
+    # frequency: this is only what's shown, reminders always follow the council's dates.
+    "E07000181": [
+        CouncilProfile(
+            effective_from=date(2026, 4, 2),
+            source="https://westoxon.gov.uk/media/5ljhjuja/wodc-waste-and-recycling-policy-2026.pdf",
+            streams=(
+                Stream("general", "refuse", 14),
+                Stream("recycling", "dry recycling", 14),
+                Stream("food", "food waste", 7),
+                Stream("garden", "garden waste", 14, optional=True),
+            ),
+            note="Standard homes. Communal bins and homes with no storage: refuse and recycling weekly.",
+        ),
+    ],
+    "E07000079": [
+        CouncilProfile(
+            effective_from=date(2023, 2, 1),
+            source="https://www.cotswold.gov.uk/media/ebwpghck/cdc-waste-recycling-street-cleaning-policy.pdf",
+            streams=(
+                Stream("general", "residual household waste", 14),
+                Stream("recycling", "recycling", 14),
+                Stream("food", "food waste", 7),
+                Stream("garden", "garden waste", None, optional=True),
+            ),
+            note="Flats may have communal bins or a bag service; no frequency stated for those.",
+        ),
+    ],
+    "E09000022": [
+        CouncilProfile(
+            effective_from=date(2024, 4, 1),
+            source="https://lambeth.gov.uk/rubbish-recycling/fortnightly-rubbish-collections",
+            streams=(
+                # Black bins went fortnightly for street-level homes only; communal bins and
+                # sacks did not change, and the label doesn't tell them apart: not stated.
+                Stream("general", "black bin rubbish", None),
+                Stream("recycling", "recycling", 7),
+                Stream("food", "food waste", 7),
+                Stream("garden", "garden waste", 7, optional=True),
+            ),
+        ),
+    ],
 }
 
 

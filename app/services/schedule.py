@@ -686,6 +686,45 @@ def recycling_containers(db: Session, bt: BinType, round_key: str | None,
     return split_recycling(bt.council.gss_code if bt.council else None)
 
 
+# A council bin's frequency, learned from the postcodes where we've watched it: needs this many
+# gaps between real collection dates in total, nearly all agreeing.
+LEARN_MIN_GAPS, LEARN_AGREEMENT = 3, 0.8
+
+
+def learned_interval(db: Session, bin_type_id: str, exclude_round: str | None = None,
+                     today: date | None = None) -> int | None:
+    """How many days apart the council collects this bin, from the other rounds that have it.
+    "240 Litre Refuse" is fortnightly on one West Oxfordshire postcode because it is on all
+    of them. Dates we projected ourselves don't count as evidence."""
+    today = today or date.today()
+    rows = db.execute(
+        select(CollectionEvent.round_key, CollectionEvent.date)
+        .outerjoin(Snapshot, Snapshot.id == CollectionEvent.snapshot_id)
+        .where(CollectionEvent.bin_type_id == bin_type_id,
+               CollectionEvent.date >= today - timedelta(days=120),
+               (Snapshot.id.is_(None)) | (Snapshot.source != "projected"))).all()
+    by_round: dict[str, set[date]] = {}
+    for key, d in rows:
+        if key != exclude_round:
+            by_round.setdefault(key, set()).add(d)
+    tally: dict[int, int] = {}
+    for dates in by_round.values():
+        interval, gaps = checker.observe(sorted(dates))
+        if interval:
+            tally[interval] = tally.get(interval, 0) + gaps
+    total = sum(tally.values())
+    if total < LEARN_MIN_GAPS:
+        return None
+    best = max(tally, key=tally.get)
+    return best if tally[best] >= LEARN_AGREEMENT * total else None
+
+
+def publishes_next_only(raw: dict | None) -> bool:
+    """Did the council give one date per bin (its next collection) and nothing further ahead?"""
+    labels = [b.get("type") or b.get("bin_type_id") for b in (raw or {}).get("bins") or []]
+    return bool(labels) and len(labels) == len(set(labels))
+
+
 def schedule_for(db: Session, prop: Property, with_checks: bool = False):
     """
     Bins for a round with a derived rule each. This is what step 3 shows. Frequencies go
@@ -733,6 +772,9 @@ def schedule_for(db: Session, prop: Property, with_checks: bool = False):
             "next": rule["next"],
             "dates": [e.date.isoformat() for e in evs[:8]],
             "history": [e.date for e in all_evs],
+            # Too few dates here to tell how often: what the same bin does elsewhere
+            "learned_days": (learned_interval(db, bt.id, prop.round_key, today)
+                             if len({e.date for e in all_evs}) < 2 else None),
         })
     order = ["recycling", "general", "food", "garden", "glass", "paper", "other"]
     out.sort(key=lambda b: order.index(b["category"]))

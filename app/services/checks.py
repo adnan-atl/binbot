@@ -11,6 +11,7 @@ Sources, most trusted first. The highest source that has an answer is what's sho
   2. Council calendar for this address   (scraped dates; specific and current)
   3. Council's stated rule on that page  ("emptied every 14 days"; Glasgow)
   4. Council service policy              (profiles.py: "3-weekly from 30 March")
+  4b. The same bin on the council's other postcodes (watched over a few weeks)
   5. Neighbours on the same postcode     (shared round; same lorry, usually same days)
   6. Our inference from a few dates      (needs evidence, see MIN_GAPS)
   7. Defaults                            (colour/purpose by category)
@@ -74,6 +75,9 @@ def run(bins: list[dict], council_name: str, gss_code: str | None,
             b["frequency"], b["frequency_source"] = FREQ_BY_DAYS[interval], "calendar"
         elif policy_days:
             b["frequency"], b["frequency_source"] = FREQ_BY_DAYS[policy_days], "policy"
+        elif b.get("learned_days") in FREQ_BY_DAYS:
+            # What this same bin does on the council's other postcodes (schedule.learned_interval)
+            b["frequency"], b["frequency_source"] = FREQ_BY_DAYS[b["learned_days"]], "learned"
         else:
             b["frequency"], b["frequency_source"] = "irregular", "unknown"
 

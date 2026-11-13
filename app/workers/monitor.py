@@ -33,7 +33,8 @@ from app.providers.messaging import send_message, send_template_message, uses_te
 from app.services import signup, split
 from app.services.reminders import dispatch_due, rebuild_reminders
 from app.services.verify import verify_round
-from app.services.schedule import lapsed_bins, refresh_round, representative_for
+from app.services.schedule import (lapsed_bins, publishes_next_only, refresh_round,
+                                   representative_for)
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +47,9 @@ BANK_HOLIDAYS = [
 
 def near_bank_holiday(today: date, window_days: int) -> bool:
     return any(0 <= (h - today).days <= window_days for h in BANK_HOLIDAYS)
+
+
+NEXT_ONLY_REFRESH_DAYS = 2
 
 
 def refresh_stale(db: Session, today: date | None = None) -> dict:
@@ -67,6 +71,17 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
     joined = set(db.scalars(select(Property.round_key).join(User, User.property_id == Property.id)).all())
     by_resident = set(db.scalars(select(Snapshot.round_key).where(Snapshot.source != "prefetch")).all())
     stale_keys = {k for k in stale_keys if k in joined or k in by_resident}
+    # A council that publishes only each bin's next date tells us nothing about the one after
+    # until we ask again. Weekly is too slow for that: someone who joined on collection day
+    # would hear about next week's collection after its reminder was due. Check every 2 days.
+    soon = datetime.now(timezone.utc) - timedelta(days=NEXT_ONLY_REFRESH_DAYS)
+    for key, raw in db.execute(
+            select(Snapshot.round_key, Snapshot.raw)
+            .join(last_ok, (Snapshot.round_key == last_ok.c.round_key)
+                  & (Snapshot.fetched_at == last_ok.c.at))
+            .where(last_ok.c.at < soon, last_ok.c.at >= cutoff)).all():
+        if key in joined and publishes_next_only(raw):
+            stale_keys.add(key)
     # Rounds with users but no good snapshot at all.
     never = set(db.scalars(
         select(Property.round_key).join(User, User.property_id == Property.id)
