@@ -1016,6 +1016,17 @@ def _bin_phrase(db: Session, user: User, text: str) -> Reply | None:
     return None
 
 
+# Someone asking how to pass Binjamin on, in their own words. Only first-person intent counts
+# ("how can I", "I'd like to"), so "my neighbour shared it with me" or "who referred me?" don't.
+WANTS_SHARE_RE = re.compile(
+    r"\b(how (can|do|could|would|should) (i|we)|can (i|we)|could (i|we)|may i|"
+    r"i'?d (like|love) to|i would (like|love) to|i want to|we want to|want to|wanna|"
+    r"where (can|do) i|is there a way to|what'?s the best way to)\b"
+    r"[^.?!]{0,40}?\b(refer|recommend|share|invite|pass (you|this|it|binjamin|binji) on|"
+    r"tell (\w+ ){0,3}about (you|binjamin|binji|this|it)|send (you|binjamin|binji|this|it) to)",
+    re.IGNORECASE)
+
+
 def _command(db: Session, user: User, text: str) -> Reply | None:
     """Typed shortcuts and taps. Returns the reply, or None if the message isn't one of them."""
     t = text.strip()
@@ -1026,6 +1037,8 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
         return None
     head, rest = words[0], " ".join(words[1:])
     if head in ("SHARE",) and len(words) == 1:
+        return share_reply()
+    if WANTS_SHARE_RE.search(t):  # "How can I refer you?": the same as typing "share"
         return share_reply()
     if head in ("SETTINGS", "MENU", "HELP", "CHANGE") and len(words) == 1:
         return settings_menu(db, user)
