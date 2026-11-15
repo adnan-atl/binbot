@@ -132,6 +132,7 @@ class Property(Base):
     postcode: Mapped[str] = mapped_column(String(10), index=True)  # normalised "E8 3PB"
     house_number: Mapped[str | None] = mapped_column(String(40))  # PAON: "12", "Flat 3, 12"
     address_line: Mapped[str | None] = mapped_column(String(240))
+    parent_uprn: Mapped[str | None] = mapped_column(String(20))  # a flat's building
     council_id: Mapped[str | None] = mapped_column(ForeignKey("councils.id"), index=True)
     lat: Mapped[float | None] = mapped_column(nullable=True)
     lng: Mapped[float | None] = mapped_column(nullable=True)

@@ -172,6 +172,15 @@ class UKBCDAdapter:
             lookup = INPUT_REWRITES[self.spec.module](lookup)
         try:
             return self._fetch_once(lookup)
+        except NoCollectionsForAddress:
+            # A flat with communal bins: the council has the bins against the building's UPRN
+            # (Ealing, 15 Nov 2026: "not found" for the flat, the block has the collections).
+            if not (lookup.parent_uprn and lookup.parent_uprn != lookup.uprn
+                    and "uprn" in self.spec.requires):
+                raise
+            log.info("%s: nothing for flat %s, trying its building %s", self.name, lookup.uprn,
+                     lookup.parent_uprn)
+            return self._fetch_once(dataclasses.replace(lookup, uprn=lookup.parent_uprn))
         except AdapterError as e:
             # "26 OLD MUSTARD MILL" as the house number: many councils' address searches only
             # match the number and find nothing. Try the plainer forms before giving up.

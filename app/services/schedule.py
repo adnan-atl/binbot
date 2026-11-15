@@ -115,6 +115,8 @@ def resolve_property(
                         round_key=round_key_for(db, council, info.postcode, house_number, uprn))
         db.add(prop)
         db.flush()
+    if prop.uprn and not prop.parent_uprn:
+        prop.parent_uprn = geo.cached_parent_uprn(info.postcode, prop.uprn)
     return prop
 
 
@@ -261,6 +263,7 @@ def fetch_collections(council: Council, prop: Property) -> list[RawCollection]:
     if not adapters:
         raise AdapterError("no adapter for council", retryable=False)
     full = LookupInput(postcode=prop.postcode, uprn=prop.uprn, house_number=prop.house_number,
+                       parent_uprn=getattr(prop, "parent_uprn", None),
                        address_line=getattr(prop, "address_line", None))
     if getattr(council, "gss_code", None) in CUSTOM_FIRST and len(adapters) > 1:
         return _hedged(adapters[0], adapters[1], full)

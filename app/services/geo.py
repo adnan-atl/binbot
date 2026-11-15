@@ -40,6 +40,7 @@ class AddressHit:
     uprn: str | None
     line: str
     house_number: str | None
+    parent_uprn: str | None = None  # a flat's building (OS Places PARENT_UPRN)
 
 
 # Postcodes don't move councils and addresses barely change, so cache both. A sign-up asks
@@ -128,6 +129,20 @@ def lookup_addresses(postcode: str, paid_ok: bool = True) -> list[AddressHit]:
     return out
 
 
+def cached_parent_uprn(postcode: str, uprn: str | None) -> str | None:
+    """The building a flat belongs to, from the address list the resident just picked from.
+    Cache only: never a paid lookup for this."""
+    if not uprn:
+        return None
+    pc = normalise_postcode(postcode)
+    for kind in ("addr", "addr-free"):
+        hit = _cache.get((kind, pc))
+        for a in (hit[1] if hit else None) or []:
+            if a.uprn == uprn:
+                return a.parent_uprn
+    return None
+
+
 PAID_PROVIDERS = {"ideal_postcodes"}
 
 
@@ -206,7 +221,8 @@ def _os_places(s, pc: str) -> list[AddressHit] | None:
     for item in r.json().get("results", []):
         d = item.get("DPA", {})
         line = d.get("ADDRESS", "")
-        out.append(AddressHit(uprn=str(d.get("UPRN")), line=line, house_number=os_door(d)))
+        out.append(AddressHit(uprn=str(d.get("UPRN")), line=line, house_number=os_door(d),
+                              parent_uprn=str(d["PARENT_UPRN"]) if d.get("PARENT_UPRN") else None))
     return out
 
 

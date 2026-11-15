@@ -15,6 +15,8 @@ class LookupInput:
     uprn: str | None = None
     house_number: str | None = None
     address_line: str | None = None  # "10 Abingdon Road, London": street-based councils need it
+    # A flat's building: councils often keep communal bins against the building, not the flat
+    parent_uprn: str | None = None
 
 
 class AdapterError(Exception):

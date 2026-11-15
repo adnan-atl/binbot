@@ -26,7 +26,7 @@ def lookup_to_json(lookup: LookupInput) -> dict:
 
 def lookup_from_json(d: dict) -> LookupInput:
     return LookupInput(postcode=d["postcode"], uprn=d.get("uprn"), house_number=d.get("house_number"),
-                       address_line=d.get("address_line"))
+                       address_line=d.get("address_line"), parent_uprn=d.get("parent_uprn"))
 
 
 def result_to_json(items: list[RawCollection]) -> dict:
