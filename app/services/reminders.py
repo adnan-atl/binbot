@@ -1064,7 +1064,32 @@ def _command(db: Session, user: User, text: str) -> Reply | None:
         if not hhmm or not _evening_ok(hhmm):
             return Reply("I didn't catch that time. Try EVENING 7pm.")
         return _set_time(db, user, ReminderMode.night_before, hhmm)
+    asked = _time_request(t)  # "Reminder, set to evening before 7pm"
+    if asked:
+        if not _evening_ok(asked):
+            return _evening_only(user)
+        return _set_time(db, user, ReminderMode.night_before, asked)
     return collection_answer(db, user, t) or _bin_phrase(db, user, t)
+
+
+# Asking for a different reminder time in their own words. Needs a word about the reminder
+# or changing it, and one clear time ("7pm", "18:30", "at 7"), so "what time do they come?"
+# or "bins went out at 7am" don't change anything.
+_TIME_ASK_RE = re.compile(r"\b(remind\w*|set|change|move|switch|make it|can you|could you|"
+                          r"please|evening|night before|day before|instead)\b", re.IGNORECASE)
+_TIME_IN_TEXT_RE = re.compile(r"\b(\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm)|\d{1,2}[:.]\d{2}|"
+                              r"(?<=at )\d{1,2})\b", re.IGNORECASE)
+_TIME_NOT_RE = re.compile(r"\b(what time|when do|when does|when will|came|come|collected|went|"
+                          r"picked up|lorry|truck)\b", re.IGNORECASE)
+
+
+def _time_request(text: str) -> str | None:
+    if not _TIME_ASK_RE.search(text) or _TIME_NOT_RE.search(text):
+        return None
+    times = {m.group(1) for m in _TIME_IN_TEXT_RE.finditer(text)}
+    if len(times) != 1:
+        return None
+    return parse_time(times.pop(), ReminderMode.night_before)
 
 
 # When Binjamin doesn't understand: these take turns (per person), then a pointer to Settings.
