@@ -58,7 +58,7 @@ def dbip_rows(http: httpx.Client):
             raw = io.BytesIO(b"".join(r.iter_bytes()))
         for row in csv.reader(io.TextIOWrapper(gzip.GzipFile(fileobj=raw), encoding="utf-8")):
             if len(row) >= 8:
-                yield row[0], row[1], row[3], row[6], row[7]
+                yield row[0], row[1], row[3], row[6], row[7], row[5]
         return
     raise SystemExit("no DB-IP City Lite file this month or last")
 
@@ -71,7 +71,10 @@ def main() -> None:
     svg = uk_map.build_svg(councils)
     dropped: list = []
     table = uk_map.build_ip_table(dbip_rows(http), councils, report=dropped)
-    for lat, lon, ver, pct in sorted(dropped, key=lambda d: -d[3]):
+    for d in dropped:
+        if len(d) == 2:
+            print(f"too vague, left out: places called {d[0]!r} (spread over {d[1]} councils)")
+    for lat, lon, ver, pct in sorted((d for d in dropped if len(d) == 4), key=lambda d: -d[3]):
         print(f"too vague, left out: {lat},{lon} (IPv{ver}, {pct}% of UK addresses)")
     t = uk_map.IpTable(table)
     print(f"map {len(svg) // 1024}KB; IP table {len(table) // 1024}KB, {len(t.s4)} IPv4 + {len(t.s6)} IPv6 ranges")

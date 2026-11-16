@@ -83,3 +83,25 @@ def test_a_location_covering_much_of_the_uk_is_left_out():
     assert t.lookup("10.1.2.3") is None
     assert report and report[0][:2] == ("51.55", "-0.05")
     assert t.lookup("81.2.5.1") == "E09000009"  # the specific ones still work
+
+
+def test_a_place_name_spread_over_many_councils_is_left_out():
+    """DB-IP's plain "London" is the city, not the borough: its points scatter over boroughs,
+    so they mustn't name one. A named district ("Camberwell") still counts."""
+    gj = {"type": "FeatureCollection", "features": [
+        {"properties": {"LAD26CD": f"E0900000{i}", "LAD26NM": f"B{i}"},
+         "geometry": {"type": "Polygon", "coordinates": SQ(i / 10, 51.0, i / 10 + 0.1, 51.1)}}
+        for i in range(1, 4)]}
+    councils = uk_map.councils_from_geojson(gj)
+    rows = [("81.2.1.0", "81.2.1.255", "GB", "51.05", "0.15", "London"),
+            ("81.2.2.0", "81.2.2.255", "GB", "51.05", "0.25", "London"),
+            ("81.2.3.0", "81.2.3.255", "GB", "51.05", "0.35", "London"),
+            ("81.2.4.0", "81.2.4.255", "GB", "51.06", "0.15", "Camberwell"),
+            ("81.2.5.0", "81.2.5.255", "GB", "51.06", "0.25", "Sometown"),
+            ("81.2.6.0", "81.2.6.255", "GB", "51.07", "0.25", "Sometown")]
+    report = []
+    t = uk_map.IpTable(uk_map.build_ip_table(rows, councils, vague_share=None, report=report))
+    assert t.lookup("81.2.1.9") is None and t.lookup("81.2.3.9") is None
+    assert t.lookup("81.2.4.9") == "E09000001"
+    assert t.lookup("81.2.6.9") == "E09000002"  # two points, one council: fine
+    assert ("London", 3) in report

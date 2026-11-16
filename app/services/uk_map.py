@@ -124,6 +124,9 @@ def council_at(councils: list[dict], lon: float, lat: float) -> str | None:
 # the table's "somewhere in the UK / London" default (half of all UK IPv4 sat on one spot in
 # Westminster, Nov 2026) or a data centre. Visitors there get no council rather than a wrong one.
 VAGUE_SHARE = 0.01
+# A place name whose points land in this many councils or more (DB-IP's plain "London") only
+# tells us the city, not the borough, so those points are left out too.
+VAGUE_PLACE_COUNCILS = 3
 
 
 def build_ip_table(rows, councils: list[dict], vague_share: float | None = VAGUE_SHARE,
@@ -134,9 +137,13 @@ def build_ip_table(rows, councils: list[dict], vague_share: float | None = VAGUE
     uk = []
     size: dict[tuple[str, str, int], int] = {}
     total = {4: 0, 6: 0}
-    for start, end, country, lat, lon in rows:
+    place: dict[tuple[str, str], str] = {}
+    for row in rows:
+        start, end, country, lat, lon = row[:5]
         if country != "GB":
             continue
+        if len(row) > 5 and row[5]:
+            place[(lat, lon)] = row[5]
         a, b = ipaddress.ip_address(start), ipaddress.ip_address(end)
         if a.version == 4:
             n = int(b) - int(a) + 1
@@ -153,17 +160,25 @@ def build_ip_table(rows, councils: list[dict], vague_share: float | None = VAGUE
                 if report is not None:
                     report.append((lat, lon, ver, round(100 * n / total[ver], 1)))
     at: dict[tuple[str, str], str | None] = {}
+    for key in {(lat, lon) for _, _, lat, lon in uk} - vague:
+        try:
+            at[key] = council_at(councils, float(key[1]), float(key[0]))
+        except ValueError:
+            at[key] = None
+    spread: dict[str, set] = {}
+    for key, gss in at.items():
+        if gss and key in place:
+            spread.setdefault(place[key], set()).add(gss)
+    vague_places = {p for p, gs in spread.items() if len(gs) >= VAGUE_PLACE_COUNCILS}
+    if report is not None:
+        for p in sorted(vague_places):
+            report.append((p, len(spread[p])))
     v4: list[list] = []
     v6: list[list] = []
     for a, b, lat, lon in uk:
         key = (lat, lon)
-        if key in vague:
+        if key in vague or place.get(key) in vague_places:
             continue
-        if key not in at:
-            try:
-                at[key] = council_at(councils, float(lon), float(lat))
-            except ValueError:
-                at[key] = None
         gss = at[key]
         if not gss:
             continue
