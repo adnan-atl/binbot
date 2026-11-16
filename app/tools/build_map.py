@@ -69,7 +69,10 @@ def main() -> None:
     councils = uk_map.councils_from_geojson(fetch_geojson(http, service))
     print(f"{service}: {len(councils)} councils")
     svg = uk_map.build_svg(councils)
-    table = uk_map.build_ip_table(dbip_rows(http), councils)
+    dropped: list = []
+    table = uk_map.build_ip_table(dbip_rows(http), councils, report=dropped)
+    for lat, lon, ver, pct in sorted(dropped, key=lambda d: -d[3]):
+        print(f"too vague, left out: {lat},{lon} (IPv{ver}, {pct}% of UK addresses)")
     t = uk_map.IpTable(table)
     print(f"map {len(svg) // 1024}KB; IP table {len(table) // 1024}KB, {len(t.s4)} IPv4 + {len(t.s6)} IPv6 ranges")
     if "--dry-run" in sys.argv:

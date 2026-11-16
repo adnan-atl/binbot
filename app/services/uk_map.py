@@ -120,16 +120,45 @@ def council_at(councils: list[dict], lon: float, lat: float) -> str | None:
     return best
 
 
-def build_ip_table(rows, councils: list[dict]) -> bytes:
+# A single location covering more than this share of the UK's addresses isn't a real place: it's
+# the table's "somewhere in the UK / London" default (half of all UK IPv4 sat on one spot in
+# Westminster, Nov 2026) or a data centre. Visitors there get no council rather than a wrong one.
+VAGUE_SHARE = 0.01
+
+
+def build_ip_table(rows, councils: list[dict], vague_share: float | None = VAGUE_SHARE,
+                   report: list | None = None) -> bytes:
     """rows: (ip_start, ip_end, country, lat, lon) strings from DB-IP City Lite. UK rows only are
-    kept, each town placed once, neighbouring ranges in the same council merged."""
-    at: dict[tuple[str, str], str | None] = {}
-    v4: list[list] = []
-    v6: list[list] = []
+    kept, each town placed once, locations too vague to mean anything dropped (vague_share),
+    neighbouring ranges in the same council merged. `report` collects what was dropped."""
+    uk = []
+    size: dict[tuple[str, str, int], int] = {}
+    total = {4: 0, 6: 0}
     for start, end, country, lat, lon in rows:
         if country != "GB":
             continue
+        a, b = ipaddress.ip_address(start), ipaddress.ip_address(end)
+        if a.version == 4:
+            n = int(b) - int(a) + 1
+        else:
+            n = (int(b) >> 64) - (int(a) >> 64) + 1
+        uk.append((a, b, lat, lon))
+        size[(lat, lon, a.version)] = size.get((lat, lon, a.version), 0) + n
+        total[a.version] += n
+    vague = set()
+    if vague_share is not None:
+        for (lat, lon, ver), n in size.items():
+            if total[ver] and n / total[ver] > vague_share:
+                vague.add((lat, lon))
+                if report is not None:
+                    report.append((lat, lon, ver, round(100 * n / total[ver], 1)))
+    at: dict[tuple[str, str], str | None] = {}
+    v4: list[list] = []
+    v6: list[list] = []
+    for a, b, lat, lon in uk:
         key = (lat, lon)
+        if key in vague:
+            continue
         if key not in at:
             try:
                 at[key] = council_at(councils, float(lon), float(lat))
@@ -138,15 +167,14 @@ def build_ip_table(rows, councils: list[dict]) -> bytes:
         gss = at[key]
         if not gss:
             continue
-        a, b = ipaddress.ip_address(start), ipaddress.ip_address(end)
         if a.version == 4:
-            s, e, dst = int(a), int(b), v4
+            s_, e, dst = int(a), int(b), v4
         else:
-            s, e, dst = int(a) >> 64, int(b) >> 64, v6
-        if dst and dst[-1][2] == gss and dst[-1][1] + 1 >= s:
+            s_, e, dst = int(a) >> 64, int(b) >> 64, v6
+        if dst and dst[-1][2] == gss and dst[-1][1] + 1 >= s_:
             dst[-1][1] = max(dst[-1][1], e)
         else:
-            dst.append([s, e, gss])
+            dst.append([s_, e, gss])
     codes = sorted({r[2] for r in v4 + v6})
     idx = {g: i for i, g in enumerate(codes)}
     out = [MAGIC, struct.pack("<H", len(codes)), b"".join(g.encode().ljust(9, b" ") for g in codes)]

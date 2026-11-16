@@ -24,7 +24,7 @@ ROWS = [("81.2.69.0", "81.2.69.255", "GB", "51.55", "-0.05"),    # Hackney
 def built(db):
     councils = uk_map.councils_from_geojson(GJ)
     uk_map.save_asset(db, "uk_map_svg", uk_map.build_svg(councils).encode())
-    uk_map.save_asset(db, "ip_councils", uk_map.build_ip_table(ROWS, councils))
+    uk_map.save_asset(db, "ip_councils", uk_map.build_ip_table(ROWS, councils, vague_share=None))
     db.commit()
     uk_map.reset_cache()
     yield
@@ -38,7 +38,7 @@ def test_svg_has_every_council():
 
 def test_ip_ranges_map_to_councils():
     councils = uk_map.councils_from_geojson(GJ)
-    t = uk_map.IpTable(uk_map.build_ip_table(ROWS, councils))
+    t = uk_map.IpTable(uk_map.build_ip_table(ROWS, councils, vague_share=None))
     assert len(t.s4) == 2  # the two Hackney ranges merged, France dropped
     assert t.lookup("81.2.69.7") == t.lookup("81.2.70.200") == "E09000012"
     assert t.lookup("81.2.71.1") == "E09000009"
@@ -71,3 +71,15 @@ def test_outside_the_uk_or_before_the_map_is_built(client, db, monkeypatch):
     monkeypatch.setattr("app.api.routes.client_ip", lambda request: "8.8.8.8")
     assert client.get("/api/map").json()["you"] is None
     assert client.get("/api/map.svg").status_code == 404
+
+
+def test_a_location_covering_much_of_the_uk_is_left_out():
+    """Half of all UK addresses on one spot in Westminster is the table not knowing, not a place."""
+    councils = uk_map.councils_from_geojson(GJ)
+    rows = [("10.0.0.0", "10.255.255.255", "GB", "51.55", "-0.05")]  # 16m addresses on one point
+    rows += [(f"81.2.{i}.0", f"81.2.{i}.255", "GB", f"51.5{i % 4}", "-0.3{0}".format(i % 5)) for i in range(60)]
+    report = []
+    t = uk_map.IpTable(uk_map.build_ip_table(rows, councils, report=report))
+    assert t.lookup("10.1.2.3") is None
+    assert report and report[0][:2] == ("51.55", "-0.05")
+    assert t.lookup("81.2.5.1") == "E09000009"  # the specific ones still work
