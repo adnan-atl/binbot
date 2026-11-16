@@ -2357,7 +2357,7 @@ Share to WhatsApp
       } else if (y && y.name) {
         h = 'Help ' + y.name + ' become the council with the most binfluencers';
         p = y.rank === 1 ? y.name + ' is top with ' + people(y.count) + '. Keep it there.'
-                         : y.name + ' is number ' + y.rank + ' with ' + people(y.count) + '.';
+                         : people(y.count) + ' so far.';
       } else {
         h = 'Which council has the most binfluencers?';
         p = 'Sign up and put yours on the map.';
