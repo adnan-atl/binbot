@@ -98,10 +98,15 @@ def test_a_place_name_spread_over_many_councils_is_left_out():
             ("81.2.3.0", "81.2.3.255", "GB", "51.05", "0.35", "London"),
             ("81.2.4.0", "81.2.4.255", "GB", "51.06", "0.15", "Camberwell"),
             ("81.2.5.0", "81.2.5.255", "GB", "51.06", "0.25", "Sometown"),
-            ("81.2.6.0", "81.2.6.255", "GB", "51.07", "0.25", "Sometown")]
+            ("81.2.6.0", "81.2.6.255", "GB", "51.07", "0.25", "Sometown"),
+            ("81.2.7.0", "81.2.8.255", "GB", "51.08", "0.35", "Bigtown"),   # mostly B3...
+            ("81.2.9.0", "81.2.9.127", "GB", "51.08", "0.25", "Bigtown"),   # ...spilling into B2
+            ("81.2.10.0", "81.2.10.255", "GB", "55.0", "0.15", "Sometown")]  # same name, far away
     report = []
     t = uk_map.IpTable(uk_map.build_ip_table(rows, councils, vague_share=None, report=report))
     assert t.lookup("81.2.1.9") is None and t.lookup("81.2.3.9") is None
     assert t.lookup("81.2.4.9") == "E09000001"
     assert t.lookup("81.2.6.9") == "E09000002"  # two points, one council: fine
+    assert t.lookup("81.2.9.9") == "E09000003"  # the spill goes to the town's own council
+    assert t.lookup("81.2.10.9") is None        # a different Sometown, outside every council
     assert ("London", 3) in report

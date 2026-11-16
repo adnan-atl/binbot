@@ -124,9 +124,12 @@ def council_at(councils: list[dict], lon: float, lat: float) -> str | None:
 # the table's "somewhere in the UK / London" default (half of all UK IPv4 sat on one spot in
 # Westminster, Nov 2026) or a data centre. Visitors there get no council rather than a wrong one.
 VAGUE_SHARE = 0.01
-# A place name whose points land in this many councils or more (DB-IP's plain "London") only
-# tells us the city, not the borough, so those points are left out too.
-VAGUE_PLACE_COUNCILS = 3
+# DB-IP gives a place name with each point. Points with the same name close together are one
+# place (Newport in Wales and Newport on Wight are two). If one council holds most of a place's
+# addresses, every point of that place goes to it ("Oxford" points spilling into the Vale are
+# still Oxford). If none does (plain "London" across 30 boroughs), the place is left out.
+PLACE_RADIUS = 0.4        # degrees: same name within this of the first point = same place
+PLACE_DOMINANT = 0.6      # share of the place's addresses one council needs
 
 
 def build_ip_table(rows, councils: list[dict], vague_share: float | None = VAGUE_SHARE,
@@ -165,19 +168,38 @@ def build_ip_table(rows, councils: list[dict], vague_share: float | None = VAGUE
             at[key] = council_at(councils, float(key[1]), float(key[0]))
         except ValueError:
             at[key] = None
-    spread: dict[str, set] = {}
-    for key, gss in at.items():
-        if gss and key in place:
-            spread.setdefault(place[key], set()).add(gss)
-    vague_places = {p for p, gs in spread.items() if len(gs) >= VAGUE_PLACE_COUNCILS}
-    if report is not None:
-        for p in sorted(vague_places):
-            report.append((p, len(spread[p])))
+    weight = {}
+    for (lat, lon, ver), n in size.items():
+        if total[ver]:
+            weight[(lat, lon)] = weight.get((lat, lon), 0) + n / total[ver]
+    groups: dict[str, list] = {}
+    for key in sorted(at, key=lambda k: -weight.get(k, 0)):
+        name = place.get(key)
+        if not name or not at[key]:
+            continue
+        lat, lon = float(key[0]), float(key[1])
+        for g in groups.setdefault(name, []):
+            if abs(g["lat"] - lat) <= PLACE_RADIUS and abs(g["lon"] - lon) <= PLACE_RADIUS:
+                g["keys"].append(key)
+                break
+        else:
+            groups[name].append({"lat": lat, "lon": lon, "keys": [key]})
+    for name, gs in groups.items():
+        for g in gs:
+            by: dict[str, float] = {}
+            for k in g["keys"]:
+                by[at[k]] = by.get(at[k], 0) + weight.get(k, 0)
+            best = max(by, key=by.get)
+            share = by[best] / (sum(by.values()) or 1)
+            for k in g["keys"]:
+                at[k] = best if share >= PLACE_DOMINANT else None
+            if share < PLACE_DOMINANT and report is not None:
+                report.append((name, len(by)))
     v4: list[list] = []
     v6: list[list] = []
     for a, b, lat, lon in uk:
         key = (lat, lon)
-        if key in vague or place.get(key) in vague_places:
+        if key in vague:
             continue
         gss = at[key]
         if not gss:
