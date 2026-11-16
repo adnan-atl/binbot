@@ -722,8 +722,8 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .map-art path.you{stroke:var(--ink,#1D1D1F);stroke-width:2;paint-order:stroke}
 .map-credit{margin:10px 4px 0;font-size:12px;line-height:1.4;color:var(--soft,#8C8282)}
 .map-credit a{color:inherit}
-@media (max-width:760px){.mapsec{padding:0 16px;margin-top:32px}.map-card{display:flex;flex-direction:column;padding:28px 20px 16px;gap:0;border-radius:24px}
-.map-card{text-align:left;align-items:stretch}.map-copy{display:contents}.map-h{order:1;font-size:24px}.map-p{order:2;margin-top:8px}.map-art{order:3;max-width:220px;margin:24px auto 8px;width:100%}.map-top{order:4;margin-top:16px}.map-top li:nth-child(n+6):not(.you){display:none}}
+@media (max-width:760px){.mapsec{padding:0 16px;margin-top:32px}.map-card{display:grid;grid-template-columns:minmax(0,45%) minmax(0,1fr);grid-template-areas:"h h" "p p" "art top";column-gap:14px;row-gap:0;align-items:center;padding:24px 18px 20px;border-radius:24px;text-align:left}
+.map-copy{display:contents}.map-h{grid-area:h;font-size:24px}.map-p{grid-area:p;margin-top:6px;font-size:16px}.map-art{grid-area:art;margin:20px 0 0;width:100%}.map-art svg{max-height:min(46vh,340px)}.map-top{grid-area:top;margin:20px 0 0;gap:0}.map-top li{padding:7px 8px;gap:8px;font-size:14px;line-height:1.2;border-radius:10px}.map-top li::before{width:12px;flex:none;font-size:12px}.map-top li:nth-child(n+6):not(.you){display:none}}
 </style>
 </head>
 <body>
