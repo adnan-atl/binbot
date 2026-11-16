@@ -781,22 +781,22 @@ html.cta-green .cta-wa{color:#0B0B0B}
    by residents. Hidden until /api/map answers, so nothing half-built ever shows. */
 .mapsec{width:100%;max-width:1080px;margin:16px auto 0;padding:0 32px}
 .mapsec[hidden]{display:none}
-.map-card{background:#FFFFFF;border-radius:28px;padding:32px;display:grid;grid-template-columns:1fr minmax(240px,340px);gap:32px;align-items:center}
-.map-h{margin:0;font-size:clamp(24px,2.6vw,34px);line-height:1.12;font-weight:700;letter-spacing:-.02em;color:var(--ink,#1D1D1F);text-wrap:balance}
-.map-p{margin:10px 0 0;font-size:17px;line-height:1.4;font-weight:500;color:var(--grey,#6E6E73)}
-.map-top{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:2px;counter-reset:top}
+.map-card{background:#FFFFFF;border-radius:28px;padding:40px 48px;display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,280px);gap:56px;align-items:center}
+.map-h{margin:0;font-size:clamp(28px,3.4vw,44px);line-height:1.08;font-weight:700;letter-spacing:-.02em;color:var(--ink,#1D1D1F);text-wrap:balance}
+.map-p{margin:14px 0 0;font-size:20px;line-height:1.4;font-weight:500;color:var(--grey,#6E6E73)}
+.map-top{list-style:none;margin:28px 0 0;max-width:360px;padding:0;display:grid;gap:2px;counter-reset:top}
 .map-top li{counter-increment:top;display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:12px;font-size:16px;font-weight:600;color:var(--ink,#1D1D1F)}
 .map-top li::before{content:counter(top);width:22px;flex:none;font-size:14px;font-weight:700;color:var(--grey,#6E6E73)}
 .map-top li b{margin-left:auto;font-weight:700}
 .map-top li.you{background:var(--oat,#F0EDE6)}
-.map-art svg{display:block;width:100%;height:auto;max-height:520px}
+.map-art svg{display:block;width:100%;height:auto;max-height:400px}
 .map-art path{fill:#ECE8E0;stroke:#FFFFFF;stroke-width:.6;stroke-linejoin:round}
 .map-art path.n1{fill:#FFC7E3}.map-art path.n2{fill:#FF85C2}.map-art path.n3{fill:#FF47A3}.map-art path.n4{fill:#FF0080}
 .map-art path.you{stroke:var(--ink,#1D1D1F);stroke-width:2;paint-order:stroke}
 .map-credit{margin:10px 4px 0;font-size:12px;line-height:1.4;color:var(--soft,#8C8282)}
 .map-credit a{color:inherit}
 @media (max-width:760px){.mapsec{padding:0 16px;margin-top:32px}.map-card{display:flex;flex-direction:column;align-items:stretch;gap:0;padding:24px 20px 14px;border-radius:24px;text-align:left}
-.map-copy{display:contents}.map-h{order:1;font-size:24px}.map-p{order:2;margin-top:6px;font-size:16px}.map-art{order:3;margin:16px 0 0;width:100%}.map-art svg{width:auto;max-width:100%;margin:0 auto;height:clamp(170px,calc(100svh - 450px),320px);max-height:none}.map-top{order:4;margin:12px 0 0;gap:0}.map-top li{padding:6px 10px;font-size:15px}}
+.map-copy{display:contents}.map-h{order:1;font-size:26px}.map-p{order:2;margin-top:8px;font-size:17px}.map-art{order:3;margin:16px 0 0;width:100%}.map-art svg{width:auto;max-width:100%;margin:0 auto;height:clamp(160px,calc(100svh - 480px),320px);max-height:none}.map-top{order:4;margin:12px 0 0;gap:0}.map-top li{padding:6px 10px;font-size:15px}}
 </style>
 <script>/* A/B test: pink vs green WhatsApp buttons, picked per visit (see cta_variant below) */
 document.documentElement.classList.add('cta-' + ((location.search.match(/[?&]cta=(pink|green)\b/) || [])[1] || (Math.random() < 0.5 ? 'pink' : 'green')));</script>
