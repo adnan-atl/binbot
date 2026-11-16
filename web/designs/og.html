@@ -703,6 +703,27 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 .perk{flex-direction:row;align-items:center;gap:16px;padding:14px 18px 14px 14px;border-radius:24px}
 .perk-pic{flex:none;width:92px;height:92px;border-radius:18px}.perk-n{top:6px;left:6px;width:20px;height:20px;font-size:11px}
 .perk p{font-size:17px;line-height:1.3;text-wrap:wrap}.perk p span{display:inline;margin:0;font-size:inherit;font-weight:600;color:var(--soft,#8C8282)}}
+
+/* UK map under the cards: the visitor's council (guessed from their IP) and every council shaded
+   by residents. Hidden until /api/map answers, so nothing half-built ever shows. */
+.mapsec{width:100%;max-width:1080px;margin:16px auto 0;padding:0 32px}
+.mapsec[hidden]{display:none}
+.map-card{background:#FFFFFF;border-radius:28px;padding:32px;display:grid;grid-template-columns:1fr minmax(240px,340px);gap:32px;align-items:center}
+.map-h{margin:0;font-size:clamp(24px,2.6vw,34px);line-height:1.12;font-weight:700;letter-spacing:-.02em;color:var(--ink,#1D1D1F);text-wrap:balance}
+.map-p{margin:10px 0 0;font-size:17px;line-height:1.4;font-weight:500;color:var(--grey,#6E6E73)}
+.map-top{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:2px;counter-reset:top}
+.map-top li{counter-increment:top;display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:12px;font-size:16px;font-weight:600;color:var(--ink,#1D1D1F)}
+.map-top li::before{content:counter(top);width:22px;font-size:14px;font-weight:700;color:var(--grey,#6E6E73)}
+.map-top li b{margin-left:auto;font-weight:700}
+.map-top li.you{background:var(--oat,#F0EDE6)}
+.map-art svg{display:block;width:100%;height:auto;max-height:520px}
+.map-art path{fill:#ECE8E0;stroke:#FFFFFF;stroke-width:.6;stroke-linejoin:round}
+.map-art path.n1{fill:#FFC7E3}.map-art path.n2{fill:#FF85C2}.map-art path.n3{fill:#FF47A3}.map-art path.n4{fill:#FF0080}
+.map-art path.you{stroke:var(--ink,#1D1D1F);stroke-width:2;paint-order:stroke}
+.map-credit{margin:10px 4px 0;font-size:12px;line-height:1.4;color:var(--soft,#8C8282)}
+.map-credit a{color:inherit}
+@media (max-width:760px){.mapsec{padding:0 16px;margin-top:10px}.map-card{grid-template-columns:1fr;padding:24px 20px;gap:20px;border-radius:24px}
+.map-art{order:-1;max-width:240px;margin:0 auto;width:100%}.map-h{font-size:24px}.map-top li:nth-child(n+6):not(.you){display:none}}
 </style>
 </head>
 <body>
@@ -764,6 +785,17 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <p>Messages you on WhatsApp at the time you choose. <span>You can update it in the same chat.</span></p></figure>
 </div>
 </section>
+<section class="mapsec" id="mapsec" hidden aria-labelledby="map-h">
+<div class="map-card">
+<div class="map-copy">
+<h2 class="map-h" id="map-h"></h2>
+<p class="map-p" id="map-p"></p>
+<ol class="map-top" id="map-top" aria-label="Councils with the most binfluencers"></ol>
+</div>
+<div class="map-art" id="map-art" aria-hidden="true"></div>
+</div>
+<p class="map-credit">Your area is a guess from your IP address, made on our server and not stored. Boundaries: ONS, OGL v3.0, contains OS data &copy; Crown copyright 2026. <a href="https://db-ip.com" target="_blank" rel="noopener">IP Geolocation by DB-IP</a>.</p>
+</section>
 <footer class="home-foot">
 <nav class="foot-links" aria-label="Legal"><a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">Privacy</a><a href="{{TERMS_URL}}" target="_blank" rel="noopener">Terms &amp; Conditions</a></nav>
 </footer>
@@ -815,7 +847,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <div class="page-card">
 <main class="page-main legal">
 <h1 class="h1">Privacy</h1>
-<p class="updated">Last updated 4 November 2026</p>
+<p class="updated">Last updated 16 November 2026</p>
 
 <h2 class="h2">Who we are</h2>
 <p>{{BRAND}} is run by Alfred Wholesale Limited (company number 16293586), 9 Thorney Leys Park, Witney, OX28 4GE. We decide how your information is used, which makes us the data controller. Questions about your data: <a href="mailto:privacy@alfred.co.uk">privacy@alfred.co.uk</a>.</p>
@@ -828,7 +860,7 @@ html.vt [data-screen="faqs"] .page-main{view-transition-name:faqs-content}
 <li>The messages you send {{BRAND}}, and the reminders we send you.</li>
 <li>Whether you've asked us not to tell you about other {{PARENT_NAME}} services.</li>
 <li>Who invited you, if you joined from a friend's link.</li>
-<li>Your IP address when you use the website, to stop spam and abuse.</li>
+<li>Your IP address when you use the website, to stop spam and abuse, and to guess roughly which council area you're in for the map on the home page. That guess happens on our own server and isn't stored.</li>
 </ul>
 
 <h2 class="h2">How we use it</h2>
@@ -2297,6 +2329,47 @@ Share to WhatsApp
     window.addEventListener('hashchange', closeAll);
     window.addEventListener('popstate', closeAll);
   })();
+</script>
+<script>/* UK map: see services/uk_map.py. Shown only once the counts and the outlines are both in. */
+(function () {
+  var sec = document.getElementById('mapsec');
+  if (!sec || !window.fetch) return;
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var band = function (n) { return n >= 10 ? 'n4' : n >= 5 ? 'n3' : n >= 2 ? 'n2' : n >= 1 ? 'n1' : ''; };
+  var people = function (n) { return n + (n === 1 ? ' binfluencer' : ' binfluencers'); };
+  Promise.all([fetch('/api/map').then(function (r) { return r.ok ? r.json() : null; }),
+               fetch('/api/map.svg').then(function (r) { return r.ok ? r.text() : null; })])
+    .then(function (got) {
+      var d = got[0], svg = got[1];
+      if (!d || !svg || svg.indexOf('<svg') !== 0) return;
+      var art = document.getElementById('map-art');
+      art.innerHTML = svg;
+      art.querySelectorAll('path').forEach(function (p) {
+        var g = p.getAttribute('data-gss'), cls = band(d.counts[g] || 0);
+        if (cls) p.classList.add(cls);
+        if (d.you && d.you.gss === g) { p.classList.add('you'); p.parentNode.appendChild(p); }
+      });
+      var y = d.you, h, p;
+      if (y && y.name && !y.count) {
+        h = 'Put ' + y.name + ' on the map';
+        p = 'Nobody in ' + y.name + ' is on Binjamin yet. Be the first.';
+      } else if (y && y.name) {
+        h = 'Help ' + y.name + ' become the council with the most binfluencers';
+        p = y.rank === 1 ? y.name + ' is top with ' + people(y.count) + '. Keep it there.'
+                         : y.name + ' is number ' + y.rank + ' with ' + people(y.count) + '.';
+      } else {
+        h = 'Which council has the most binfluencers?';
+        p = 'Sign up and put yours on the map.';
+      }
+      document.getElementById('map-h').textContent = h;
+      document.getElementById('map-p').textContent = p;
+      document.getElementById('map-top').innerHTML = (d.top || []).map(function (r) {
+        return '<li' + (y && y.gss === r.gss ? ' class="you"' : '') + '>' + esc(r.name) + '<b>' + r.count + '</b></li>';
+      }).join('');
+      sec.hidden = false;
+      try { if (window.posthog) posthog.capture('map_shown', { has_council: !!(y && y.name), council_count: y ? y.count : null }); } catch (e) {}
+    }).catch(function () {});
+})();
 </script>
 </body>
 </html>

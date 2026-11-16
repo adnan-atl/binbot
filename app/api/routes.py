@@ -182,6 +182,26 @@ def verify(user_id: str, background: BackgroundTasks, db: Session = Depends(get_
 BIN_COLOURS = {"blue", "black", "green", "brown", "grey", "purple", "red", "yellow", "white", "orange", "pink"}
 
 
+@router.get("/map")
+def home_map(request: Request, db: Session = Depends(get_db)):
+    """The home page map: residents per council, the top 10, and the visitor's council guessed
+    from their IP (on our server, not stored: services/uk_map.py)."""
+    from app.services import uk_map
+
+    rate_limit(request, "map", 60, 600)
+    return uk_map.summary(db, client_ip(request))
+
+
+@router.get("/map.svg")
+def home_map_svg(db: Session = Depends(get_db)):
+    from app.services import uk_map
+
+    svg = uk_map.map_svg(db)
+    if not svg:
+        raise HTTPException(404, "Map not built yet")
+    return Response(svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+
+
 @router.get("/users/{user_id}/bins", response_model=list[S.BinOut])
 def get_bins(user_id: str, db: Session = Depends(get_db)):
     return _bins_out(db, _user(db, user_id))

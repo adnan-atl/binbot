@@ -14,6 +14,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import (
     JSON,
     Boolean,
+    LargeBinary,
     Date,
     DateTime,
     Enum,
@@ -385,3 +386,13 @@ def level_for(referrals: int) -> tuple[int, str, int | None]:
             idx = i
     nxt = LEVELS[idx + 1][0] if idx + 1 < len(LEVELS) else None
     return idx + 1, LEVELS[idx][1], nxt
+
+
+class Asset(Base):
+    """Prepared data the site serves, built by a tool rather than per request (the home page
+    map's outlines and IP table: services/uk_map.py). Kept here so a deploy doesn't lose it."""
+    __tablename__ = "assets"
+
+    name: Mapped[str] = mapped_column(String(64), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
