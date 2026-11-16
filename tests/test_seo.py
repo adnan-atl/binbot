@@ -92,3 +92,18 @@ def test_llms_txt_follows_the_spec(silly):
     assert "## Common questions" in body and "## Optional" in body
     assert body.index("## Optional") > body.index("## Common questions")
     assert "{{" not in body and "&#" not in body and "&amp;" not in body
+
+
+def test_hosted_pages_are_unlisted(client):
+    """/p/<slug>: someone else's one-off page, served with noindex and kept out of the sitemap."""
+    from pathlib import Path
+    page = Path(__file__).resolve().parent.parent / "hosted" / "test-page-xyz.html"
+    page.write_text("<!doctype html><title>t</title>hello")
+    try:
+        r = client.get("/p/test-page-xyz")
+        assert r.status_code == 200 and "hello" in r.text
+        assert "noindex" in r.headers["x-robots-tag"]
+        assert "/p/" not in client.get("/sitemap.xml").text and "/p/" not in client.get("/robots.txt").text
+        assert client.get("/p/../main").status_code == 404 and client.get("/p/nope-nope-nope").status_code == 404
+    finally:
+        page.unlink()

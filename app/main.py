@@ -159,6 +159,20 @@ if WEB.exists():
         # previews of the same site: never indexed, so they can't compete with the real pages
         return HTMLResponse(render_index(page), headers={"X-Robots-Tag": "noindex, nofollow"})
 
+    HOSTED = Path(__file__).resolve().parent.parent / "hosted"
+
+    @app.api_route("/p/{slug}", methods=["GET", "HEAD"], include_in_schema=False)
+    def hosted_page(slug: str):
+        """One-off pages we host for someone else (e.g. an Alfred survey landing page): hosted/<slug>.html
+        at /p/<slug>. Unlisted: not in the sitemap or robots.txt, never indexed, never linked from the
+        site; the slug has a random part so it can't be guessed."""
+        page = HOSTED / f"{slug}.html"
+        if not re.fullmatch(r"[a-z0-9-]{8,60}", slug) or not page.is_file():
+            raise HTTPException(404, "No such page")
+        return FileResponse(page, media_type="text/html; charset=utf-8", headers={
+            "X-Robots-Tag": "noindex, nofollow, noarchive", "Referrer-Policy": "no-referrer",
+            "Cache-Control": "public, max-age=300"})
+
     app.mount("/static", StaticFiles(directory=WEB), name="static")
 
 
