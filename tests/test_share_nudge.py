@@ -1,5 +1,6 @@
-"""The one "share with neighbours" message: after the first Done, or the day after the first
-collection; only for people who didn't opt out of hearing from us."""
+"""The one "share with neighbours" message: after a Done, or on a Sunday evening after their
+collections; only for people who didn't opt out of hearing from us, and never before Binjamin has
+been reminding them for a week."""
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -34,13 +35,33 @@ def _shares(db):
     return db.scalars(select(Outbox).where(Outbox.kind == "share")).all()
 
 
+def _week_ago(db, first):
+    """Pretend the first reminder went out eight days ago."""
+    db.expire_all()
+    r = db.get(Reminder, first.id)
+    r.sent_at = datetime.now(ZoneInfo("UTC")) - timedelta(days=8)
+    db.commit()
+
+
 def _say(client, text):
     return client.post("/api/inbound", json={"phone": PHONE, "text": text}).json()["reply"]
 
 
-def test_done_on_the_first_reminder_sends_the_share_link_once(client, db):
+def test_no_share_link_for_a_done_in_the_first_week(client, db):
     uid = _on(client)
     _send_first(db, uid)
+    _say(client, "DONE")
+    assert _shares(db) == [] and not db.get(User, uid).share_nudged_at
+
+
+def test_done_after_a_week_of_reminders_sends_the_share_link_once(client, db):
+    uid = _on(client)
+    first = _send_first(db, uid)
+    _week_ago(db, first)
+    db.expire_all()
+    second = db.scalar(select(Reminder).where(Reminder.user_id == uid, Reminder.id != first.id)
+                       .order_by(Reminder.send_at))
+    dispatch_due(db, now_utc=second.send_at + timedelta(minutes=1))  # a later reminder
     _say(client, "DONE")
     intro, msg = _shares(db)
     code = db.get(User, uid).referral_code
@@ -58,10 +79,12 @@ def test_day_after_the_first_collection_if_they_never_tapped_done(client, db):
     same_day = datetime.combine(first.collection_date, time(11, 7), LONDON)
     assert share_nudges(db, now_utc=same_day) == 0  # collection not over yet
     next_day = same_day + timedelta(days=1)
-    assert share_nudges(db, now_utc=next_day) == 1
+    assert share_nudges(db, now_utc=next_day) == 0  # only a day of reminders so far
+    week_on = datetime.combine(first.collection_date + timedelta(days=8), time(19, 30), LONDON)
+    assert share_nudges(db, now_utc=week_on) == 1
     [msg] = _shares(db)
     assert msg.body.startswith("Hope Binny made bin day a bit easier this week")
-    assert share_nudges(db, now_utc=next_day + timedelta(days=1)) == 0
+    assert share_nudges(db, now_utc=week_on + timedelta(days=7)) == 0
 
 
 def test_no_nudge_for_people_who_opted_out(client, db):
@@ -98,7 +121,7 @@ def test_real_whatsapp_waits_for_the_approved_template(client, db, monkeypatch):
     first = _send_first(db, uid)
     monkeypatch.setattr(messaging, "get_provider", lambda: fake)
     monkeypatch.setattr("app.services.reminders.get_provider", lambda: fake)
-    nxt = datetime.combine(first.collection_date + timedelta(days=1), time(11, 7), LONDON)
+    nxt = datetime.combine(first.collection_date + timedelta(days=8), time(19, 30), LONDON)
     assert share_nudges(db, now_utc=nxt) == 0  # no template yet: nothing sent, still queued
     monkeypatch.setenv("META_SHARE_TEMPLATE", "bin_share")
     get_settings.cache_clear()

@@ -289,17 +289,35 @@ def share_text(user: User) -> str:
     return f"If you want to share {get_settings().brand_name} with neighbours or friends, send them this link: {share_link(user)}"
 
 
-def _wants_share(user: User) -> bool:
-    """One nudge per person, and only to people who said yes to hearing from us (it's promoting
-    the service, so the opt-out at sign-up covers it)."""
+# Nobody is asked to share Binjamin until it has been reminding them for at least a week: their
+# first reminder went out this long ago (a Done on day one doesn't count as having tried it).
+SHARE_AFTER = timedelta(days=7)
+
+
+def _reminded_for_a_week(db: Session, user: User, now_utc: datetime) -> bool:
+    first = db.scalar(select(func.min(Reminder.sent_at)).where(
+        Reminder.user_id == user.id, Reminder.sent_at.is_not(None),
+        Reminder.status.in_([ReminderStatus.sent, ReminderStatus.done, ReminderStatus.snoozed])))
+    if first is None:
+        return False
+    if first.tzinfo is None:
+        first = first.replace(tzinfo=ZoneInfo("UTC"))
+    return first <= now_utc - SHARE_AFTER
+
+
+def _wants_share(db: Session, user: User, now_utc: datetime | None = None) -> bool:
+    """One nudge per person, only to people who said yes to hearing from us (it's promoting the
+    service, so the opt-out at sign-up covers it), and only once they've had a week of reminders."""
+    now_utc = now_utc or datetime.now(ZoneInfo("UTC"))
     return (user.status == UserStatus.active and user.share_nudged_at is None
-            and user.marketing_consent_at is not None and bool(user.phone_e164))
+            and user.marketing_consent_at is not None and bool(user.phone_e164)
+            and _reminded_for_a_week(db, user, now_utc))
 
 
 def share_after_done(db: Session, user: User, phone: str) -> bool:
     """They just tapped Done on a reminder: the product worked, and the chat window is open,
     so the nudge goes now as free text (no template, no charge)."""
-    if not _wants_share(user):
+    if not _wants_share(db, user):
         return False
     send_share(db, phone, user, kind="share")
     user.share_nudged_at = datetime.now(ZoneInfo("UTC"))
@@ -333,7 +351,7 @@ def share_nudges(db: Session, now_utc: datetime | None = None) -> int:
                 .where(Reminder.status.in_([ReminderStatus.sent, ReminderStatus.done,
                                             ReminderStatus.snoozed]),
                        Reminder.collection_date < today))
-    users = [u for u in db.scalars(select(User).where(User.id.in_(reminded))) if _wants_share(u)]
+    users = [u for u in db.scalars(select(User).where(User.id.in_(reminded))) if _wants_share(db, u, now_utc)]
     # Readable copy of the bin_share_sunday template (docs/whatsapp-templates.md, section 4)
     jobs = [(u.phone_e164, [s.brand_name, share_link(u)],
              f"Hope {s.brand_name} made bin day a bit easier this week \U0001F3A9 Know a neighbour "
