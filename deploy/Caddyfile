@@ -40,6 +40,9 @@
 test.alfred.co.uk {
 	encode gzip
 	header X-Robots-Tag "noindex, nofollow, noarchive"
+	# test.alfred.co.uk/quotes: the same page with Founding Member quotes (Tom's version)
+	@quotes path /quotes /quotes/
+	rewrite @quotes /p/alfred-d-qabd791b5
 	rewrite * /p/alfred-d-7icxhyjw
 	reverse_proxy api:8000
 }
