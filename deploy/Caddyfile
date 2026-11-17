@@ -33,3 +33,13 @@
 		respond `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="5"><title>Back in a moment</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;background:#fff;color:#1a1a1a;text-align:center;padding:24px}h1{font-size:28px;margin:0 0 8px}p{margin:0;color:#6e6e73}</style></head><body><div><h1>Back in a moment</h1><p>We're updating Binjamin. This page will refresh by itself.</p></div></body></html>` 503
 	}
 }
+
+# Alfred's survey landing page (version D), temporary for the Prolific run: Faisal points
+# test.alfred.co.uk here until about 1 Dec 2026. The page lives in the app at /p/alfred-d-7icxhyjw
+# (hosted/), so this just serves it at the root of the Alfred address. Remove after the run.
+test.alfred.co.uk {
+	encode gzip
+	header X-Robots-Tag "noindex, nofollow, noarchive"
+	rewrite * /p/alfred-d-7icxhyjw
+	reverse_proxy api:8000
+}
