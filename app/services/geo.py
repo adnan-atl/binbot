@@ -201,7 +201,9 @@ def _fetch_addresses(s, pc: str, paid_ok: bool = True, errors: list[str] | None 
             continue
         if out:
             return out
-    if errors and alert:  # every provider errored (not "no addresses"): residents have to type it
+    # Every provider errored (not "no addresses"): residents have to type it. A background lookup
+    # (filling in a neighbour's calendar) has no resident waiting, so it doesn't page anyone.
+    if errors and alert and not background:
         from app.services import inbox
 
         inbox.alert_address_lookup_failed(pc, errors)
