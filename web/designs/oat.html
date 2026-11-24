@@ -799,7 +799,9 @@ html.cta-green .cta-wa{color:#0B0B0B}
 .map-copy{display:contents}.map-h{order:1;font-size:26px}.map-p{order:2;margin-top:8px;font-size:17px}.map-art{order:3;margin:16px 0 0;width:100%}.map-art svg{width:auto;max-width:100%;margin:0 auto;height:clamp(160px,calc(100svh - 480px),320px);max-height:none}.map-top{order:4;margin:12px 0 0;gap:0}.map-top li{padding:6px 10px;font-size:15px}}
 </style>
 <script>/* A/B test: pink vs green WhatsApp buttons, picked per visit (see cta_variant below) */
-document.documentElement.classList.add('cta-' + ((location.search.match(/[?&]cta=(pink|green)\b/) || [])[1] || (Math.random() < 0.5 ? 'pink' : 'green')));</script>
+document.documentElement.classList.add('cta-' + ((location.search.match(/[?&]cta=(pink|green)\b/) || [])[1] || (Math.random() < 0.5 ? 'pink' : 'green')));
+document.documentElement.classList.add('offers-' + ((location.search.match(/[?&]offers=(in|out)\b/) || [])[1] || (Math.random() < 0.5 ? 'in' : 'out')));</script>
+<style>.offers-in .oo-out,.offers-out .oo-in{display:none!important}</style>
 </head>
 <body>
 
@@ -1120,11 +1122,15 @@ document.documentElement.classList.add('cta-' + ((location.search.match(/[?&]cta
 <input id="tel" class="field" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="7700 900123" aria-describedby="tel-err tel-hint" style="text-transform:none;letter-spacing:0.02em">
 </div>
 <span id="tel-err" class="error" hidden>Enter a UK mobile number, like 7700 900123.</span>
-<span id="tel-hint" class="hint">By continuing, you agree to our <a href="{{TERMS_URL}}" target="_blank" rel="noopener">terms</a> and <a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">privacy policy</a>. {{BRAND}} will message you on WhatsApp about your bins, as well as other household services within the {{PARENT_NAME}} family.</span>
+<span id="tel-hint" class="hint">By continuing, you agree to our <a href="{{TERMS_URL}}" target="_blank" rel="noopener">terms</a> and <a href="{{PRIVACY_URL}}" target="_blank" rel="noopener">privacy policy</a>. {{BRAND}} will message you on WhatsApp about your bins<span class="oo-out">, as well as other household services within the {{PARENT_NAME}} family</span>.</span>
 </div>
-<label style="display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.35;color:var(--grey);cursor:pointer">
+<label class="oo-out" style="display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.35;color:var(--grey);cursor:pointer">
 <input id="no-offers" type="checkbox" style="width:17px;height:17px;margin:0;accent-color:var(--ink);flex:none">
 <span>Tick here to opt out of other {{PARENT_NAME}} household services</span>
+</label>
+<label class="oo-in" style="display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.35;color:var(--grey);cursor:pointer">
+<input id="yes-offers" type="checkbox" style="width:17px;height:17px;margin:0;accent-color:var(--ink);flex:none">
+<span>Tick here to hear about other {{PARENT_NAME}} household services on WhatsApp</span>
 </label>
 <div><button type="button" class="pill solid" id="tel-go">Continue</button></div>
 </div>
@@ -1231,6 +1237,11 @@ Share to WhatsApp
   // so switch-ons can be compared too (docs/analytics.md).
   // (Picked in <head>, before the page draws, so nobody sees the colour switch.)
   var CTA = document.documentElement.classList.contains('cta-green') ? 'green' : 'pink';
+  // A/B test: Alfred offers as opt-out (tick to say no) vs opt-in (tick to say yes), picked per
+  // visit like the CTA test; ?offers=in or ?offers=out forces one. Every event carries offers_variant.
+  var OFFERS = document.documentElement.classList.contains('offers-in') ? 'in' : 'out';
+  function offersOk() { var y = document.getElementById('yes-offers'), n = document.getElementById('no-offers');
+    return OFFERS === 'in' ? !!(y && y.checked) : !(n && n.checked); }
   var phQueue = [], phUser = null;
   function ph() { return PH && window.posthog && window.posthog.__loaded ? window.posthog : null; }
   function track(name, props) {
@@ -1240,7 +1251,7 @@ Share to WhatsApp
   function trackUser(id) {
     if (!PH || !id || id === phUser) return;
     phUser = id;
-    try { if (ph()) ph().identify(id, {}, { signup_design: DESIGN, cta_variant: CTA }); } catch (e) {}
+    try { if (ph()) ph().identify(id, {}, { signup_design: DESIGN, cta_variant: CTA, offers_variant: OFFERS }); } catch (e) {}
   }
   if (PH) {
     var phScript = document.createElement('script');
@@ -1256,8 +1267,8 @@ Share to WhatsApp
           disable_session_recording: true, disable_surveys: true, capture_exceptions: false,
           capture_pageview: 'history_change', capture_pageleave: true,
           loaded: function (p) {
-            p.register({ design: DESIGN, cta_variant: CTA });
-            if (phUser) p.identify(phUser, {}, { signup_design: DESIGN, cta_variant: CTA });
+            p.register({ design: DESIGN, cta_variant: CTA, offers_variant: OFFERS });
+            if (phUser) p.identify(phUser, {}, { signup_design: DESIGN, cta_variant: CTA, offers_variant: OFFERS });
             phQueue.splice(0).forEach(function (q) { p.capture(q[0], q[1]); });
           }
         });
@@ -1637,8 +1648,8 @@ Share to WhatsApp
     if (!ok) { track('phone_invalid'); return; }
     phone = '+44 ' + d.slice(1, 5) + ' ' + d.slice(5);
     if (!API.live || !API.userId) { go('reminders'); return; }
-    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true, marketing_consent: !$('#no-offers').checked }).then(function () {
-      track('phone_added', { offers_ok: !$('#no-offers').checked }); go('reminders'); })
+    api('POST', '/users/' + API.userId + '/phone', { phone: d, consent: true, marketing_consent: offersOk() }).then(function () {
+      track('phone_added', { offers_ok: offersOk(), offers_variant: OFFERS }); go('reminders'); })
       .catch(function (e) { track('phone_failed'); $('#tel-err').textContent = e.message; $('#tel-err').hidden = false; });
   }
   $('#tel-go').addEventListener('click', submitPhone);

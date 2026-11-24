@@ -250,6 +250,15 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
             f"FROM events WHERE properties.design = 'oat' AND notEmpty(toString(properties.cta_variant)) AND {span} GROUP BY 1")
         ab_on = _hogql(f"SELECT toString(person.properties.cta_variant), count() FROM events "
                        f"WHERE event = 'reminders_switched_on' AND {span} GROUP BY 1")
+        # A/B test: Alfred offers opt-out vs opt-in (offers_variant on phone_added): how many gave
+        # a number, how many of those are OK to hear about Alfred, and switch-ons by variant
+        offers_ab = _hogql(
+            "SELECT toString(properties.offers_variant), count(), "
+            "countIf(toString(properties.offers_ok) IN ('true', '1')) "
+            f"FROM events WHERE event = 'phone_added' AND notEmpty(toString(properties.offers_variant)) AND {span} GROUP BY 1")
+        offers_on = _hogql(f"SELECT toString(person.properties.offers_variant), count() FROM events "
+                           f"WHERE event = 'reminders_switched_on' AND notEmpty(toString(person.properties.offers_variant)) "
+                           f"AND {span} GROUP BY 1")
         on = {p for (p,) in _hogql(
             "SELECT DISTINCT toString(person_id) FROM events WHERE event = 'reminders_switched_on' "
             f"AND timestamp >= toDateTime('{_ts(start)}')")}
@@ -267,7 +276,17 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
             "shares": {SHARE_HOW.get(a, a or "?"): int(b) for a, b in shares},
             "calendar_failed": {a or "Unknown council": int(b) for a, b in failed},
             "via": {a or "?": int(b) for a, b in via}, "hello": by_device,
-            "sites": _sites(site_visits, site_on), "ab": _ab(ab_funnel, ab_on)}
+            "sites": _sites(site_visits, site_on), "ab": _ab(ab_funnel, ab_on),
+            "offers": _offers(offers_ab, offers_on)}
+
+
+def _offers(rows: list, on: list) -> dict[str, list[int]]:
+    """{variant: [gave a number, OK with Alfred offers, switched on]} for the opt-in test."""
+    out = {v: [int(n), int(ok), 0] for v, n, ok in rows if v}
+    for v, n in on:
+        if v:
+            out.setdefault(v, [0, 0, 0])[2] = int(n)
+    return out
 
 
 def _ab(funnel: list, on: list) -> dict[str, list[int]]:
@@ -360,6 +379,15 @@ def build(db: Session, day: date) -> str:
     if ph and ph.get("ab"):
         lines.append("*🧪 Button test* _(binjamin.uk, pink vs green)_")
         lines += _ab_lines(ph["ab"])
+        lines.append("")
+
+    # Alfred offers: opt-out vs opt-in
+    if ph and ph.get("offers"):
+        lines.append("*🧪 Offers test* _(opt-out vs opt-in)_")
+        names = {"out": "Opt-out (tick to say no)", "in": "Opt-in (tick to say yes)"}
+        for v, (n, ok, n_on) in sorted(ph["offers"].items(), key=lambda kv: kv[0] != "out"):
+            lines.append(f"{names.get(v, v)}: {n} gave a number → *{ok} OK with offers ({_pct(ok, n)})* "
+                         f"· {n_on} switched on")
         lines.append("")
 
     # Sites and the last step

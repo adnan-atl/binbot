@@ -78,7 +78,8 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
             "calendar_failed": {"Glasgow City": 2}, "via": {"website": 2},
             "hello": {"phone": [4, 3], "computer": [2, 0]},
             "sites": R._sites([("oat", 30), ("og", 10)], [("oat", 1), ("og", 1), ("", 1)]),
-            "ab": R._ab([("pink", 20, 10), ("green", 20, 14)], [("pink", 1), ("green", 2), ("", 1)])}
+            "ab": R._ab([("pink", 20, 10), ("green", 20, 14)], [("pink", 1), ("green", 2), ("", 1)]),
+            "offers": R._offers([("out", 6, 5), ("in", 4, 1)], [("out", 2), ("in", 1), ("", 3)])}
     monkeypatch.setattr(R, "posthog_day", lambda s, e: fake)
     glasgow = db.scalar(select(Council).where(Council.name == "Hackney"))
     glasgow.status = CouncilStatus.broken
@@ -98,6 +99,9 @@ def test_report_with_posthog_and_problem_councils(day, db, monkeypatch):
     assert "💚 Green: 20 visits → 14 to postcode (70%) → *2 switched on (10%)*" in text
     assert "Too early to call" in text
     assert text.index("Pink:") < text.index("Green:")
+    assert "*🧪 Offers test*" in text
+    assert "Opt-out (tick to say no): 6 gave a number → *5 OK with offers (83%)* · 2 switched on" in text
+    assert "Opt-in (tick to say yes): 4 gave a number → *1 OK with offers (25%)* · 1 switched on" in text
     assert "Tapped turn on reminders → switched on: computer 0/2 (0%), phone 3/4 (75%)" in text
     assert "• binjamin.uk: 30 visits → 1 switched on" in text
     assert "• /d/og: 10 visits → 1 switched on" in text and "• WhatsApp only: 1 switched on" in text
