@@ -204,6 +204,12 @@ def _ts(d: datetime) -> str:
     return d.strftime("%Y-%m-%d %H:%M:%S")
 
 
+# The A/B tests are judged on running totals since each began (one day is never enough).
+# Times are UK, as the site's events are.
+BUTTON_TEST_FROM = datetime(2026, 11, 9, tzinfo=ZoneInfo("Europe/London"))
+OFFERS_TEST_FROM = datetime(2026, 11, 24, 19, 0, tzinfo=ZoneInfo("Europe/London"))
+
+
 def posthog_day(start: datetime, end: datetime) -> dict | None:
     """Visits, funnel, sources, share taps and server events for one day. None when PostHog
     isn't set up for reading, or the query fails."""
@@ -211,6 +217,8 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
     if not (s.posthog_personal_api_key and s.posthog_project_id):
         return None
     span = f"timestamp >= toDateTime('{_ts(start)}') AND timestamp < toDateTime('{_ts(end)}')"
+    since = lambda t: f"timestamp >= toDateTime('{_ts(t)}') AND timestamp < toDateTime('{_ts(end)}')"
+    button_span, offers_span = since(BUTTON_TEST_FROM), since(OFFERS_TEST_FROM)
     try:
         counts = _hogql(
             # say_hello_tapped is the old name of turn_on_tapped (renamed Nov 2026): counted as one
@@ -247,18 +255,18 @@ def posthog_day(start: datetime, end: datetime) -> dict | None:
             "SELECT toString(properties.cta_variant), "
             "uniqIf(properties.$session_id, event = '$pageview'), "
             "uniqIf(properties.$session_id, event = 'screen_viewed' AND toString(properties.screen) = 'postcode') "
-            f"FROM events WHERE properties.design = 'oat' AND notEmpty(toString(properties.cta_variant)) AND {span} GROUP BY 1")
+            f"FROM events WHERE properties.design = 'oat' AND notEmpty(toString(properties.cta_variant)) AND {button_span} GROUP BY 1")
         ab_on = _hogql(f"SELECT toString(person.properties.cta_variant), count() FROM events "
-                       f"WHERE event = 'reminders_switched_on' AND {span} GROUP BY 1")
+                       f"WHERE event = 'reminders_switched_on' AND {button_span} GROUP BY 1")
         # A/B test: Alfred offers opt-out vs opt-in (offers_variant on phone_added): how many gave
         # a number, how many of those are OK to hear about Alfred, and switch-ons by variant
         offers_ab = _hogql(
             "SELECT toString(properties.offers_variant), count(), "
             "countIf(toString(properties.offers_ok) IN ('true', '1')) "
-            f"FROM events WHERE event = 'phone_added' AND notEmpty(toString(properties.offers_variant)) AND {span} GROUP BY 1")
+            f"FROM events WHERE event = 'phone_added' AND notEmpty(toString(properties.offers_variant)) AND {offers_span} GROUP BY 1")
         offers_on = _hogql(f"SELECT toString(person.properties.offers_variant), count() FROM events "
                            f"WHERE event = 'reminders_switched_on' AND notEmpty(toString(person.properties.offers_variant)) "
-                           f"AND {span} GROUP BY 1")
+                           f"AND {offers_span} GROUP BY 1")
         on = {p for (p,) in _hogql(
             "SELECT DISTINCT toString(person_id) FROM events WHERE event = 'reminders_switched_on' "
             f"AND timestamp >= toDateTime('{_ts(start)}')")}
@@ -329,6 +337,7 @@ def _vs(now: int, before: int) -> str:
 
 
 AB_ENOUGH = 200  # visits per colour before the button test is worth calling
+OFFERS_ENOUGH = 50  # phone numbers per version before the offers test is worth calling
 
 
 def _ab_lines(ab: dict[str, list[int]]) -> list[str]:
@@ -377,17 +386,19 @@ def build(db: Session, day: date) -> str:
 
     # Button colour A/B test
     if ph and ph.get("ab"):
-        lines.append("*🧪 Button test* _(binjamin.uk, pink vs green)_")
+        lines.append(f"*🧪 Button test* _(binjamin.uk, pink vs green, since {BUTTON_TEST_FROM:%-d %b})_")
         lines += _ab_lines(ph["ab"])
         lines.append("")
 
     # Alfred offers: opt-out vs opt-in
     if ph and ph.get("offers"):
-        lines.append("*🧪 Offers test* _(opt-out vs opt-in)_")
+        lines.append(f"*🧪 Offers test* _(opt-out vs opt-in, since {OFFERS_TEST_FROM:%-d %b})_")
         names = {"out": "Opt-out (tick to say no)", "in": "Opt-in (tick to say yes)"}
         for v, (n, ok, n_on) in sorted(ph["offers"].items(), key=lambda kv: kv[0] != "out"):
             lines.append(f"{names.get(v, v)}: {n} gave a number → *{ok} OK with offers ({_pct(ok, n)})* "
                          f"· {n_on} switched on")
+        if len(ph["offers"]) < 2 or min(x[0] for x in ph["offers"].values()) < OFFERS_ENOUGH:
+            lines.append(f"_Too early to call: needs about {OFFERS_ENOUGH} numbers per version_")
         lines.append("")
 
     # Sites and the last step
