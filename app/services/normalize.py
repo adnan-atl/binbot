@@ -44,7 +44,28 @@ COUNCIL_COLOURS: dict[str, dict[str, BinCategory]] = {
     "E09000022": {
         "green": BinCategory.recycling, "brown": BinCategory.food, "black": BinCategory.general,
     },
+    # Manchester names its bins by colour only (manchester.gov.uk, bins and recycling): blue is
+    # paper and card, brown glass, cans and plastic, green food and garden, grey/black general.
+    "E08000003": {
+        "blue": BinCategory.paper, "brown": BinCategory.recycling, "green": BinCategory.garden,
+        "black": BinCategory.general, "grey": BinCategory.general,
+    },
 }
+
+# What goes in a colour-only bin, in the council's own words, where the general wording for its
+# category would be wrong (Manchester's brown bin isn't paper; its green bin takes food too).
+COUNCIL_PURPOSE: dict[str, dict[str, str]] = {
+    "E08000003": {
+        "blue": "Paper and card", "brown": "Glass, cans and plastic bottles",
+        "green": "Food and garden waste", "black": "General waste", "grey": "General waste",
+    },
+}
+
+
+def council_purpose(label: str, gss_code: str | None) -> str | None:
+    if gss_code and gss_code in COUNCIL_PURPOSE:
+        return COUNCIL_PURPOSE[gss_code].get(colour_of(label.lower()))
+    return None
 
 
 def council_category(label: str, gss_code: str | None) -> BinCategory | None:

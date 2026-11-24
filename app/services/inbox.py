@@ -366,13 +366,21 @@ def context(db: Session, user: User | None, phone: str) -> str:
     if user.property:
         from app.services.signup import bins_out
 
+        from app.models import BinCategory
+        from app.services.normalize import PURPOSE, colour_of, council_purpose
+
+        gss = user.property.council.gss_code if user.property.council else None
         bits = []
         for b in bins_out(db, user):
             if not b.enabled:
                 continue
             when = "daily, no reminders" if b.daily else (
                 f"next {datetime.fromisoformat(b.next).strftime('%a %-d %b')}" if b.next else "no date")
-            bits.append(f"{b.label} ({when})")
+            # A colour-only name ("Brown bin") doesn't say what it's for: add what goes in it
+            what = ""
+            if colour_of(b.label.lower()) and re.fullmatch(r"\w+ (bin|box|bag|caddy|sack)s?", b.label.strip().lower()):
+                what = b.purpose or council_purpose(b.label, gss) or PURPOSE.get(BinCategory(b.category), "")
+            bits.append(f"{b.label}{f' – {what}' if what else ''} ({when})")
         if bits:
             lines.append("Bins: " + ", ".join(bits))
     last = db.scalar(select(Reminder).where(Reminder.user_id == user.id,

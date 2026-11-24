@@ -35,7 +35,7 @@ from app.models import (
 )
 from app.services import checks as checker
 from app.services import geo, sides
-from app.services.normalize import (PURPOSE, categorise, colour_of, colours_text, council_category, council_colour,
+from app.services.normalize import (PURPOSE, categorise, colour_of, colours_text, council_category, council_colour, council_purpose,
                                     council_colour_options, describe_rule)
 
 log = logging.getLogger(__name__)
@@ -769,7 +769,8 @@ def schedule_for(db: Session, prop: Property, with_checks: bool = False):
             "colour_options": [] if colour or parts else council_colour_options(
                 bt.council.gss_code if bt.council else None, bt.category.value),
             "purpose": (f"Recycling: {colours_text(parts, detail=True)}" if parts
-                        else PURPOSE[bt.category]),
+                        else council_purpose(bt.council_label, bt.council.gss_code if bt.council else None)
+                        or PURPOSE[bt.category]),
             "days": rule["days"],
             "frequency": rule["frequency"],
             "next": rule["next"],
