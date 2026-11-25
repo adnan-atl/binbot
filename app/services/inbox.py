@@ -333,6 +333,36 @@ def alert_failed_reminders(db: Session, failures: list) -> None:
          unfurl_links=False)
 
 
+def alert_reminder_watchdog(db: Session, gaps: list, stuck: list, dry: list) -> None:
+    """The reminder watchdog found something wrong (services/reminders.reminder_watchdog):
+    a collection in the next two days with no reminder, a reminder past its time that the
+    dispatcher never picked up, or a resident whose calendar has nothing coming up. One
+    message tagging the team; street, council and the last four digits only."""
+    s = get_settings()
+    if not enabled() or not s.slack_alerts_channel or not (gaps or stuck or dry):
+        return
+
+    def who(user):
+        council = user.property.council.name if user.property and user.property.council else ""
+        return f"…{(user.phone_e164 or '')[-4:]} · " + " · ".join(x for x in (_street(user), council) if x)
+
+    lines = [f":rotating_light: *Reminder watchdog* {s.slack_alert_mention}".rstrip()]
+    if gaps:
+        lines.append(f"*{len(gaps)} collection{'s' if len(gaps) != 1 else ''} in the next 2 days with no "
+                     f"reminder booked* (the hourly top-up should have caught these):")
+        lines += [f"• {who(u)} for {d.strftime('%a %-d %b')}" for u, d in gaps[:10]]
+    if stuck:
+        lines.append(f"*{len(stuck)} reminder{'s' if len(stuck) != 1 else ''} past their time and not sent* "
+                     f"(is the worker running?):")
+        lines += [f"• {who(db.get(User, r.user_id))} for {r.collection_date.strftime('%a %-d %b')}, "
+                  f"due {r.send_at.strftime('%-d %b %H:%M')}" for r in stuck[:10]]
+    if dry:
+        lines.append(f"*{len(dry)} resident{'s' if len(dry) != 1 else ''} with no collections in the next "
+                     f"2 weeks* (their council calendar may have stopped updating):")
+        lines += [f"• {who(u)}" for u in dry[:10]]
+    _api("chat.postMessage", channel=s.slack_alerts_channel, text="\n".join(lines), unfurl_links=False)
+
+
 def _street(user: User | None) -> str:
     """Street and postcode district, never the house number: 'Elm Road, E8'."""
     prop = user.property if user else None

@@ -150,6 +150,50 @@ def top_up_reminders(db: Session) -> int:
     return added
 
 
+WATCH_AHEAD = timedelta(days=2)     # a collection this close must have a reminder booked
+WATCH_LATE = timedelta(minutes=15)  # a booked reminder this far past its time should have gone
+WATCH_DRY = timedelta(days=14)      # nobody's bins go two weeks without a collection
+_watch_last: dict[str, datetime] = {}
+
+
+def reminder_watchdog(db: Session, now_utc: datetime | None = None, alert: bool = True) -> dict:
+    """Hourly, after the top-up: checks the promise end to end and tags the team if any of it
+    is broken. Gaps: a collection in the next 2 days with no reminder. Stuck: a reminder past
+    its time that was never sent (worker down). Dry: an active resident with no collections
+    at all in the next 2 weeks (their calendar stopped updating). Same problem alerted at most
+    every 6 hours, a new problem straight away. Returns what it found."""
+    now_utc = now_utc or datetime.now(ZoneInfo("UTC"))
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=ZoneInfo("UTC"))
+    gaps, dry = [], []
+    for user in db.scalars(select(User).where(User.status == UserStatus.active,
+                                              User.phone_e164.is_not(None))):
+        have = set(db.scalars(select(Reminder.collection_date).where(Reminder.user_id == user.id)))
+        upcoming = [d for d in effective_collections(db, user)
+                    if send_at_for(user, d) >= now_utc.astimezone(ZoneInfo(user.timezone or "Europe/London"))]
+        today = now_utc.astimezone(ZoneInfo(user.timezone or "Europe/London")).date()
+        if not [d for d in upcoming if d <= today + WATCH_DRY] and user.property is not None:
+            dry.append(user)
+        for d in upcoming:
+            if d not in have and send_at_for(user, d) <= now_utc + WATCH_AHEAD:
+                gaps.append((user, d))
+    stuck = db.scalars(select(Reminder).where(Reminder.status == ReminderStatus.scheduled,
+                                              Reminder.send_at < now_utc - WATCH_LATE,
+                                              Reminder.send_at > now_utc - timedelta(days=1))).all()
+    found = {"gaps": len(gaps), "stuck": len(stuck), "dry": len(dry)}
+    key = f"{sorted((u.id, d) for u, d in gaps)}|{sorted(r.id for r in stuck)}|{sorted(u.id for u in dry)}"
+    last = _watch_last.get(key)
+    if alert and (gaps or stuck or dry) and (last is None or now_utc - last > timedelta(hours=6)):
+        _watch_last.clear()
+        _watch_last[key] = now_utc
+        from app.services import inbox
+
+        inbox.alert_reminder_watchdog(db, gaps, stuck, dry)
+    if gaps or stuck:
+        log.warning("reminder_watchdog: %s", found)
+    return found
+
+
 # ---- referrals: credit on activation, news with the next reminder -------------------------------
 
 def credit_referral(db: Session, user: User) -> None:

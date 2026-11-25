@@ -1,11 +1,12 @@
 """Worker process: runs the monitor jobs on a schedule. `python -m app.workers.main`."""
+from datetime import datetime, timezone
 import logging
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.core.db import session_factory
 from app.services import daily_report
-from app.services.reminders import purge_unrecognised, send_fallbacks, share_nudges, signup_nudges, top_up_reminders
+from app.services.reminders import purge_unrecognised, send_fallbacks, share_nudges, signup_nudges, top_up_reminders, reminder_watchdog
 from app.services.retention import purge_inactive
 from app.workers import monitor
 
@@ -36,7 +37,11 @@ def main():
     sched.add_job(_with_db(monitor.dispatch), "interval", minutes=1, id="dispatch")
     sched.add_job(_with_db(monitor.refresh_stale), "interval", hours=1, id="refresh")
     # Book any collection that has no reminder yet (calendars grow after sign-up)
-    sched.add_job(_with_db(top_up_reminders), "cron", minute=20, id="top-up")
+    sched.add_job(_with_db(top_up_reminders), "cron", minute=20, id="top-up",
+                  next_run_time=datetime.now(timezone.utc))  # and once straight after a deploy
+    # Then check the whole promise held: nothing coming up unbooked, nothing stuck, nobody's
+    # calendar run dry. Tags the team in Slack if any of it broke.
+    sched.add_job(_with_db(reminder_watchdog), "cron", minute=35, id="watchdog")
     sched.add_job(_with_db(monitor.health_check), "cron", hour=4, minute=15, id="health")
     sched.add_job(_with_db(monitor.resolve_disputes), "cron", hour=4, minute=45, id="disputes")
     sched.add_job(_with_db(purge_unrecognised), "cron", hour=5, minute=5, id="purge")
