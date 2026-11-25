@@ -5,7 +5,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.core.db import session_factory
 from app.services import daily_report
-from app.services.reminders import purge_unrecognised, send_fallbacks, share_nudges, signup_nudges
+from app.services.reminders import purge_unrecognised, send_fallbacks, share_nudges, signup_nudges, top_up_reminders
 from app.services.retention import purge_inactive
 from app.workers import monitor
 
@@ -35,6 +35,8 @@ def main():
     sched = BlockingScheduler(timezone="Europe/London")
     sched.add_job(_with_db(monitor.dispatch), "interval", minutes=1, id="dispatch")
     sched.add_job(_with_db(monitor.refresh_stale), "interval", hours=1, id="refresh")
+    # Book any collection that has no reminder yet (calendars grow after sign-up)
+    sched.add_job(_with_db(top_up_reminders), "cron", minute=20, id="top-up")
     sched.add_job(_with_db(monitor.health_check), "cron", hour=4, minute=15, id="health")
     sched.add_job(_with_db(monitor.resolve_disputes), "cron", hour=4, minute=45, id="disputes")
     sched.add_job(_with_db(purge_unrecognised), "cron", hour=5, minute=5, id="purge")

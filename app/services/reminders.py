@@ -2,6 +2,7 @@
 Layer 3: reminders = council events + user overrides + user preferences.
 Rebuilt from scratch for a user whenever any input changes (idempotent).
 """
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
@@ -35,6 +36,8 @@ _CATEGORY_NAMES = {
     "recycling": "Recycling", "general": "General waste", "food": "Food waste",
     "garden": "Garden", "glass": "Glass", "paper": "Paper and card", "other": "Bin",
 }
+
+log = logging.getLogger(__name__)
 
 
 def effective_collections(db: Session, user: User) -> dict[date, list[dict]]:
@@ -117,6 +120,34 @@ def rebuild_reminders(db: Session, user: User) -> int:
         n += 1
     db.flush()
     return n
+
+
+def top_up_reminders(db: Session) -> int:
+    """Hourly safety net: book any collection a resident has no reminder for yet. Calendars
+    grow after sign-up (a council publishing further ahead, a round's pattern projected
+    forward, a neighbour's calendar filling a gap) and not every path rebuilds reminders, so
+    without this someone's reminders could simply run out. Only adds: never deletes or moves
+    a booked reminder, so it can't race the dispatcher. Returns how many it booked."""
+    added = 0
+    for user in db.scalars(select(User).where(User.status == UserStatus.active,
+                                              User.phone_e164.is_not(None))):
+        have = set(db.scalars(select(Reminder.collection_date).where(Reminder.user_id == user.id)))
+        now_ = datetime.now(ZoneInfo(user.timezone or "Europe/London"))
+        for d, bins in effective_collections(db, user).items():
+            if d in have:
+                continue
+            send_at = send_at_for(user, d)
+            if send_at < now_:
+                continue
+            db.add(Reminder(user_id=user.id, collection_date=d, send_at=send_at,
+                            bins=[{"label": b["label"], "category": b["category"], "colour": b.get("colour"),
+                                   "colours": b.get("colours") or []}
+                                  for b in bins]))
+            added += 1
+    db.commit()
+    if added:
+        log.info("top_up_reminders: booked %d missing reminders", added)
+    return added
 
 
 # ---- referrals: credit on activation, news with the next reminder -------------------------------
