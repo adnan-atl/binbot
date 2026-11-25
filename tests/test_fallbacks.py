@@ -313,7 +313,7 @@ def test_no_collections_answer_still_projects(client, db, monkeypatch):
     db.commit()
     state["error"] = NoCollectionsForAddress("adapter returned no collections")
     asked = []
-    monkeypatch.setattr(monitor, "verify_round", lambda db, p: asked.append(p.round_key))
+    monkeypatch.setattr(monitor, "rescue_round", lambda db, p, wide=False: asked.append(p.round_key))
     stats = monitor.refresh_stale(db)
     assert stats["failed"] == 1 and stats["projected"]
     assert asked == [prop.round_key]  # the neighbours were asked before projecting

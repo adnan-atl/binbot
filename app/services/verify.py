@@ -53,7 +53,10 @@ def _week(today: date) -> int:
     return today.toordinal() // 7
 
 
-def _neighbours(db: Session, prop: Property) -> list:
+WIDE_NEIGHBOURS = 6  # a rescue for a round with residents tries this many homes
+
+
+def _neighbours(db: Session, prop: Property, wide: bool = False) -> list:
     """
     Other homes on the postcode, never this one, two spread-out picks (first and middle).
     Residents on the round come first: theirs are the calendars that matter. The picks
@@ -78,6 +81,8 @@ def _neighbours(db: Session, prop: Property) -> list:
             continue
         seen.add(h.house_number)
         pool.append(h)
+    if wide:
+        return pool[:WIDE_NEIGHBOURS]
     if len(pool) < 2:
         return pool
     start = _week(date.today()) % len(pool)
@@ -210,7 +215,7 @@ def verify_round(db: Session, prop: Property, confirm: bool = True) -> dict:
     return result
 
 
-def rescue_round(db: Session, prop: Property) -> bool:
+def rescue_round(db: Session, prop: Property, wide: bool = False) -> bool:
     """
     This address's lookup failed. Before giving up (and handing the resident a blank form),
     try the same council for one or two neighbours on the postcode: same street, same lorry.
@@ -222,7 +227,7 @@ def rescue_round(db: Session, prop: Property) -> bool:
     if not council or council.status == CouncilStatus.unsupported:
         return False
     first, agreed, differed = None, [], []
-    for n in _neighbours(db, prop):
+    for n in _neighbours(db, prop, wide=wide):
         items = _ask(council, prop, n)
         if items is None:
             continue

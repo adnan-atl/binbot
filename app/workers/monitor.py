@@ -33,7 +33,7 @@ from app.models import (
 from app.providers.messaging import send_message, send_template_message, uses_template
 from app.services import signup, split
 from app.services.reminders import dispatch_due, rebuild_reminders
-from app.services.verify import verify_round
+from app.services.verify import rescue_round, verify_round
 from app.services.schedule import (PROJECT_AHEAD, lapsed_bins, project_round,
                                    publishes_next_only, refresh_round, representative_for)
 
@@ -112,10 +112,11 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
             # Council down, scraper broken or "no collections" for a round that had them:
             # carry its pattern forward so reminders don't just stop (see project_round).
             if key in running_out or key in stale_keys:
-                # Southwark fails for some addresses and answers for the house next door: ask
-                # the neighbours first (at most weekly, verify.py), then carry the pattern on.
+                # Southwark fails for some addresses and answers for the house next door: take
+                # a neighbour's calendar first (as at sign-up), then carry the pattern on.
                 try:
-                    verify_round(db, prop)
+                    if rescue_round(db, prop, wide=True):
+                        stats["rescued"] = stats.get("rescued", 0) + 1
                     db.commit()
                 except Exception:  # noqa: BLE001 - a neighbour lookup must not stop the run
                     db.rollback()
