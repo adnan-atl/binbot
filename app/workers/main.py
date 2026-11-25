@@ -29,16 +29,24 @@ def _with_db(fn):
     return run
 
 
+def refresh_then_book(db):
+    """Refresh calendars, then book reminders for anything new straight away rather than
+    waiting for the :20 top-up (a round re-asked at 6pm can have a collection tomorrow)."""
+    stats = monitor.refresh_stale(db)
+    stats["booked"] = top_up_reminders(db)
+    return stats
+
+
 def main():
     from app.core.errors import init_errors
 
     init_errors("worker")
     sched = BlockingScheduler(timezone="Europe/London")
     sched.add_job(_with_db(monitor.dispatch), "interval", minutes=1, id="dispatch")
-    sched.add_job(_with_db(monitor.refresh_stale), "interval", hours=1, id="refresh")
+    sched.add_job(_with_db(refresh_then_book), "interval", hours=1, id="refresh",
+                  next_run_time=datetime.now(timezone.utc))
     # Book any collection that has no reminder yet (calendars grow after sign-up)
-    sched.add_job(_with_db(top_up_reminders), "cron", minute=20, id="top-up",
-                  next_run_time=datetime.now(timezone.utc))  # and once straight after a deploy
+    sched.add_job(_with_db(top_up_reminders), "cron", minute=20, id="top-up")
     # Then check the whole promise held: nothing coming up unbooked, nothing stuck, nobody's
     # calendar run dry. Tags the team in Slack if any of it broke.
     sched.add_job(_with_db(reminder_watchdog), "cron", minute=35, id="watchdog")

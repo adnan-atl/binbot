@@ -4,6 +4,7 @@ Rebuilt from scratch for a user whenever any input changes (idempotent).
 """
 import logging
 import re
+import threading
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from urllib.parse import quote
@@ -122,7 +123,15 @@ def rebuild_reminders(db: Session, user: User) -> int:
     return n
 
 
+_top_up_lock = threading.Lock()  # the :20 job and the refresh job's top-up never overlap
+
+
 def top_up_reminders(db: Session) -> int:
+    with _top_up_lock:
+        return _top_up(db)
+
+
+def _top_up(db: Session) -> int:
     """Hourly safety net: book any collection a resident has no reminder for yet. Calendars
     grow after sign-up (a council publishing further ahead, a round's pattern projected
     forward, a neighbour's calendar filling a gap) and not every path rebuilds reminders, so
