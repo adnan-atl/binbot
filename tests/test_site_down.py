@@ -52,3 +52,27 @@ def test_no_collections_on_a_working_site_stays_no_collections(monkeypatch):
     _page(monkeypatch, 200, "<h1>Your bin days</h1>")
     with pytest.raises(NoCollectionsForAddress):
         UKBCDAdapter(STROUD)._fetch_direct(LookupInput(postcode="GL10 3BH", uprn="1"))
+
+
+SOUTHWARK = AdapterSpec(module="SouthwarkCouncil", gss_code="E09000028", name="Southwark",
+                        url="https://services.southwark.gov.uk/bins/lookup/XXXXXXXX",
+                        placeholder="XXXXXXXX", needs_uprn=True)
+
+
+def test_error_on_the_address_page_is_down_not_no_collections(monkeypatch):
+    """Southwark's front page is fine; every address page says it couldn't get the schedules.
+    That's the council down (retry, project the pattern), not 'nothing at this address'."""
+    seen = []
+
+    def get(url, **k):
+        seen.append(url)
+        return httpx.Response(200, text="<p class='error'>An error has occurred whilst trying "
+                                        "to get the collection schedules, please retry later.</p>")
+
+    monkeypatch.setattr(httpx, "get", get)
+    monkeypatch.setattr(UKBCDAdapter, "_fetch_once",
+                        lambda self, lookup: (_ for _ in ()).throw(NoCollectionsForAddress("none")))
+    with pytest.raises(AdapterError) as e:
+        UKBCDAdapter(SOUTHWARK)._fetch_direct(LookupInput(postcode="SE22 9NE", uprn="123"))
+    assert not isinstance(e.value, NoCollectionsForAddress)
+    assert seen[0].endswith("/bins/lookup/123")

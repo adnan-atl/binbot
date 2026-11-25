@@ -112,6 +112,14 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
             # Council down, scraper broken or "no collections" for a round that had them:
             # carry its pattern forward so reminders don't just stop (see project_round).
             if key in running_out or key in stale_keys:
+                # Southwark fails for some addresses and answers for the house next door: ask
+                # the neighbours first (at most weekly, verify.py), then carry the pattern on.
+                try:
+                    verify_round(db, prop)
+                    db.commit()
+                except Exception:  # noqa: BLE001 - a neighbour lookup must not stop the run
+                    db.rollback()
+                    log.exception("refresh_stale: neighbour fill failed for %s", key)
                 stats["projected"] += keep_going(db, prop, today)
                 db.commit()
             continue

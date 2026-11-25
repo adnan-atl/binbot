@@ -87,7 +87,26 @@ def paon_alternatives(house_number: str | None) -> list[str]:
 
 _DOWN_WORDS = ("planned maintenance", "maintenance in progress", "under maintenance",
                "down for maintenance", "scheduled maintenance", "temporarily unavailable",
-               "service unavailable", "site is currently offline", "currently unavailable")
+               "service unavailable", "site is currently offline", "currently unavailable",
+               # Southwark since 11 Nov 2026: "An error has occurred whilst trying to get the
+               # collection schedules, please retry later." on a 200 page
+               "please retry later", "error has occurred whilst trying to get the collection")
+
+
+def _page_url(spec: AdapterSpec, lookup: LookupInput) -> str | None:
+    """The page the scraper read for this home, when its address is in the URL: a council can
+    answer its front page fine and fail on every address lookup (Southwark)."""
+    from urllib.parse import quote
+
+    if not lookup.uprn:
+        return None
+    if spec.url_template:
+        address = lookup.address_line or " ".join(filter(None, [lookup.house_number, lookup.postcode]))
+        return spec.url_template.format(uprn=lookup.uprn, postcode=quote(lookup.postcode or ""),
+                                        address=quote(address or ""))
+    if spec.placeholder and spec.url:
+        return spec.url.replace(spec.placeholder, lookup.uprn)
+    return None
 
 
 def site_down(url: str | None) -> str | None:
@@ -160,7 +179,7 @@ class UKBCDAdapter:
             # A council's maintenance page has no dates on it either, and the scraper reads that
             # as "nothing for this address" (Stroud, 10 Nov 2026). Look at the page before
             # sending the resident to add their bins by hand.
-            why = site_down(self.spec.url)
+            why = site_down(_page_url(self.spec, lookup)) or site_down(self.spec.url)
             if why:
                 raise AdapterError(f"{self.name}: council website is down ({why})") from e
             raise
