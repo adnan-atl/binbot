@@ -22,6 +22,7 @@ from app.core.config import get_settings
 from app.models import (
     BinType,
     ChangeLog,
+    CollectionEvent,
     Council,
     CouncilStatus,
     Property,
@@ -33,8 +34,8 @@ from app.providers.messaging import send_message, send_template_message, uses_te
 from app.services import signup, split
 from app.services.reminders import dispatch_due, rebuild_reminders
 from app.services.verify import verify_round
-from app.services.schedule import (lapsed_bins, publishes_next_only, refresh_round,
-                                   representative_for)
+from app.services.schedule import (PROJECT_AHEAD, lapsed_bins, project_round,
+                                   publishes_next_only, refresh_round, representative_for)
 
 log = logging.getLogger(__name__)
 
@@ -88,17 +89,31 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
         .where(User.status == UserStatus.active)
     ).all()) - set(db.scalars(select(last_ok.c.round_key)).all())
 
-    stats = {"checked": 0, "changed": 0, "failed": 0, "notified": 0}
-    for key in stale_keys | never:
+    # Rounds whose known dates are about to run out, refreshed weekly or not: ask again now
+    # (Lambeth answered on collection day with that day as the latest date, and nobody
+    # asked again for a week). At most every RETRY_DRY, so a council that's down isn't
+    # hammered.
+    running_out = _running_out(db, today)
+
+    stats = {"checked": 0, "changed": 0, "failed": 0, "notified": 0, "projected": 0}
+    for key in stale_keys | never | running_out:
         prop = representative_for(db, key)
         if (not prop or not prop.council or prop.council.status == CouncilStatus.unsupported
                 or prop.council.gss_code in BLOCKED):
+            if prop and key in running_out:  # can't ask the council: carry the pattern on
+                stats["projected"] += keep_going(db, prop, today)
+                db.commit()
             continue
         lapsed = lapsed_bins(db, key, today)
         res = refresh_round(db, prop)
         stats["checked"] += 1
         if res.error:
             stats["failed"] += 1
+            # Council down, scraper broken or "no collections" for a round that had them:
+            # carry its pattern forward so reminders don't just stop (see project_round).
+            if key in running_out or key in stale_keys:
+                stats["projected"] += keep_going(db, prop, today)
+                db.commit()
             continue
         if lapsed:
             signup.restore_lapsed_bins(db, key, lapsed)
@@ -107,8 +122,56 @@ def refresh_stale(db: Session, today: date | None = None) -> dict:
         if res.changed:
             stats["changed"] += 1
             stats["notified"] += _propagate_change(db, prop, res.diff)
+        if key in running_out and _last_date(db, key) < today + RUNWAY:
+            # It answered, but with nothing further ahead than before.
+            stats["projected"] += keep_going(db, prop, today, ahead=RUNWAY)
+            db.commit()
     db.commit()
+    if stats["projected"]:
+        log.warning("refresh_stale: projected %d dates for quiet rounds", stats["projected"])
     return stats
+
+
+RUNWAY = timedelta(days=3)       # a round with users whose dates end sooner than this is re-asked
+RETRY_DRY = timedelta(hours=6)   # ...at most this often
+
+
+def _last_date(db: Session, key: str) -> date:
+    return db.scalar(select(func.max(CollectionEvent.date))
+                     .where(CollectionEvent.round_key == key)) or date.min
+
+
+def _running_out(db: Session, today: date) -> set[str]:
+    keys = set(db.scalars(
+        select(Property.round_key).join(User, User.property_id == Property.id)
+        .where(User.status == UserStatus.active)).all())
+    if not keys:
+        return set()
+    last = dict(db.execute(
+        select(CollectionEvent.round_key, func.max(CollectionEvent.date))
+        .where(CollectionEvent.round_key.in_(keys)).group_by(CollectionEvent.round_key)).all())
+    tried = dict(db.execute(
+        select(Snapshot.round_key, func.max(Snapshot.fetched_at))
+        .where(Snapshot.round_key.in_(keys), Snapshot.source != "projected")
+        .group_by(Snapshot.round_key)).all())
+    cut = datetime.now(timezone.utc) - RETRY_DRY
+    out = set()
+    for k in keys:
+        if k not in last or last[k] >= today + RUNWAY:
+            continue  # no dates at all is the "never" path, or a resident's own rule
+        t = tried.get(k)
+        if t is not None and t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        if t is None or t < cut:
+            out.add(k)
+    return out
+
+
+def keep_going(db: Session, prop: Property, today: date, ahead: timedelta | None = None) -> int:
+    """Project the round forward if its dates end within `ahead` (default PROJECT_AHEAD)."""
+    if _last_date(db, prop.round_key) >= today + (ahead or PROJECT_AHEAD):
+        return 0
+    return project_round(db, prop, today)
 
 
 def _propagate_change(db: Session, prop: Property, diff: dict) -> int:

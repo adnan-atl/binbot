@@ -34,6 +34,7 @@ from app.models import (
     now,
 )
 from app.services import checks as checker
+from app.services.profiles import profile_for
 from app.services import geo, sides
 from app.services.normalize import (PURPOSE, categorise, colour_of, colours_text, council_category, council_colour, council_purpose,
                                     council_colour_options, describe_rule)
@@ -358,9 +359,11 @@ def project_round(db: Session, prop: Property, today: date | None = None) -> int
     for e in events:
         by_bin.setdefault(e.bin_type_id, set()).add(e.date)
     planned: list[tuple[str, date]] = []
+    prof = profile_for(prop.council.gss_code if prop.council else None, today)
+    policy = {s.category: s.every_days for s in (prof.streams if prof else ()) if s.every_days}
     for bt_id, dates in by_bin.items():
-        interval, evidence = checker.observe(sorted(dates))
-        if not interval or evidence < 2:
+        interval = _project_interval(db, prop, bt_id, dates, policy)
+        if not interval:
             continue
         d = max(dates) + timedelta(days=interval)
         while d <= horizon:
@@ -381,6 +384,25 @@ def project_round(db: Session, prop: Property, today: date | None = None) -> int
                      diff={"events": len(planned), "until": horizon.isoformat()}))
     db.flush()
     return len(planned)
+
+
+def _project_interval(db: Session, prop: Property, bt_id: str, dates: set[date],
+                      policy: dict[str, int]) -> int | None:
+    """How often to carry a bin forward, most trusted first: its own dates (two gaps or more),
+    the council's stated policy for that kind of bin, the same bin on the council's other
+    rounds, then its own single gap. A new resident's round has only a week or two of dates,
+    and those are exactly the rounds that went quiet in Nov 2026 when councils stopped
+    answering. A bin with one date and nothing else to go on isn't guessed: the watchdog
+    reports the round instead."""
+    interval, evidence = checker.observe(sorted(dates))
+    if interval and evidence >= 2:
+        return interval
+    bt = db.get(BinType, bt_id)
+    cat = getattr(bt.category, "value", bt.category) if bt else None
+    if cat in policy:
+        return policy[cat]
+    learned = learned_interval(db, bt_id, exclude_round=prop.round_key)
+    return learned or interval
 
 
 def _hash(items: list[RawCollection]) -> str:
@@ -600,6 +622,19 @@ def _apply_events(db: Session, round_key: str, council: Council, items: list[Raw
     for key in want.keys() & borrowed.keys():
         borrowed[key].snapshot_id = snap.id
         have[key] = borrowed[key]
+    # Dates we projected while the council was quiet give way to the council's own, up to as
+    # far ahead as this fetch tells us about that bin; beyond that they stay until it does.
+    projected = set(db.scalars(select(Snapshot.id).where(Snapshot.round_key == round_key,
+                                                         Snapshot.source == "projected")).all())
+    reach: dict[str, date] = {}
+    for bt_id, d in want:
+        reach[bt_id] = max(d, reach.get(bt_id, d))
+    unprojected = []
+    for key, e in borrowed.items():
+        if key not in want and e.snapshot_id in projected and key[0] in reach \
+                and key[1] <= reach[key[0]]:
+            unprojected.append({"bin_type_id": key[0], "date": key[1].isoformat()})
+            db.delete(e)
 
     added, removed, moved = [], [], []
     for key in want.keys() - have.keys():
@@ -618,7 +653,10 @@ def _apply_events(db: Session, round_key: str, council: Council, items: list[Raw
             removed.append({"bin_type_id": key[0], "date": key[1].isoformat()})
         db.delete(have[key])
     db.flush()
-    return {"added": added, "removed": removed, "moved": moved}
+    diff = {"added": added, "removed": removed, "moved": moved}
+    if unprojected:
+        diff["unprojected"] = unprojected
+    return diff
 
 
 def _mark_failure(db: Session, council: Council, error: str, retryable: bool):

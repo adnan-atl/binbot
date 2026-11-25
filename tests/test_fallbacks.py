@@ -196,3 +196,121 @@ def test_meta_webhook_verification(client, monkeypatch):
     assert ok.status_code == 200 and ok.text == "123"
     assert client.get("/webhooks/meta", params={"hub.mode": "subscribe",
                                                 "hub.verify_token": "nope"}).status_code == 403
+
+def _history(db, prop, dates, label="Refuse"):
+    """Put past dates back as weekly refreshes would (the signup fetch keeps only future ones)."""
+    bt = db.scalar(select(CollectionEvent.bin_type_id).where(CollectionEvent.round_key == prop.round_key))
+    for d in dates:
+        if d < date.today():
+            db.add(CollectionEvent(round_key=prop.round_key, bin_type_id=bt, date=d))
+    db.commit()
+    return bt
+
+
+def _future(db, prop):
+    return sorted(e.date for e in db.scalars(select(CollectionEvent).where(
+        CollectionEvent.round_key == prop.round_key, CollectionEvent.date >= date.today())))
+
+
+def test_new_round_with_one_gap_still_projects(client, db, monkeypatch):
+    """A resident who joined a week ago: last week's and this week's date only. When the
+    council stops answering, a week's gap is enough to keep reminders going (Lambeth, Nov 26)."""
+    today = date.today()
+    dates = [today - timedelta(days=6), today + timedelta(days=1)]
+    prop, state = _signup(client, db, monkeypatch, [RawCollection("Refuse", d) for d in dates])
+    _history(db, prop, dates)
+    state["error"] = AdapterError("site down", retryable=True)
+    schedule.refresh_round(db, prop)
+    future = _future(db, prop)
+    assert len(future) >= 4 and all((b - a).days == 7 for a, b in zip(future, future[1:]))
+
+
+def test_one_date_uses_the_council_policy(client, db, monkeypatch):
+    from app.services.profiles import CouncilProfile, Stream
+
+    today = date.today()
+    prop, state = _signup(client, db, monkeypatch, [RawCollection("Refuse", today + timedelta(days=2))])
+    bt = db.scalar(select(CollectionEvent.bin_type_id))
+    from app.models import BinType
+    cat = getattr(db.get(BinType, bt).category, "value", None)
+    monkeypatch.setattr(schedule, "profile_for", lambda gss, on=None: CouncilProfile(
+        effective_from=date(2024, 1, 1), source="test", streams=(Stream(cat, "rubbish", 14),)))
+    state["error"] = AdapterError("site down", retryable=True)
+    schedule.refresh_round(db, prop)
+    future = _future(db, prop)
+    assert len(future) >= 2 and all((b - a).days == 14 for a, b in zip(future, future[1:]))
+
+
+def test_council_dates_replace_conflicting_projections(client, db, monkeypatch):
+    today = date.today()
+    dates = [today - timedelta(days=6), today + timedelta(days=1)]
+    prop, state = _signup(client, db, monkeypatch, [RawCollection("Refuse", d) for d in dates])
+    _history(db, prop, dates)
+    state["error"] = AdapterError("site down", retryable=True)
+    schedule.refresh_round(db, prop)
+    projected = _future(db, prop)[1:]
+    # Back up, and the next collection actually moved a day later (bank holiday).
+    state["error"] = None
+    moved = projected[0] + timedelta(days=1)
+    state["items"] = [RawCollection("Refuse", dates[1]), RawCollection("Refuse", moved)]
+    res = schedule.refresh_round(db, prop)
+    future = _future(db, prop)
+    assert projected[0] not in future and moved in future
+    assert projected[1] in future  # beyond what the council told us: kept for now
+    assert res.diff.get("unprojected") and not res.diff.get("removed")
+
+
+def test_refresh_stale_reasks_a_round_that_ran_out(client, db, monkeypatch):
+    """Lambeth answered on collection day with that day as its latest date, and the weekly
+    refresh wasn't due for six days. A round about to run out is asked again (at most every
+    6 hours) and, if the council has nothing newer, carried forward."""
+    from datetime import datetime, timezone
+
+    from app.models import Snapshot
+    from app.workers import monitor
+
+    today = date.today()
+    dates = [today - timedelta(days=7), today]
+    prop, state = _signup(client, db, monkeypatch, [RawCollection("Refuse", d) for d in dates])
+    _history(db, prop, dates)
+    uid = db.scalar(select(User.id))
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    for s in db.scalars(select(Snapshot).where(Snapshot.round_key == prop.round_key)):
+        s.fetched_at = datetime.now(timezone.utc) - timedelta(hours=7)
+    db.commit()
+    asked = []
+    real = schedule.fetch_collections
+
+    def fetch(council, p):
+        if getattr(p, "round_key", None):  # not the extra homes asked about other bins
+            asked.append(p.round_key)
+        return real(council, p)
+
+    monkeypatch.setattr(schedule, "fetch_collections", fetch)
+    stats = monitor.refresh_stale(db)
+    assert asked == [prop.round_key]
+    assert stats["projected"] and _future(db, prop)[-1] > today + timedelta(days=14)
+    monitor.refresh_stale(db)
+    assert len(asked) == 1  # just asked: not again for 6 hours
+
+
+def test_no_collections_answer_still_projects(client, db, monkeypatch):
+    from app.adapters.base import NoCollectionsForAddress
+    from app.models import Snapshot
+    from app.workers import monitor
+    from datetime import datetime, timezone
+
+    today = date.today()
+    dates = [today - timedelta(days=7), today + timedelta(days=1)]
+    prop, state = _signup(client, db, monkeypatch, [RawCollection("Refuse", d) for d in dates])
+    _history(db, prop, dates)
+    uid = db.scalar(select(User.id))
+    client.post(f"/api/users/{uid}/phone", json={"phone": "07700900123", "consent": True})
+    client.post(f"/api/users/{uid}/reminders", json={"mode": "night_before", "time": "19:00"})
+    for s in db.scalars(select(Snapshot).where(Snapshot.round_key == prop.round_key)):
+        s.fetched_at = datetime.now(timezone.utc) - timedelta(hours=7)
+    db.commit()
+    state["error"] = NoCollectionsForAddress("adapter returned no collections")
+    stats = monitor.refresh_stale(db)
+    assert stats["failed"] == 1 and stats["projected"]
