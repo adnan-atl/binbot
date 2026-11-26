@@ -87,13 +87,12 @@ def test_day_after_the_first_collection_if_they_never_tapped_done(client, db):
     assert share_nudges(db, now_utc=week_on + timedelta(days=7)) == 0
 
 
-def test_no_nudge_for_people_who_opted_out(client, db):
+def test_nudge_goes_to_people_who_said_no_to_alfred_offers(client, db):
+    """The sign-up tick box is about other Alfred services; sharing Binjamin isn't one."""
     uid = _on(client, marketing=False)
     first = _send_first(db, uid)
-    _say(client, "DONE")
-    nxt = datetime.combine(first.collection_date + timedelta(days=1), time(11, 7), LONDON)
-    assert share_nudges(db, now_utc=nxt) == 0
-    assert _shares(db) == []
+    week_on = datetime.combine(first.collection_date + timedelta(days=8), time(19, 30), LONDON)
+    assert share_nudges(db, now_utc=week_on) == 1
 
 
 def test_no_nudge_before_any_reminder_went_out(client, db):

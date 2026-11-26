@@ -142,7 +142,7 @@ riding on the Done / Snooze reply. Once approved, set `META_REMINDER_NEWS_TEMPLA
 Sent once, at 7:30pm on the first Sunday after someone has had a week of reminders (their first
 reminder went out at least 7 days earlier), unless they already got the link by tapping **Done**
 on a reminder after that first week (that one goes free, inside the chat
-window). Only to people who didn't opt out of updates at sign-up. Until it's approved, leave
+window). Goes whatever they ticked about other Alfred services at sign-up. Until it's approved, leave
 `META_SHARE_TEMPLATE` empty: the Done path still works, and everyone waiting gets the template
 on the first Sunday evening after you set it.
 

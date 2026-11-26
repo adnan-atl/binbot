@@ -390,12 +390,12 @@ def _reminded_for_a_week(db: Session, user: User, now_utc: datetime) -> bool:
 
 
 def _wants_share(db: Session, user: User, now_utc: datetime | None = None) -> bool:
-    """One nudge per person, only to people who said yes to hearing from us (it's promoting the
-    service, so the opt-out at sign-up covers it), and only once they've had a week of reminders."""
+    """One nudge per person, once they've had a week of reminders. It's about Binjamin itself,
+    so it goes whatever they said about other Alfred services at sign-up (marketing_consent_at
+    covers those offers, not this)."""
     now_utc = now_utc or datetime.now(ZoneInfo("UTC"))
     return (user.status == UserStatus.active and user.share_nudged_at is None
-            and user.marketing_consent_at is not None and bool(user.phone_e164)
-            and _reminded_for_a_week(db, user, now_utc))
+            and bool(user.phone_e164) and _reminded_for_a_week(db, user, now_utc))
 
 
 def share_after_done(db: Session, user: User, phone: str) -> bool:
@@ -605,13 +605,11 @@ def local_number() -> str:
 
 def welcome_share(user: User) -> str | None:
     """The fourth welcome message: asks them to forward the next one (share_message, with their
-    tracked link) to neighbours or the street group. Only for people who didn't opt out of
-    hearing from us, and only once there's a business number. It counts as their one share
+    tracked link) to neighbours or the street group. Only once there's a business number. It counts as their one share
     nudge (share_nudges). Off unless SHARE_IN_WELCOME: asking before Binjamin has reminded them
     of anything was too soon (they share after their first Done, or on Sunday evening)."""
     s = get_settings()
-    if not s.share_in_welcome or not re.sub(r"\D", "", s.meta_display_number) \
-            or user.marketing_consent_at is None:
+    if not s.share_in_welcome or not re.sub(r"\D", "", s.meta_display_number):
         return None
     return SHARE_INTRO
 
